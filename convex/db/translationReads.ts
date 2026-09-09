@@ -567,13 +567,30 @@ export function canonicalSatisfies(
   if (formId !== AUTO) {
     const form = rendering.form;
     if (!form || canonical.renderedPoliteness === undefined) return false;
-    if (canonical.renderedPoliteness === 'unmarked') return false;
     // The stamp is a global level; the form it names must be the requested
     // one (a tu sentence satisfies both "casual" and "polite" on Spain
     // Spanish). Looked up through the row's own dialect, like the stamp.
     const config = getPolitenessConfig(classificationLanguageForRow(canonical));
     if (!config) return false;
-    if (config.forms[canonical.renderedPoliteness].id !== form.id) return false;
+    if (canonical.renderedPoliteness === 'unmarked') {
+      // An ADDRESS language marks politeness only through the word for
+      // "you", so a wording the classifier stamped `unmarked` has nothing a
+      // rewrite could change: "Hola." is the same sentence at tú and at
+      // usted, and the canonical row already IS every form. Treating that
+      // as a gap made every such sentence sit on "updating" for good in the
+      // preview and buy one LLM rewrite per card to rediscover it
+      // (2026-09-09, the pre-A1 greetings).
+      //
+      // The other markings are a real gap: a predicate, particle or pronoun
+      // language can have its carrier ADDED by a rewrite (Thai gaining
+      // ครับ, Japanese gaining です・ます), so `unmarked` there means the
+      // form is genuinely absent and worth asking for. Same shape as the
+      // gender axis above, where `unmarked` always satisfies because no
+      // rewrite can introduce first-person marking that is not there.
+      if (config.marking !== 'address') return false;
+    } else if (config.forms[canonical.renderedPoliteness].id !== form.id) {
+      return false;
+    }
   }
   return true;
 }

@@ -14,11 +14,7 @@
 
 import { APICallError, generateText } from 'ai';
 import { romanizeLocal, usesLlmRomanization } from '../lib/localRomanization';
-import {
-  OPENROUTER_MODELS,
-  ROMANIZATION_PROVIDER,
-  ROMANIZATION_REASONING,
-} from '../config/aiModels';
+import { OPENROUTER_MODELS, ROMANIZATION_REASONING } from '../config/aiModels';
 import { tryGetOpenRouter } from '../lib/openrouter';
 import { TransientAnnotationError } from '../lib/textAnnotations';
 import {
@@ -382,16 +378,13 @@ async function romanizeViaLlm(
         prompt: text,
         temperature: 0,
         maxOutputTokens: 1_000,
+        // No `provider` block: the model slug carries `:floor`, which sorts
+        // the endpoints by price and makes the flex tier eligible. Pinning
+        // one endpoint with `allow_fallbacks: false` used to fail the row
+        // outright whenever flex was busy (2026-09-09).
         providerOptions: {
           openrouter: {
             reasoning: { effort: ROMANIZATION_REASONING },
-            // Spread into a mutable shape: the const assertion on
-            // ROMANIZATION_PROVIDER makes `order` a readonly tuple, which
-            // is not a JSONValue.
-            provider: {
-              order: [...ROMANIZATION_PROVIDER.order],
-              allow_fallbacks: ROMANIZATION_PROVIDER.allow_fallbacks,
-            },
           },
         },
       });

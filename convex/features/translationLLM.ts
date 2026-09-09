@@ -127,7 +127,7 @@ export type LlmTranslationResult =
  * 'neutral' register is intentionally treated as informal in the instructions
  * so German doesn't default to Sie, French to vous, etc.
  */
-const PROMPT_B_INSTRUCTIONS = `Use the supplied speaker, referent, and (if present) addressee gender for any grammatical agreement (verb conjugation, adjective inflection, pronoun choice, gendered noun forms) the target language requires. The referent_gender drives third-party noun forms like German Übersetzer/-in, French traducteur/-rice, Spanish profesor/-a. Use the requested register. Three levels exist: casual (the familiar T-form: du/tú/tu/ты, Japanese plain form with 君 or the name for "you", Korean 반말), polite (the level that is safe with anyone: vous/usted/вы/आप, Japanese です・ます, Korean 해요체) and formal (the distance or honorific level: Sie, keigo 尊敬語・謙譲語, Korean 합쇼체). 'informal' and 'neutral' both mean casual; 'formal' means polite. Never the aggressive おまえ. DO NOT default to the polite form when the register is neutral, unless a required politeness form below says otherwise. If the target language does not grammatically encode a given feature, translate naturally and ignore it. Do not output any field as a literal word. Only return one translation. Do not return multiple alternative translations or explanations — when several renderings are possible, silently pick the single most natural one.`;
+export const PROMPT_B_INSTRUCTIONS = `Use the supplied speaker, referent, and (if present) addressee gender for any grammatical agreement (verb conjugation, adjective inflection, pronoun choice, gendered noun forms) the target language requires. The referent_gender drives third-party noun forms like German Übersetzer/-in, French traducteur/-rice, Spanish profesor/-a. It applies ONLY where the source leaves the third party's gender open (a unisex noun such as "the doctor", "my friend", "a teacher"): when the source itself fixes that person's gender — a pronoun ("he", "she", "him", "her"), a gendered kinship or role noun, an unambiguous name — the SOURCE wins and referent_gender is ignored. Never translate "he" as "she" or vice versa because referent_gender says otherwise. Use the requested register. Three levels exist: casual (the familiar T-form: du/tú/tu/ты, Japanese plain form with 君 or the name for "you", Korean 반말), polite (the level that is safe with anyone: vous/usted/вы/आप, Japanese です・ます, Korean 해요체) and formal (the distance or honorific level: Sie, keigo 尊敬語・謙譲語, Korean 합쇼체). 'informal' and 'neutral' both mean casual; 'formal' means polite. Never the aggressive おまえ. DO NOT default to the polite form when the register is neutral, unless a required politeness form below says otherwise. If the target language does not grammatically encode a given feature, translate naturally and ignore it. Do not output any field as a literal word. Only return one translation. Do not return multiple alternative translations or explanations — when several renderings are possible, silently pick the single most natural one.`;
 
 export type TranslationPromptArgs = {
   text: string;
@@ -233,10 +233,32 @@ export function buildRenderingRewritePrompt(args: {
   sourceText: string;
   canonicalText: string;
   requestedGender?: 'male' | 'female';
+  /**
+   * Who is speaking, when no gender was REQUESTED. Context, not an
+   * instruction to re-gender the sentence: a politeness form whose carrier
+   * agrees with the speaker (Thai ครับ/ค่ะ, a self-reference term) has to be
+   * introduced in the right one, and the canonical wording may not contain it
+   * yet. Without this the model falls back to the form prompt's own default
+   * for an unstated speaker (ค่ะ on Thai), so a male-voiced card asking for
+   * the polite level got the female particle read in a male voice.
+   */
+  speakerGender?: 'male' | 'female' | 'neutral';
   requestedForm?: { id: string; label: string; prompt: string };
   promptWording?: 'product' | 'literature';
 }): string {
   const requirements = requestedFormInstruction(args);
+  // Only when no gender was requested: `requestedFormInstruction` already
+  // emits a stronger line for that case, and stacking the two would read as a
+  // request to change every first-person form.
+  if (
+    args.requestedGender === undefined &&
+    (args.speakerGender === 'male' || args.speakerGender === 'female')
+  ) {
+    const who = args.speakerGender === 'male' ? 'a man' : 'a woman';
+    requirements.push(
+      `The speaker is ${who}. Where the required form introduces a word that agrees with the speaker (a politeness particle, a first-person pronoun or a self-reference term), use the form for ${who}. Do not change any other first-person form, and do not re-gender wording the sentence already has.`,
+    );
+  }
   return [
     `You are a professional ${args.targetLangName} editor. Below is an English sentence and its ${args.targetLangName} translation. Rewrite the translation so that it satisfies the requirement, and change NOTHING else: keep every word, the word order, the punctuation and the meaning exactly as they are wherever the requirement does not force a change. If the translation already satisfies the requirement, output it unchanged, character for character.`,
     ``,
@@ -366,7 +388,7 @@ function sanitizeUntrustedForPrompt(raw: string): string {
  * best-of-N judge prompt. The judge must see exactly the constraints the
  * candidates were generated under.
  */
-function buildContextLines(args: TranslationPromptArgs): string[] {
+export function buildContextLines(args: TranslationPromptArgs): string[] {
   const speakerLine = `  <speaker_gender>${args.requestedGender ?? args.speakerGender ?? 'unspecified'}</speaker_gender>`;
   const referentLine = `  <referent_gender>${args.referentGender}</referent_gender>`;
   const contextLines: string[] = [speakerLine, referentLine];
@@ -407,6 +429,7 @@ export function buildPrompt(args: TranslationPromptArgs): string {
       sourceText: args.text,
       canonicalText: args.rewriteOf,
       requestedGender: args.requestedGender,
+      speakerGender: args.speakerGender,
       requestedForm: args.requestedForm,
       promptWording: args.promptWording,
     });

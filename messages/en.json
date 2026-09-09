@@ -752,7 +752,8 @@
       "feminine": "feminine",
       "casual": "casual",
       "polite": "polite",
-      "formal": "formal"
+      "formal": "formal",
+      "pending": "updating…"
     }
   },
   "Footer": {

@@ -60,6 +60,13 @@ export interface CardTranslation {
    */
   renderedGender?: 'masculine' | 'feminine';
   renderedPoliteness?: 'casual' | 'polite' | 'formal';
+  /**
+   * The course's sentence-form settings ask for a rendering this language
+   * does not have yet: `text` is the canonical wording and will change once
+   * the rewrite lands. Drives the "updating" chip, so the sentence on screen
+   * is not presented as the final answer.
+   */
+  formPending?: boolean;
 }
 
 export interface WordTiming {

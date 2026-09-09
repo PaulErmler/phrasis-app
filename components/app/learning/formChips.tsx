@@ -25,6 +25,8 @@ export type ChipTranslation = {
   voiceGender?: 'male' | 'female';
   renderedGender?: 'masculine' | 'feminine';
   renderedPoliteness?: PolitenessLevel;
+  /** The rendering the settings ask for has not landed; see `formPending`. */
+  formPending?: boolean;
 };
 
 export type FormChipKey =
@@ -32,7 +34,8 @@ export type FormChipKey =
   | 'feminine'
   | 'casual'
   | 'polite'
-  | 'formal';
+  | 'formal'
+  | 'pending';
 
 /** `LearningMode.formChips` translator: the five words plus the title. */
 export type FormChipTranslator = {
@@ -108,6 +111,14 @@ export function buildFormChips(
     : targets.find((tr) => tr.renderedGender)?.renderedGender;
   if (gender) {
     chips.push({ label: t(gender), testId: `form-chip-${gender}` });
+  }
+  // The settings ask for a wording this card does not have yet. Said once
+  // per card, before the axis chips, so the sentence on screen is not read
+  // as the answer to a level the learner just picked. The politeness chip of
+  // a pending language is suppressed upstream (the canonical stamp would
+  // describe the wording about to be replaced), so the two never disagree.
+  if (translations.some((tr) => tr.formPending)) {
+    chips.push({ label: t('pending'), testId: 'form-chip-pending' });
   }
   const polite = targets.filter((tr) => tr.renderedPoliteness);
   const disagree =

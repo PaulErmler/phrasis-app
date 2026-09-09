@@ -1,10 +1,11 @@
 import {
   viewOfCard,
+  renderingCardOf,
   renderingSettingsOf,
   renderingTextOf,
 } from '../db/translationReads';
 import { v } from 'convex/values';
-import { query } from '../_generated/server';
+import { mutation, query } from '../_generated/server';
 import { Doc } from '../_generated/dataModel';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -23,6 +24,19 @@ import {
   schedulingPhaseValidator,
 } from '../types';
 import { getCourseSettings } from '../db/courseSettings';
+import {
+  flushRenderingStamps,
+  newRenderingStampCollector,
+  scheduleMissingRenderings,
+} from '../lib/contentScheduling';
+import { hasRenderingOverride } from '../../lib/preferenceResolution';
+
+/**
+ * How many library cards one request may sweep. The library page size; a
+ * bigger batch would put the whole (bounded) transaction budget behind one
+ * scroll.
+ */
+const MAX_LIBRARY_RENDERING_CARDS = 60;
 
 // ============================================================================
 // QUERY
@@ -399,5 +413,74 @@ export const getLibraryCards = query({
       .filter((c): c is NonNullable<typeof c> => c !== null);
 
     return page;
+  },
+});
+
+/**
+ * Ask for the rendering variants of the cards the library is showing.
+ *
+ * The library is a query, and a query cannot schedule work, so the wording a
+ * course's politeness setting asks for used to appear only once the review
+ * ensure path happened to reach the card. A learner who set a level and
+ * opened the library saw the canonical sentence with nothing to say it was
+ * about to change (2026-09-08 review). The client calls this for the page it
+ * has rendered, the same shape the collection preview already uses.
+ *
+ * TEXT ONLY (`skipTts`): a browse surface may buy a translation, never a
+ * clip. Claim-deduped per variant, so repeated calls while a job is in
+ * flight are no-ops and two learners on the same course share one job. Not
+ * quota-gated, for the same reason `requestPreviewTranslations` is not:
+ * translations are the cheap half and audio is the spend that matters.
+ */
+export const requestLibraryRenderings = mutation({
+  args: { cardIds: v.array(v.id('cards')) },
+  returns: v.object({ translationsScheduled: v.number() }),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { translationsScheduled: 0 };
+    const active = await getActiveCourseForUser(ctx, userId);
+    if (!active) return { translationsScheduled: 0 };
+    const { course } = active;
+    const deck = await getDeckByCourseId(ctx, course._id);
+    if (!deck) return { translationsScheduled: 0 };
+
+    const renderingSettings = renderingSettingsOf(
+      await getCourseSettings(ctx, course._id),
+    );
+
+    // One collector for the page, so the classifier is asked once per
+    // language per 25 rows rather than once per card.
+    const stamps = newRenderingStampCollector();
+    let translationsScheduled = 0;
+    for (const cardId of args.cardIds.slice(0, MAX_LIBRARY_RENDERING_CARDS)) {
+      const card = await ctx.db.get(cardId);
+      // Ownership: the card must belong to this user's active deck.
+      if (!card || card.deckId !== deck._id) continue;
+      const renderingCard = renderingCardOf(card);
+      if (
+        !card.followsCoursePreferences &&
+        !hasRenderingOverride(renderingCard)
+      )
+        continue;
+      const text = await ctx.db.get(card.textId);
+      if (!text) continue;
+      const scheduled = await scheduleMissingRenderings(
+        ctx,
+        card.textId,
+        text,
+        course.baseLanguages,
+        course.targetLanguages,
+        renderingSettings,
+        {
+          skipTts: true,
+          stamps,
+          card: renderingCard,
+          requestedByUserId: userId,
+        },
+      );
+      translationsScheduled += scheduled.translationsScheduled;
+    }
+    await flushRenderingStamps(ctx, stamps, userId);
+    return { translationsScheduled };
   },
 });

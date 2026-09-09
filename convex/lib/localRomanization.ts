@@ -89,10 +89,16 @@ export const ROMANIZATION_SOURCES = {
   /**
    * The model, for a language with no library and no Google support. One
    * tag PER LANGUAGE: the prompt is per language (romanizationPrompt.ts), so
-   * a Thai convention change must not re-buy every Hebrew row. The tag
-   * names the model AND the price tier: they are separate OpenRouter
-   * endpoints of one model, so a tier change is an engine change and should
-   * invalidate stored rows the same way a library swap does.
+   * a Thai convention change must not re-buy every Hebrew row.
+   *
+   * The `flex` in both tags is HISTORICAL. It named the price tier back
+   * when the call pinned `google-ai-studio/flex` and failed if that
+   * endpoint was busy; since 2026-09-09 the model slug carries `:floor` and
+   * the tier floats. The tags were deliberately NOT bumped: the Sep 2026
+   * eval measured the tiers as indistinguishable (98% Thai, 96% Hebrew on
+   * both), so re-deriving every stored row would re-buy 2,555+ rows to
+   * produce the same text. Bump them if a future tier or provider ever does
+   * change the output.
    *
    * Neither tag matches the shared `gemini-3.8-flash-flex-v1` the first
    * cut wrote, which is deliberate: those rows include the '' sentinels

@@ -76,8 +76,20 @@ export const OPENROUTER_MODELS = {
    *  but costs more. Re-run the eval before switching.
    *
    *  Reasoning is `minimal`, not off: Gemini 3.x rejects a disabled-reasoning
-   *  request outright ("Reasoning is mandatory for this endpoint"). */
-  romanization: 'google/gemini-3.8-flash',
+   *  request outright ("Reasoning is mandatory for this endpoint").
+   *
+   *  Routing: `:floor` sorts endpoints by price and opts into the flex
+   *  service tier, which a base slug never matches, so the cheapest is
+   *  tried first and a busy flex falls through to standard rather than
+   *  failing the row. Same idiom as `SOL_MINIMAL` in lib/languages.ts. The
+   *  three tiers are $0.375/$1.875, $0.75/$3.75 and $1.35/$6.75 per M
+   *  tokens; no ceiling is set (Paul, 2026-09-09), because the job is a
+   *  hundred tokens a sentence and the spread is worth less than a learner
+   *  seeing the transliteration line arrive at all. Note `:floor` sorts
+   *  across PROVIDERS too, so google-vertex is eligible alongside
+   *  google-ai-studio; the Sep 2026 eval measured the two google-ai-studio
+   *  tiers as indistinguishable (91% IPA, 98% romanization), not Vertex. */
+  romanization: 'google/gemini-3.8-flash:floor',
 
   /** Speech-to-text for languages MAI-Transcribe-2 does not cover
    *  (convex/lib/stt/gemini.ts): the clip goes in as `input_audio` on a
@@ -147,27 +159,6 @@ export const OPENROUTER_USAGE_ACCOUNTING = {
  * constraint already recorded on `translationAutoFill` above.
  */
 export const ROMANIZATION_REASONING = 'minimal' as const;
-
-/**
- * Pin the romanization call to Google's cheapest endpoint.
- *
- * The same model is served at three price tiers, which are OpenRouter
- * ENDPOINTS of one model rather than separate slugs, so the tier is only
- * reachable through `provider.order`: `google-ai-studio/flex` at
- * $0.375/$1.875 per M tokens, plain `google-ai-studio` at $0.75/$3.75, and
- * `/priority` at $1.35/$6.75. The Sep 2026 eval measured flex and standard
- * as indistinguishable in quality (91% IPA, 98% romanization on both) at half
- * the price.
- *
- * `allow_fallbacks: false` is deliberate. Romanization is a background
- * per-sentence job with no user waiting on it, so silently paying double
- * because flex was busy is the wrong trade — better to fail and let the
- * caller leave the row empty for the next attempt.
- */
-export const ROMANIZATION_PROVIDER = {
-  order: ['google-ai-studio/flex'],
-  allow_fallbacks: false,
-} as const;
 
 /** Default OpenRouter provider options for the chat agent.
  *  Reasoning is streamed (exclude: false) so Gemini thought signatures

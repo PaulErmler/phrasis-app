@@ -107,6 +107,27 @@ export function LibraryView({
     sourceFilter: sourceFilter ?? undefined,
   });
 
+  // Ask for the rendering the course's sentence-form settings want, for the
+  // cards this page is showing. The library is a query and cannot schedule,
+  // so without this a learner who set a politeness level saw the canonical
+  // wording here until the review path happened to reach the card
+  // (2026-09-08 review). Text only, claim-deduped, so a re-render while jobs
+  // are in flight is a no-op. Keyed on the card ids so it fires once per
+  // distinct page rather than on every render.
+  const requestLibraryRenderings = useMutation(
+    api.features.library.requestLibraryRenderings,
+  );
+  const renderingRequestKey = result?.map((card) => card._id).join(',') ?? '';
+  useEffect(() => {
+    if (renderingRequestKey === '') return;
+    void requestLibraryRenderings({
+      cardIds: renderingRequestKey.split(',') as Id<'cards'>[],
+    }).catch(() => {
+      // Best-effort warm: the page still renders what exists today, and the
+      // next visit asks again.
+    });
+  }, [renderingRequestKey, requestLibraryRenderings]);
+
   const masterCard = useMutation(api.features.scheduling.masterCard);
   const unmasterCard = useMutation(api.features.scheduling.unmasterCard);
   const hideCard = useMutation(api.features.scheduling.hideCard);

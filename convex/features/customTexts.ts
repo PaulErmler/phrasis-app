@@ -22,7 +22,7 @@ import {
   getTranslationSource,
   isMixedLanguage,
   postProcessTranslation,
-  resolveMixedVariant,
+  pickMixedVariantForNewRow,
 } from '../../lib/languages';
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../lib/translationProvenance';
 import { trackEvent } from '../db/stats/dailyStats';
@@ -222,7 +222,11 @@ export const autoFillTranslations = action({
     const resolutionByRequested = new Map<string, Resolved>();
     for (const code of targetLanguages) {
       if (isMixedLanguage(code)) {
-        const r = resolveMixedVariant(code, variantSeed);
+        // Always a new row, so the decorrelated pick. The legacy one made
+        // the dialect a copy of the speaker-gender draw below (both seeded
+        // on `variantSeed`), and worse: parity is permutation-invariant, so
+        // a seed whose varying part appears twice never moved it at all.
+        const r = pickMixedVariantForNewRow(code, variantSeed);
         if (r) {
           resolutionByRequested.set(code, {
             resolved: r.subCode,

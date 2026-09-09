@@ -29,6 +29,10 @@ import {
   viewOfCard,
 } from '../../db/translationReads';
 import { getLlmClaim } from '../../features/llmTranslationQueue';
+import {
+  forkSharedTextForEdit,
+  resolveCardEditPlan,
+} from '../../features/cardEditPipeline';
 import { getRomanizationSource } from '../../lib/localRomanization';
 import {
   getCurrentTranslationVersion,
@@ -1115,6 +1119,281 @@ async function hydrateMixedSpanish(
     return map.get('k')!;
   });
 }
+
+describe('2026-09-08 review fixes', () => {
+  it('a curated canonical row still gets a rendering variant', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, cardId, rows } = await seed(t);
+    // Hand-curated wording on a premade text (the Essential greetings ship
+    // like this). `mayRegenerateTranslation` protects it from being
+    // OVERWRITTEN, which used to be read as "no variant either", so the
+    // course's politeness setting was silently ignored for good.
+    await t.run(async (ctx) => {
+      await ctx.db.patch(rows.ja, { translationSource: 'curated-manual' });
+    });
+
+    await ensureRenderings(t, textId, { politenessLevels: ['polite'] }, cardId);
+
+    const job = llmEnqueues().find((j) => j.targetLanguage === 'ja');
+    expect(job?.variantKey).toBe('auto|desu-masu');
+    // A rewrite of the curated wording, which itself is never touched.
+    expect(job?.rewriteOf).toBe(CANONICAL_JA);
+    const canonical = await t.run((ctx) => liveTranslation(ctx, textId, 'ja'));
+    expect(canonical?.translatedText).toBe(CANONICAL_JA);
+    expect(canonical?.translationSource).toBe('curated-manual');
+  });
+
+  it('the card reports the wording as pending until the variant lands', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, cardId } = await seed(t);
+    const settings = { politenessLevels: ['polite' as const] };
+
+    const pending = await hydrate(t, textId, cardId, settings);
+    const ja = pending.translations.find((tr) => tr.language === 'ja')!;
+    // The canonical casual wording is what there is to show, but the card
+    // must not present it as the answer to the level the learner picked.
+    expect(ja.text).toBe(CANONICAL_JA);
+    expect(ja.formPending).toBe(true);
+    // ... and the stale politeness chip is suppressed while it is pending,
+    // so the two never contradict each other.
+    expect(ja.renderedPoliteness).toBeUndefined();
+
+    // A language the settings do not change is not pending.
+    const de = pending.translations.find((tr) => tr.language === 'de')!;
+    expect(de.formPending).toBeUndefined();
+  });
+
+  // 2026-09-08 review. The fork re-derived the slot's rendering WITHOUT the
+  // canonical row's dialect, so a mixed code resolved under its default
+  // (Spain, familiar split: polite -> tú) while the served row had resolved
+  // under the row's own (es_latam, distance split: polite -> usted). The
+  // keyed pointer lookup missed and the code fell back to the canonical
+  // pointer, so the user-owned copy showed one sentence and played another,
+  // permanently.
+  it('an edit fork copies the clip that speaks the wording it copies', async () => {
+    const t = convexTest(schema, modules);
+    const CANONICAL_ES = '¿Vienes?';
+    const VARIANT_ES = '¿Viene usted?';
+    const { textId, cardId } = await seedMixedSpanish(t, {
+      renderedPoliteness: 'casual',
+      translatedText: CANONICAL_ES,
+    });
+    const settings = { politenessLevels: ['polite' as const] };
+    // `resolveCardEditPlan` builds its view from the STORED course settings,
+    // so the fixture has to carry them or the plan resolves canonical and
+    // the submitted variant wording reads as an edit.
+    await t.run(async (ctx) => {
+      const course = (await ctx.db.query('courses').first())!;
+      await ctx.db.insert('courseSettings', {
+        courseId: course._id,
+        initialReviewCount: 5,
+        politenessLevels: ['polite'],
+      });
+    });
+
+    // The landed polite variant and its own clip. es-US resolves through
+    // es_latam, whose distance split renders "polite" as usted.
+    const variantAssetId = await t.run(async (ctx) => {
+      await ctx.db.insert('translations', {
+        textId,
+        targetLanguage: 'es_mixed',
+        translatedText: VARIANT_ES,
+        variantKey: 'auto|v',
+        regionVariant: 'es-US',
+        translationSource: 'openai/gpt-5.6-sol:floor-minimal',
+        renderedGender: 'unmarked',
+        renderedPoliteness: 'polite',
+      });
+      const { assetId } = await insertAudioFixture(ctx, {
+        textId,
+        language: 'es_mixed',
+        voiceName: 'es-test-male',
+        storageId: await ctx.storage.store(new Blob([new Uint8Array([9])])),
+        ttsQuality: 'validated',
+        ttsProvider: getTtsProviderForLanguage('es_mixed'),
+        ttsVersion: getCurrentTtsVersion('es_mixed'),
+        voiceGender: 'male',
+        regionVariant: 'es-US',
+        spokenText: VARIANT_ES,
+        wordTimings: [],
+      });
+      // insertAudioFixture writes the CANONICAL pointer; this clip belongs
+      // to the variant, so re-key it.
+      const pointer = (await ctx.db
+        .query('audioRecordings')
+        .withIndex('by_assetId', (q) => q.eq('assetId', assetId))
+        .first())!;
+      await ctx.db.patch(pointer._id, { variantKey: 'male|v' });
+      return assetId;
+    });
+
+    // The card shows the variant wording, so this is what the fork carries.
+    const shown = await hydrateMixedSpanish(t, textId, cardId, settings);
+    expect(
+      shown.translations.find((tr) => tr.language === 'es_mixed')?.text,
+    ).toBe(VARIANT_ES);
+
+    // Edit only the English line: the Spanish slot is copied untouched.
+    const forked = await t.run(async (ctx) => {
+      const card = (await ctx.db.get(cardId))!;
+      const text = (await ctx.db.get(textId))!;
+      const course = (await ctx.db
+        .query('courses')
+        .filter((q) => q.eq(q.field('userId'), 'user_A'))
+        .first())!;
+      const plan = await resolveCardEditPlan(ctx, {
+        userId: 'user_A',
+        card,
+        text,
+        course,
+        translations: [
+          { language: 'en', text: 'Are you coming along?' },
+          { language: 'es_mixed', text: VARIANT_ES },
+        ],
+        ensureUserOwnedText: true,
+        proposedAudioSpeakerGender: undefined,
+      });
+      const forkedTextId = await forkSharedTextForEdit(ctx, {
+        userId: 'user_A',
+        card,
+        text,
+        plan,
+      });
+      const row = await ctx.db
+        .query('audioRecordings')
+        .withIndex('by_textId', (q) => q.eq('textId', forkedTextId))
+        .filter((q) => q.eq(q.field('language'), 'es_mixed'))
+        .first();
+      return {
+        text: (await liveTranslation(ctx, forkedTextId, 'es_mixed'))
+          ?.translatedText,
+        asset: row ? await ctx.db.get(row.assetId) : null,
+      };
+    });
+
+    // The copy carries the variant wording ...
+    expect(forked.text).toBe(VARIANT_ES);
+    // ... and the clip that speaks it. Under the bug the fork resolved the
+    // key under Spain rules (polite -> tú), missed the `male|v` pointer and
+    // fell back to the canonical clip, so the copy showed usted and said
+    // ¿Vienes?.
+    expect(forked.asset).not.toBeNull();
+    expect(forked.asset!.spokenText).toBe(VARIANT_ES);
+    expect(forked.asset!._id).toBe(variantAssetId);
+  });
+
+  // 2026-09-09, from the pre-A1 greetings sitting on "updating" for good in
+  // the collection preview. Spanish marks politeness only on the word for
+  // "you", so the classifier stamps a greeting with no "you" as `unmarked`.
+  // `canonicalSatisfies` treated that as a gap, so the view kept asking for
+  // a variant that no rewrite could ever produce: a permanent pending chip
+  // on the browse surfaces, and one wasted LLM rewrite per card to
+  // rediscover that "Hola." is "Hola." at every level.
+  it('an unmarked address-language wording satisfies any level, so it never pends', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, cardId } = await seedMixedSpanish(t, {
+      renderedPoliteness: 'casual',
+      translatedText: 'Hola.',
+    });
+    await t.run((ctx) =>
+      ctx.db.patch(textId, { text: 'Hello.', addressesSomeone: true }),
+    );
+    // What the classifier says about a greeting with no "you".
+    await t.run(async (ctx) => {
+      const row = (await liveTranslation(ctx, textId, 'es_mixed'))!;
+      await ctx.db.patch(row._id, { renderedPoliteness: 'unmarked' });
+    });
+    const settings = { politenessLevels: ['formal' as const] };
+
+    const shown = await hydrateMixedSpanish(t, textId, cardId, settings);
+    const es = shown.translations.find((tr) => tr.language === 'es_mixed')!;
+    expect(es.text).toBe('Hola.');
+    expect(es.formPending).toBeUndefined();
+
+    // ... and nothing is bought to discover it.
+    vi.mocked(llmPool.enqueueAction).mockClear();
+    await t.run(async (ctx) => {
+      const text = (await ctx.db.get(textId))!;
+      const card = (await ctx.db.get(cardId))!;
+      await scheduleMissingRenderings(
+        ctx,
+        textId,
+        text,
+        ['en'],
+        ['es_mixed'],
+        settings,
+        { card: renderingCardOf(card) },
+      );
+    });
+    expect(
+      llmEnqueues().filter((j) => j.targetLanguage === 'es_mixed'),
+    ).toEqual([]);
+  });
+
+  // A predicate language is the opposite case: `unmarked` there means the
+  // carrier is absent and a rewrite can add it, so the variant is still
+  // worth asking for.
+  it('an unmarked predicate-language wording still wants its form', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, cardId } = await seed(t);
+    await t.run(async (ctx) => {
+      const row = (await liveTranslation(ctx, textId, 'ja'))!;
+      await ctx.db.patch(row._id, { renderedPoliteness: 'unmarked' });
+    });
+    const pending = await hydrate(t, textId, cardId, {
+      politenessLevels: ['polite'],
+    });
+    expect(
+      pending.translations.find((tr) => tr.language === 'ja')?.formPending,
+    ).toBe(true);
+  });
+
+  it('a curriculum fix retires the variants of the old wording', async () => {
+    const t = convexTest(schema, modules);
+    const { textId } = await seed(t);
+    const FIXED_JA = '疲れています。';
+    // A landed polite variant, a rewrite of the wording about to be fixed.
+    const variantId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert('translations', {
+        textId,
+        targetLanguage: 'ja',
+        translatedText: '疲れました。',
+        variantKey: 'auto|desu-masu',
+        translationSource: 'openai/gpt-5.6-sol:floor-minimal',
+      });
+      await ctx.db.insert('audioRecordings', {
+        textId,
+        language: 'ja',
+        assetId: (await ctx.db.query('audioAssets').first())!._id,
+        variantKey: 'male|desu-masu',
+      });
+      const text = (await ctx.db.get(textId))!;
+      await ctx.db.patch(textId, { datasetSentenceId: 4242 });
+      expect(text).toBeTruthy();
+      return id;
+    });
+
+    await t.mutation(internal.db.translationSeed.batchUpsertTranslations, {
+      items: [
+        {
+          datasetSentenceId: 4242,
+          textEn: "I'm tired.",
+          translations: [{ language: 'ja', text: FIXED_JA }],
+        },
+      ],
+    });
+
+    // The canonical row carries the fix, and the rewrite of the wording that
+    // was just declared wrong is gone rather than being served for good.
+    const canonical = await t.run((ctx) => liveTranslation(ctx, textId, 'ja'));
+    expect(canonical?.translatedText).toBe(FIXED_JA);
+    expect(await t.run((ctx) => ctx.db.get(variantId))).toBeNull();
+    const keyed = await t.run((ctx) =>
+      audioPointer(ctx, textId, 'ja', 'male|desu-masu'),
+    );
+    expect(keyed).toBeNull();
+  });
+});
 
 describe('mixed dialects resolve the form through the row dialect', () => {
   const sweep = (

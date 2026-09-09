@@ -86,6 +86,14 @@ export const translationValidator = v.object({
   renderedPoliteness: v.optional(
     v.union(v.literal('casual'), v.literal('polite'), v.literal('formal')),
   ),
+  /**
+   * The course's sentence-form settings ask for a rendering of this language
+   * that has not landed yet, so `text` is the canonical wording and is about
+   * to change. Surfaces show it as pending rather than presenting the current
+   * sentence as the answer (2026-09-08 review: a learner who set "formal" was
+   * shown the casual wording with nothing to say so).
+   */
+  formPending: v.optional(v.boolean()),
 });
 
 export const audioRecordingValidator = v.object({

@@ -198,6 +198,9 @@ export function useCollectionDetail({
   // honor the stay-visible contract regardless of which side of the anchor
   // they live on.
   const rowSnapshotsRef = useRef<Map<string, BrowseTextRow>>(new Map());
+  // Read by the first-page top-up effect, which must not re-run whenever a
+  // toggle changes the callback's identity.
+  const isRowVisibleRef = useRef<(row: BrowseTextRow) => boolean>(() => true);
   const forwardIdsRef = useRef<Set<string> | null>(null);
   const [resurrectedRows, setResurrectedRows] = useState<
     Map<string, BrowseTextRow>
@@ -403,7 +406,12 @@ export function useCollectionDetail({
             // Complete translations can still lack an annotation line
             // (IPA/romanization); requesting the row runs the server's
             // annotation backfill without touching the translations.
-            row.needsAnnotationBackfill) &&
+            row.needsAnnotationBackfill ||
+            // ... or the wording the course's politeness setting asks for.
+            // Same trap as the annotation flag above: these rows have every
+            // canonical translation, so without this they were never sent
+            // and the "updating" chip never cleared.
+            row.needsRenderingRewrite) &&
           !requestedTranslationsRef.current.has(row._id),
       )
       .map((row) => row._id);
@@ -617,6 +625,22 @@ export function useCollectionDetail({
     [requestAudio],
   );
 
+  // The first page is 5 rows by RANK, and the toggles then hide the added
+  // and ignored ones. On a collection whose leading sentences are all
+  // already added (`browseAnchor` is the progress frontier, which a manual
+  // add does not always advance) that leaves the dialog showing nothing but
+  // "Show more" (2026-09-09, Pre-A1 with 8 added). Top the first page up
+  // until 5 rows are actually VISIBLE, or the feed runs out. Only while the
+  // user has not paged themselves: once they click "Show more" the reveal
+  // boundary owns the feed.
+  useEffect(() => {
+    if (!anchorReady || revealBoundary !== null) return;
+    if (forward.status !== 'CanLoadMore') return;
+    const visible = forwardRowsRaw.filter(isRowVisibleRef.current).length;
+    if (visible >= PREVIEW_FIRST_PAGE_SIZE) return;
+    forward.loadMore(PREVIEW_FIRST_PAGE_SIZE);
+  }, [anchorReady, revealBoundary, forward, forwardRowsRaw]);
+
   const isRowVisible = useCallback(
     (row: BrowseTextRow) => {
       if (sessionActedIds.has(row._id)) return true;
@@ -626,6 +650,7 @@ export function useCollectionDetail({
     },
     [sessionActedIds, showAdded, showIgnored],
   );
+  isRowVisibleRef.current = isRowVisible;
 
   const browse: CollectionBrowse = useMemo(() => {
     const visibleForward =

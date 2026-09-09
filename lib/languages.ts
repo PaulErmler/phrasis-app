@@ -3278,15 +3278,53 @@ export function fnv1a(str: string): number {
 }
 
 /**
- * Resolve the concrete regional sub-variant for a mixed-dialect language.
- * Returns `null` when `code` is not a mixed language. Callers should fall
- * back to the non-mixed translation path in that case.
+ * A well-mixed index in `[0, n)` from a seed string. Use this, never
+ * `fnv1a(seed) % n`, for any pick that must be independent of another pick
+ * on the SAME seed.
  *
- * `seed` should be the textId (or any stable per-sentence identifier) so the
- * choice survives retries and re-translations. The returned `subCode` is the
- * language code to feed `getTranslationConfigForLanguage` (so the LLM gets
- * regionally accurate prompt context), and `regionVariant` is the locale
- * prefix the audio player needs to pick a matching voice.
+ * FNV-1a's finalisation is weak in the low bits: the prime is odd, so
+ * multiplying never carries into bit 0, and bit 0 of the digest is only the
+ * parity of the seed's odd-valued character codes. Two `% 2` picks on one
+ * textId therefore agree on every input, whatever salt each uses, unless the
+ * salt itself has odd parity, which merely flips agreement to perfect
+ * disagreement. That is how the politeness form came to be a copy of the
+ * speaker-gender coin flip (2026-09-08 review): `du` for every male-voiced
+ * card, `Sie` for every female-voiced one, never mixed.
+ *
+ * The xorshift-multiply finalizer below (the murmur3 avalanche) spreads every
+ * input bit across all 32 output bits, so a modulo of 2 or 3 is independent
+ * of any other pick on the same seed.
+ */
+export function seededIndex(seed: string, n: number): number {
+  if (n <= 1) return 0;
+  let h = fnv1a(seed);
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b) >>> 0;
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35) >>> 0;
+  h ^= h >>> 16;
+  return (h >>> 0) % n;
+}
+
+/**
+ * The dialect a mixed-language row from BEFORE `translations.regionVariant`
+ * existed was generated under. Legacy reconstruction only: two call sites
+ * are allowed to use it, `getVoiceForText`'s fallback for an unpinned row
+ * (lib/voices.ts) and `backfillMixedDialectPin` (convex/migrations.ts),
+ * which stamps that row with this answer so nothing has to guess again.
+ *
+ * NOT for choosing the dialect of a NEW row: use
+ * `pickMixedVariantForNewRow`. This pick reads bit 0 of the FNV-1a digest,
+ * which is only the parity of the seed's odd-valued character codes, so it
+ * is permutation-invariant (every anagram of a seed collides) and, worse,
+ * identical to every other `% 2` or `& 1` on the same seed. That is why
+ * every Spain-dialect sentence in a Mixed Spanish course was spoken by a man
+ * and every Latin-American one by a woman: `resolveAudioSpeakerGender` reads
+ * the same bit (2026-09-08 review).
+ *
+ * Returns `null` when `code` is not a mixed language. `subCode` feeds
+ * `getTranslationConfigForLanguage`; `regionVariant` is the locale prefix
+ * the audio player needs to pick a matching voice.
  */
 export function resolveMixedVariant(
   code: string,
@@ -3296,6 +3334,28 @@ export function resolveMixedVariant(
   if (!variants) return null;
   const idx = fnv1a(seed) % variants.length;
   const pick = variants[idx];
+  return { subCode: pick.subCode, regionVariant: pick.voiceLocalePrefix };
+}
+
+/**
+ * The dialect to translate a NEW mixed-language row into, decorrelated from
+ * every other pick seeded on the same id (`seededIndex`). Once the row is
+ * written its `regionVariant` pins the answer for good, so this function is
+ * consulted exactly once per (text, language) and a later change of hash
+ * cannot move an existing sentence.
+ *
+ * Callers must reach for this only when no row and no preferred variant
+ * exist. A row that predates the pin column keeps `resolveMixedVariant`,
+ * because that is the coin its wording was actually written under and its
+ * clip has to agree with it.
+ */
+export function pickMixedVariantForNewRow(
+  code: string,
+  seed: string,
+): { subCode: string; regionVariant: string } | null {
+  const variants = MIXED_LANGUAGE_VARIANTS[code];
+  if (!variants) return null;
+  const pick = variants[seededIndex(`${seed}|dialect`, variants.length)];
   return { subCode: pick.subCode, regionVariant: pick.voiceLocalePrefix };
 }
 

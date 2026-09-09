@@ -28,6 +28,7 @@ import {
   getTranslationSourceFromStage,
   getVoiceForText,
   isMixedLanguage,
+  pickMixedVariantForNewRow,
   resolveMixedVariant,
   resolveTranslationStages,
   ROMANIZATION_LANGUAGES,
@@ -511,7 +512,18 @@ async function resolveMixedVariantPin(
       );
     }
     if (!mixed) {
-      mixed = resolveMixedVariant(args.targetLanguage, args.textId as string);
+      // A row that exists but carries no pin predates the column: its
+      // wording was written under the legacy coin, so reconstruct that one
+      // and never re-roll it. Only a (text, language) with no row at all is
+      // a genuinely new pick, and that one is decorrelated from the speaker
+      // gender (2026-09-08 review).
+      mixed =
+        existingRow === null
+          ? pickMixedVariantForNewRow(
+              args.targetLanguage,
+              args.textId as string,
+            )
+          : resolveMixedVariant(args.targetLanguage, args.textId as string);
     }
   }
   return {

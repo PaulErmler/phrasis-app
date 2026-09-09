@@ -70,6 +70,7 @@ import {
 } from '../lib/languages';
 import { ttsDeliveryInstruction } from '../convex/lib/tts/deliveryInstruction';
 import {
+  normalizeModelOutput,
   openrouterCallOptions,
   type TranslationPromptArgs,
 } from '../convex/features/translationLLM';
@@ -142,6 +143,13 @@ const MP3_KBPS = 48;
 const TTS_SPEED = 1;
 /** How many sentences also get the "with dialect note" audio variant. */
 const TTS_VARIANT_B_COUNT = 6;
+
+/**
+ * How many times the self-revision pass feeds a sentence back to the model.
+ * Two, because one round only says whether it changes its mind; the second
+ * says whether it ever stops.
+ */
+const REVISE_ROUNDS = 2;
 
 // --------------------------------------------------------- mechanical checks
 
@@ -511,6 +519,96 @@ async function runCritique(
   return [];
 }
 
+// ------------------------------------------------------------------ revise
+
+/**
+ * Hand Sol its own translation back and ask for either the same sentence or a
+ * better one. Same model and thinking as the stage that wrote it, so this is
+ * the model reviewing itself, not a second opinion. The prompt names identity
+ * as the expected answer, the way `buildAccentRewritePrompt` and
+ * `buildRenderingRewritePrompt` do: without that, a rewrite prompt rewrites
+ * everything it is handed whether or not anything is wrong.
+ */
+function buildRevisePrompt(source: string, candidate: string): string {
+  return [
+    `You are a native speaker of Zurich Swiss German (Züridütsch) checking a translation for a language-learning app. A learner will see the ${SWISS.translationName} sentence next to the English and learn it as the way to say the English.`,
+    ``,
+    `<source>${source}</source>`,
+    `<translation>${candidate}</translation>`,
+    ``,
+    `<instructions>`,
+    `If the translation is already what a Zurich native would say and write, output it back UNCHANGED, character for character. That is the expected answer for most sentences.`,
+    `Otherwise output a corrected version, changing ONLY what is actually wrong: a word that is not Zurich dialect or does not mean what it is being used to mean, a Standard German form left unshifted (ß, the simple past, unshifted k, nicht/ist/wir/kein), another canton's form, a spelling no Zürcher would write, or a meaning or speech act that does not match the English. Leave every part that is already right exactly as it is.`,
+    `</instructions>`,
+    ``,
+    `Output only the ${SWISS.translationName} sentence. No commentary, no quotation marks, no alternatives.`,
+  ].join('\n');
+}
+
+/**
+ * A second, looser pass: not "fix what is wrong" but "make it sound as
+ * natural as possible". The identity anchor is deliberately weaker here —
+ * this prompt is allowed to reach for a different phrasing — so the
+ * interesting number is how much it moves and whether the meaning survives.
+ */
+function buildNaturalPrompt(source: string, candidate: string): string {
+  return [
+    `You are a native speaker of Zurich Swiss German (Züridütsch). Below is an English sentence and its ${SWISS.translationName} translation, which a learner will see next to the English and learn as the way to say it.`,
+    ``,
+    `<source>${source}</source>`,
+    `<translation>${candidate}</translation>`,
+    ``,
+    `<instructions>`,
+    `Return the translation as it is, or, if you can improve it, make it sound as natural as possible — the phrasing a Zürcher would actually use in everyday speech, not a dialect-coloured rendering of the English. It must still mean the same as the English and stay usable in the same range of situations.`,
+    `</instructions>`,
+    ``,
+    `Output only the ${SWISS.translationName} sentence. No commentary, no quotation marks, no alternatives.`,
+  ].join('\n');
+}
+
+/** One revise/naturalize call on the production Sol stage, cached and budgeted. */
+async function reviseCached(
+  bench: Bench,
+  openrouter: OpenRouterClient,
+  key: string,
+  prompt: string,
+  role: string,
+): Promise<string | null> {
+  const hit = bench.cache[key];
+  if (hit) return hit.text;
+  const startedAt = Date.now();
+  const providerOptions = openrouterCallOptions(STAGE.reasoning, STAGE.provider);
+  try {
+    const res = await generateText({
+      model: openrouter(STAGE.model),
+      prompt,
+      temperature: 0,
+      maxOutputTokens: STAGE.maxOutputTokens,
+      ...(providerOptions ? { providerOptions } : {}),
+    });
+    const telemetry: CallTelemetry[] = [
+      {
+        model: STAGE.model,
+        inputTokens: res.usage.inputTokens ?? 0,
+        outputTokens: res.usage.outputTokens ?? 0,
+        costUsd: openrouterCostUsd(res.providerMetadata),
+        latencyMs: Date.now() - startedAt,
+        role,
+        generationId: openrouterGenerationId(res.providerMetadata),
+      },
+    ];
+    bench.recordSpend(telemetry);
+    const text = normalizeModelOutput(SWISS.code, res.text);
+    bench.cache[key] = { text, telemetry };
+    return text;
+  } catch (err) {
+    console.warn(
+      `  revise failed: ${err instanceof Error ? err.message.slice(0, 120) : err}`,
+    );
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------- tts
 
 /**
@@ -623,6 +721,10 @@ type Row = {
   scoreDe?: number;
   scoreSwiss?: number;
   critique?: Critique;
+  /** One entry per self-revision round; `[0]` is the revision of `swiss`. */
+  revisions?: (string | null)[];
+  /** The naturalness pass, run on whatever the revision loop settled on. */
+  natural?: string | null;
   audioA?: string;
   audioB?: string;
 };
@@ -633,6 +735,24 @@ async function main(): Promise<void> {
   const seed = argValue(argv, 'seed') ?? DEFAULT_SEED;
   const withJudge = !argv.includes('--no-judge');
   const withAudio = !argv.includes('--no-audio');
+  const withRevise = !argv.includes('--no-revise');
+
+  // `--print-prompts` dumps the two quality-pass prompts exactly as they are
+  // sent, filled in with one real sentence, and exits. The prompts are the
+  // experiment, so they need to be readable without running it.
+  if (argv.includes('--print-prompts')) {
+    const source = 'Touch it with your bare hands.';
+    const candidate = "Lang's mit de blutte Händ aa.";
+    console.log('=== PASS 2 — fix what is wrong ===\n');
+    console.log(buildRevisePrompt(source, candidate));
+    console.log('\n\n=== PASS 3 — make it natural ===\n');
+    console.log(buildNaturalPrompt(source, candidate));
+    console.log(
+      `\n\n(model ${STAGE.model}, reasoning ${STAGE.reasoning}, temperature 0, ` +
+        `max ${STAGE.maxOutputTokens} tokens)`,
+    );
+    return;
+  }
   const budgetUsd = Number(argValue(argv, 'budget') ?? DEFAULT_BUDGET_USD);
 
   const bench = new Bench({
@@ -671,6 +791,40 @@ async function main(): Promise<void> {
     console.log(`  ${row.item.text}\n    de:  ${de.text}\n    ch:  ${swiss.text}`);
   });
   bench.save();
+
+  // ---- self-revision: hand each sentence back to the same model
+  if (withRevise) {
+    console.log('\nRevising...');
+    await pool(rows, CONCURRENCY, async (row) => {
+      if (!row.swiss) return;
+      const revisions: (string | null)[] = [];
+      let candidate: string = row.swiss;
+      for (let round = 1; round <= REVISE_ROUNDS; round++) {
+        // Keyed on the text going in, so a round that changed nothing reuses
+        // the previous round's cached call instead of buying it twice.
+        const next = await reviseCached(
+          bench,
+          openrouter,
+          `revise|${contentHash(candidate)}`,
+          buildRevisePrompt(row.item.text, candidate),
+          'self-revise',
+        );
+        revisions.push(next);
+        if (next === null) break;
+        candidate = next;
+      }
+      row.revisions = revisions;
+      // Third pass, on whatever the revision loop settled on.
+      row.natural = await reviseCached(
+        bench,
+        openrouter,
+        `natural|${contentHash(candidate)}`,
+        buildNaturalPrompt(row.item.text, candidate),
+        'naturalize',
+      );
+    });
+    bench.save();
+  }
 
   // ---- judge
   if (withJudge) {
@@ -790,6 +944,58 @@ async function main(): Promise<void> {
       lines.push(`  ${c}x  ${v}`);
     }
   }
+  if (withRevise) {
+    lines.push('');
+    lines.push('--- self-revision (same model, same thinking, own output) ---');
+    for (let round = 0; round < REVISE_ROUNDS; round++) {
+      const seen = rows.filter((r) => r.revisions?.[round] != null);
+      const before = (r: Row) =>
+        round === 0 ? (r.swiss as string) : (r.revisions?.[round - 1] as string);
+      const changed = seen.filter((r) => r.revisions?.[round] !== before(r));
+      lines.push(
+        `  round ${round + 1}: ${changed.length}/${seen.length} sentences changed`,
+      );
+    }
+    const finalRev = (r: Row) =>
+      r.revisions?.filter((t): t is string => t !== null).at(-1) ?? null;
+    const stillClean = rows.filter((r) => {
+      const t = finalRev(r);
+      return t !== null && mechanicallyClean(mechanicalCheck(t));
+    });
+    lines.push(
+      `  mechanically clean after revision: ${stillClean.length}/${rows.length}`,
+    );
+    const natChanged = rows.filter(
+      (r) => r.natural != null && r.natural !== (finalRev(r) ?? r.swiss),
+    );
+    const natClean = rows.filter(
+      (r) => r.natural != null && mechanicallyClean(mechanicalCheck(r.natural)),
+    );
+    lines.push(
+      `  naturalness pass: ${natChanged.length}/${rows.length} changed, ` +
+        `${natClean.length}/${rows.length} mechanically clean`,
+    );
+    lines.push('');
+    for (const r of rows) {
+      if (!r.revisions) continue;
+      const chain = [r.swiss as string, ...r.revisions.filter((t) => t !== null)];
+      const moved =
+        !chain.every((t) => t === chain[0]) ||
+        (r.natural != null && r.natural !== chain.at(-1));
+      if (!moved) continue;
+      lines.push(`  ${r.item.text}`);
+      chain.forEach((t, i) => {
+        const tag = i === 0 ? 'orig' : `r${i}  `;
+        const same = i > 0 && t === chain[i - 1] ? '  (unchanged)' : '';
+        lines.push(`    ${tag} ${t}${same}`);
+      });
+      if (r.natural != null) {
+        const same = r.natural === chain.at(-1) ? '  (unchanged)' : '';
+        lines.push(`    nat  ${r.natural}${same}`);
+      }
+      lines.push('');
+    }
+  }
   lines.push('');
   lines.push('--- sentences ---');
   for (const r of rows) {
@@ -833,6 +1039,8 @@ async function main(): Promise<void> {
       scoreSwiss: r.scoreSwiss,
       mech: r.mech,
       critique: r.critique,
+      revisions: r.revisions,
+      natural: r.natural,
       audioA: r.audioA,
       audioB: r.audioB,
     })),

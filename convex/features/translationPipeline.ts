@@ -9,6 +9,7 @@ import { getRomanizationSource } from '../lib/localRomanization';
 import {
   getVoiceForText,
   getMixedVariantByRegion,
+  pickMixedVariantForNewRow,
   resolveMixedVariant,
   ROMANIZATION_LANGUAGES,
   IPA_LANGUAGES,
@@ -333,7 +334,12 @@ export async function processTranslationForCardHandler(
           args.preferredRegionVariant,
         )
       : null) ??
-    resolveMixedVariant(args.targetLanguage, args.textId as string);
+    // An existing row with no pin predates the column and keeps the legacy
+    // coin its wording was written under; only a brand-new row gets the
+    // decorrelated pick. See `pickMixedVariantForNewRow`.
+    (existingRow === null
+      ? pickMixedVariantForNewRow(args.targetLanguage, args.textId as string)
+      : resolveMixedVariant(args.targetLanguage, args.textId as string));
   const translateTarget = mixed ? mixed.subCode : args.targetLanguage;
   const regionVariant = mixed?.regionVariant;
 
@@ -759,7 +765,7 @@ async function replaceTranslationRow(
  * its claim here lets the next ensure pass ask for the rewrite of the new
  * wording right away instead of after the claim goes stale.
  */
-async function retireVariantRenderings(
+export async function retireVariantRenderings(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   targetLanguage: string,
@@ -900,6 +906,17 @@ async function replaceForVersionBump(
       translationVersion: getCurrentTranslationVersion(args.targetLanguage),
       ...(args.translationSource
         ? { translationSource: args.translationSource }
+        : {}),
+      // A `metadata_correction` that came back byte-identical must still
+      // record the gender it was regenerated under, or the sweep's
+      // `firstGenderCorrection` test (contentScheduling.ts) stays true and
+      // buys the same regeneration on every ensure pass, for good: the
+      // retry counter is only spent on the `retryGenderCorrection` branch,
+      // which a row can never reach while its `speakerGender` still holds
+      // the pre-correction value. A `version_bump` needs no equivalent,
+      // since stamping the version is itself what clears its trigger.
+      ...(args.translationReason === 'metadata_correction' && args.speakerGender
+        ? { speakerGender: args.speakerGender }
         : {}),
     });
     return {

@@ -396,6 +396,55 @@ describe('features/translationLLM', () => {
         expect(lines.join(' ')).toContain('Speaker gender agreement');
       });
 
+      // 2026-09-08 review: a politeness-only variant has no requestedGender,
+      // so the rewrite prompt carried no speaker at all. On Thai, going from
+      // the plain form to the particle form means ADDING ครับ or ค่ะ, and the
+      // form prompt's own fallback for an unstated speaker is ค่ะ — a
+      // male-voiced card got the female particle in a male voice.
+      it('a rewrite names the speaker as context when no gender was requested', () => {
+        const p = buildPrompt({
+          ...baseArgs,
+          targetLang: 'th',
+          targetLangName: 'Thai',
+          addressesSomeone: false,
+          speakerGender: 'male',
+          rewriteOf: 'ขอบคุณ',
+          requestedForm: form,
+        });
+        expect(p).toContain('The speaker is a man.');
+        expect(p).toContain('politeness particle');
+        // Context, not a re-gendering request: the wording the sentence
+        // already has must survive untouched.
+        expect(p).toContain(
+          'do not re-gender wording the sentence already has',
+        );
+        expect(p).not.toContain('masculine first-person forms');
+      });
+
+      it('a rewrite WITH a requested gender does not stack a second speaker line', () => {
+        const p = buildPrompt({
+          ...baseArgs,
+          addressesSomeone: false,
+          speakerGender: 'male',
+          requestedGender: 'female',
+          rewriteOf: 'Kommst du?',
+          requestedForm: form,
+        });
+        expect(p).toContain('feminine first-person forms');
+        expect(p).not.toContain('The speaker is a man.');
+      });
+
+      it('a rewrite with a neutral speaker names nobody', () => {
+        const p = buildPrompt({
+          ...baseArgs,
+          addressesSomeone: false,
+          speakerGender: 'neutral',
+          rewriteOf: 'Kommst du?',
+          requestedForm: form,
+        });
+        expect(p).not.toContain('The speaker is');
+      });
+
       it('nothing requested: no instruction lines and the prompt is unchanged', () => {
         expect(requestedFormInstruction({})).toEqual([]);
         const p = buildPrompt({ ...baseArgs, addressesSomeone: false });

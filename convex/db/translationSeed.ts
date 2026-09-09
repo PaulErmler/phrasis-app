@@ -9,6 +9,7 @@ import {
   audioPointer,
   audioPointersForTextLanguage,
 } from './translationReads';
+import { retireVariantRenderings } from '../features/translationPipeline';
 
 const SPANISH_VOICE_PREFIXES: Record<string, string> = {
   es: 'es-ES',
@@ -163,6 +164,18 @@ export const batchUpsertTranslations = internalMutation({
               : {}),
           });
           stats.translationsUpdated++;
+
+          // A curriculum fix is a canonical WORDING change, so the rendering
+          // variants of this (text, language) are rewrites of wording that
+          // has just been declared wrong. Invariant 3 in
+          // docs/architecture/translation-variants.md names this exact
+          // trigger. Without it a learner with a politeness setting keeps
+          // being served the old wording for good, because the variant sweep
+          // sees a variant row and never re-asks, while a learner with no
+          // setting gets the fix. Retiring also drops the in-flight variant
+          // claims, so the next ensure pass rewrites from the new wording
+          // instead of waiting out the claim.
+          await retireVariantRenderings(ctx, textId, tr.language);
 
           // Translation text changed. Delete audio so it regenerates on demand
           for (const audio of await audioPointersForTextLanguage(

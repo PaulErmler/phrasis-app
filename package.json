@@ -44,6 +44,7 @@
     "eval:stt": "tsx --env-file=.env.local scripts/eval-stt.ts",
     "eval:rom": "tsx --env-file=.env.local scripts/eval-rom.ts",
     "eval:swiss": "tsx --env-file=.env.local scripts/eval-swiss-german.mts",
+    "eval:qc": "tsx --env-file=.env.local scripts/eval-translation-qc.mts",
     "eval:validation": "tsx --env-file=.env.local scripts/eval-tts-validation.ts",
     "store:assets": "tsx scripts/store-screenshots.ts",
     "store:squares": "tsx scripts/store-squares.ts",

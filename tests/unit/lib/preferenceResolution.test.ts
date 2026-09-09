@@ -208,11 +208,21 @@ describe('resolveLanguageRendering', () => {
     expect(language.audioVariantKey).toBe(`${language.voiceGender}|desu-masu`);
   });
 
+  // Spain Spanish is a FAMILIAR split (casual and polite both render tú), so
+  // this level set really does collapse to one form. Turkish, which this test
+  // used before, is a distance split: casual+polite is {t, v} there and the
+  // form alternates, so the old assertion only passed because the fixture id
+  // happened to hash to index 0.
   it('levels that map to one form on this language do not alternate', () => {
-    const { language } = resolve('tr', {
+    const { language } = resolve('es', {
       politenessLevels: ['casual', 'polite'],
     });
     expect(language.form?.id).toBe('t');
+    for (let i = 0; i < 50; i++) {
+      expect(
+        pickPolitenessForm('es', ['casual', 'polite'], `no-alt-${i}`)!.id,
+      ).toBe('t');
+    }
   });
 
   it('several forms alternate deterministically per text', () => {
@@ -230,6 +240,45 @@ describe('resolveLanguageRendering', () => {
       ).toBe(form!.id);
     }
     expect(seen.size).toBe(3);
+  });
+
+  // 2026-09-08 review: `fnv1a(seed) % 2` is the seed's character parity and
+  // nothing more, so every two-way pick on one textId agreed with every other
+  // one whatever salt it used. The politeness form was a bit-for-bit copy of
+  // the speaker-gender coin: `du` on every male-voiced card, `Sie` on every
+  // female-voiced one, and never the other two combinations. Only ja and ko
+  // escaped, because three forms means `% 3`.
+  it('the form of a two-form language is independent of the speaker gender', () => {
+    for (const [code, levels] of [
+      ['de', ['casual', 'polite']],
+      ['es', ['casual', 'formal']],
+      ['th', ['casual', 'polite']],
+    ] as const) {
+      const combinations = new Map<string, number>();
+      for (let i = 0; i < 2000; i++) {
+        const id = `text-${code}-${i}`;
+        const form = pickPolitenessForm(code, levels, id);
+        const { audioSpeakerGender } = resolveCardSpeakerGenders(premade, id);
+        const key = `${audioSpeakerGender}|${form!.id}`;
+        combinations.set(key, (combinations.get(key) ?? 0) + 1);
+      }
+      // All four combinations occur, and none is rare enough to look like a
+      // leak: a perfect correlation shows up here as two missing keys.
+      expect(combinations.size).toBe(4);
+      for (const count of combinations.values()) {
+        expect(count).toBeGreaterThan(300);
+      }
+    }
+  });
+
+  it('the form pick is stable across calls for one text', () => {
+    for (let i = 0; i < 50; i++) {
+      const id = `stable-${i}`;
+      const first = pickPolitenessForm('de', ['casual', 'polite'], id);
+      expect(pickPolitenessForm('de', ['casual', 'polite'], id)!.id).toBe(
+        first!.id,
+      );
+    }
   });
 
   it('an address language without a "you" stays canonical', () => {
@@ -286,10 +335,15 @@ describe('resolveLanguageRendering', () => {
   });
 
   it('both axes combine into one key', () => {
-    const { language } = resolve('ja', { politenessLevels: ['casual'] }, premade, {
-      ...stamped,
-      renderingGenderOverride: 'male',
-    });
+    const { language } = resolve(
+      'ja',
+      { politenessLevels: ['casual'] },
+      premade,
+      {
+        ...stamped,
+        renderingGenderOverride: 'male',
+      },
+    );
     expect(language.textVariantKey).toBe('male|plain');
     expect(language.audioVariantKey).toBe('male|plain');
     expect(parseVariantKey(language.textVariantKey!)).toEqual({

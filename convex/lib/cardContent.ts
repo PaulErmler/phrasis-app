@@ -103,6 +103,13 @@ export interface CardTranslationContent {
    */
   renderedGender?: 'masculine' | 'feminine';
   renderedPoliteness?: 'casual' | 'polite' | 'formal';
+  /**
+   * The course's sentence-form settings ask for a rendering this language
+   * does not have yet, so `text` is the canonical wording and will change
+   * when the rewrite lands. Surfaces render it as pending rather than
+   * presenting the current sentence as the answer.
+   */
+  formPending?: boolean;
 }
 
 export interface CardAudioContent {
@@ -709,6 +716,12 @@ export async function buildTextContentBatchForLanguages(
         entry.renderedPoliteness !== 'unmarked' &&
         !entry.textVariantMissing
           ? { renderedPoliteness: entry.renderedPoliteness }
+          : {}),
+        // The wording the settings ask for is still being written. Only
+        // meaningful once there is something to show: a language with no
+        // text at all is already rendered as loading.
+        ...(entry?.textVariantMissing && translatedText.length > 0
+          ? { formPending: true }
           : {}),
       };
     });

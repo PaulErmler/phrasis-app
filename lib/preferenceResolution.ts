@@ -21,7 +21,7 @@
  * maps the global levels onto its own forms.
  */
 
-import { fnv1a } from './languages';
+import { seededIndex } from './languages';
 import {
   concreteLanguageCodes,
   getPolitenessConfig,
@@ -184,8 +184,13 @@ function addressesSomeone(text: RenderingText): boolean {
  * Pick the politeness form for one language: the single distinct form the
  * selected levels resolve to, or one of several by a per-text hash so a
  * mixed selection alternates evenly and a text keeps its form across
- * regenerations. Salted so it does not correlate with the gender or accent
- * bits of the same id.
+ * regenerations.
+ *
+ * `seededIndex`, never `fnv1a(...) % n`: a raw FNV-1a modulo 2 is the seed's
+ * character parity and nothing else, so it agrees with EVERY other `% 2` pick
+ * on the same textId no matter how each is salted. That is what tied the form
+ * to the speaker's gender until 2026-09-08 (`du` on every male-voiced card,
+ * `Sie` on every female-voiced one, never mixed).
  */
 export function pickPolitenessForm(
   code: string,
@@ -196,7 +201,7 @@ export function pickPolitenessForm(
   const forms = selectedPolitenessForms(code, levels);
   if (forms.length === 0) return null;
   if (forms.length === 1) return forms[0];
-  return forms[fnv1a(`${textId}|politeness`) % forms.length];
+  return forms[seededIndex(`${textId}|politeness`, forms.length)];
 }
 
 /** The gender part of a variant key. */

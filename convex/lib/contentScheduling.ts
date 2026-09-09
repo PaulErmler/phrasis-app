@@ -1688,7 +1688,16 @@ export async function scheduleMissingRenderings(
     // until the canonical sweep has landed it (and audio-only variants
     // need it as the text to speak).
     if (!canonical) continue;
-    if (!mayRegenerateTranslation(text, canonical)) continue;
+    // NO provenance gate here on purpose. `mayRegenerateTranslation` answers
+    // "may an automated pass overwrite or delete this row?", and creating a
+    // rendering variant does neither: the canonical row is read as the thing
+    // to rewrite and is never written. Gating on it meant every
+    // `curated-manual` row (the Essential greetings, in all 60 languages)
+    // ignored the course's politeness setting and the Flag dialog's
+    // correction for good, while `textVariantMissing` kept reporting the card
+    // as missing content. A user-created text never reaches this line anyway:
+    // `resolveLanguageRendering` returns the canonical rendering for one, so
+    // both keys are null and the loop has already continued above.
     const rendering = renderingForView(
       view,
       renderingText,

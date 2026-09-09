@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { resolveCardSpeakerGenders } from '@/lib/voices';
 import {
   SUPPORTED_LANGUAGES,
   getLanguageByCode,
@@ -20,7 +21,9 @@ import {
   IPA_LANGUAGES,
   normalizeLanguageCode,
   ROMANIZATION_LANGUAGES,
+  pickMixedVariantForNewRow,
   resolveMixedVariant,
+  getVoiceLocalesForLanguage,
   isMixedLanguage,
   DEFAULT_CONTENT_VERSION,
   getCurrentTranslationVersion,
@@ -345,6 +348,74 @@ describe('normalizeLanguageCode', () => {
   it('keeps non-variant codes unchanged', () => {
     expect(normalizeLanguageCode('en')).toBe('en');
     expect(normalizeLanguageCode('zh')).toBe('zh');
+  });
+});
+
+describe('the dialect pick is not the speaker-gender coin (2026-09-09)', () => {
+  // `fnv1a(seed) % 2` reads bit 0 of the digest, which is only the parity of
+  // the seed's odd-valued character codes: permutation-invariant, and equal
+  // to every other `% 2` or `& 1` on the same seed. So every Spain-dialect
+  // sentence in a Mixed Spanish course was spoken by a man and every Latin
+  // American one by a woman.
+  it('a new row picks its dialect independently of the voice', () => {
+    const combinations = new Map<string, number>();
+    for (let i = 0; i < 4000; i++) {
+      const textId = `text-${i}-${(i * 7919).toString(36)}`;
+      const dialect = pickMixedVariantForNewRow('es_mixed', textId)!.subCode;
+      const { audioSpeakerGender } = resolveCardSpeakerGenders(
+        { userCreated: false },
+        textId,
+      );
+      const key = `${audioSpeakerGender}|${dialect}`;
+      combinations.set(key, (combinations.get(key) ?? 0) + 1);
+    }
+    // A perfect correlation shows up here as two of the four keys missing.
+    expect(combinations.size).toBe(4);
+    for (const count of combinations.values()) {
+      expect(count).toBeGreaterThan(600);
+    }
+  });
+
+  it('the new pick is stable per text and null for a non-mixed code', () => {
+    for (let i = 0; i < 40; i++) {
+      const id = `stable-${i}`;
+      expect(pickMixedVariantForNewRow('es_mixed', id)!.subCode).toBe(
+        pickMixedVariantForNewRow('es_mixed', id)!.subCode,
+      );
+    }
+    expect(pickMixedVariantForNewRow('es', 'any')).toBeNull();
+    expect(pickMixedVariantForNewRow('en', 'any')).toBeNull();
+  });
+
+  // The legacy pick must NOT move: it is how an unpinned row from before
+  // `translations.regionVariant` reconstructs the dialect its wording was
+  // written under, and `backfillMixedDialectPin` stamps that answer. Change
+  // these and existing sentences flip dialect under their cards.
+  it('the legacy reconstruction is frozen', () => {
+    expect(resolveMixedVariant('es_mixed', 'seed-1')!.subCode).toBe('es');
+    expect(resolveMixedVariant('es_mixed', 'seed-2')!.subCode).toBe('es_latam');
+    expect(resolveMixedVariant('es_mixed', 'text-abc-123')!.subCode).toBe('es');
+    expect(
+      resolveMixedVariant('es_mixed', 'k17abcdef0123456789')!.subCode,
+    ).toBe('es');
+  });
+
+  // `pickAccentForText` still uses the raw hash. That is safe only while no
+  // language offers exactly two accents, because `% 3` does not read bit 0.
+  // The day one does, its accent becomes a copy of the speaker gender.
+  it('no language has exactly two accents outside the dialect path', () => {
+    const twoAccentLanguages = SUPPORTED_LANGUAGES.filter(
+      (lang) =>
+        getVoiceLocalesForLanguage(lang.code).filter((l) => l !== undefined)
+          .length === 2,
+    ).map((lang) => lang.code);
+    // es_mixed is a MIXED language, so its accent comes from the dialect
+    // pick above, not from `pickAccentForText`. Anything else appearing here
+    // means `pickAccentForText` needs `seededIndex` before that language
+    // ships. See mixed-spanish-dialect-gender-correlation-2026-09-08.
+    expect(twoAccentLanguages.filter((code) => !isMixedLanguage(code))).toEqual(
+      [],
+    );
   });
 });
 

@@ -423,6 +423,71 @@ describe('what a definitive verdict regenerates', () => {
     expect(llmEnqueues()).toEqual([]);
   });
 
+  // 2026-09-08 review. The regeneration a first correction buys can come back
+  // byte-identical: the model was already writing the sentence in a way it
+  // will not change (the audit found exactly this, `<speaker_gender>` being
+  // ignored). `replaceForVersionBump` restamped only the version, and the
+  // row's own `speakerGender` is patched solely on the differing-wording
+  // branch, so `firstGenderCorrection` stayed true and the counter, which is
+  // only spent on the RETRY branch, was never reached. Every ensure pass
+  // bought another translation, for good.
+  it('an identical-wording correction terminates instead of billing on every pass', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, rows } = await seed(t, {
+      metadata: { speakerGender: 'female' },
+      jaGender: 'masculine',
+    });
+    await t.run((ctx) =>
+      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
+    );
+
+    const before = await t.run((ctx) => ctx.db.get(rows.ja));
+    await sweep(t, textId);
+    expect(llmEnqueues()).toMatchObject([
+      { targetLanguage: 'ja', translationReason: 'metadata_correction' },
+    ]);
+
+    // The regeneration lands, and the model returns the wording unchanged.
+    await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
+      textId,
+      targetLanguage: 'ja',
+      translatedText: before!.translatedText,
+      translationReason: 'metadata_correction',
+      speakerGender: 'female',
+      replaceExisting: true,
+      // The wording is unchanged, so nothing needs voicing; a real voice
+      // name is not the subject here.
+      voiceName: 'ja-test-female',
+      skipTts: true,
+    });
+
+    // Each further pass gets a clean slate: the claim the previous enqueue
+    // took would defer the sweep on its own and prove nothing.
+    const passes: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      vi.mocked(llmPool.enqueueAction).mockClear();
+      await t.run(async (ctx) => {
+        for (const claim of await ctx.db
+          .query('llmTranslationClaims')
+          .collect()) {
+          await ctx.db.delete(claim._id);
+        }
+      });
+      await sweep(t, textId);
+      passes.push(llmEnqueues().length);
+    }
+
+    // At most the one counted retry, then silence. Before the fix every pass
+    // enqueued, so this was [1, 1, 1, 1, 1].
+    expect(passes.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(1);
+    expect(passes[passes.length - 1]).toBe(0);
+    // The row now records the gender it was regenerated under, which is what
+    // moves it off the free first-correction branch.
+    expect((await t.run((ctx) => ctx.db.get(rows.ja)))?.speakerGender).toBe(
+      'female',
+    );
+  });
+
   it('never touches a user-written text', async () => {
     const t = convexTest(schema, modules);
     const { textId } = await seed(t, {

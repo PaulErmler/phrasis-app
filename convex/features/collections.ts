@@ -36,6 +36,7 @@ import {
   scheduleMissingContent,
   scheduleTranslationForLanguage,
   scheduleAudioForLanguage,
+  scheduleMissingRenderings,
 } from '../lib/contentScheduling';
 import {
   isCollectionAccessible,
@@ -90,6 +91,7 @@ import {
   renderingTextOf,
 } from '../db/translationReads';
 import { getCourseSettings } from '../db/courseSettings';
+import type { RenderingSettings } from '../../lib/preferenceResolution';
 
 // ============================================================================
 // QUERIES
@@ -149,6 +151,16 @@ export const browseCollectionTexts = query({
       audioRecordings: v.array(audioRecordingValidator),
       missingTranslationLanguages: v.array(v.string()),
       needsAnnotationBackfill: v.boolean(),
+      /**
+       * The course's sentence-form settings want a rendering this row does
+       * not have yet. Same reason `needsAnnotationBackfill` exists: the
+       * client's `requestPreviewTranslations` batching keys off
+       * `missingTranslationLanguages`, and a row whose canonical
+       * translations are all present is never sent, so the rewrite was
+       * never asked for and the row sat on "updating" for good
+       * (2026-09-09, the Thai pre-A1 rows).
+       */
+      needsRenderingRewrite: v.boolean(),
     }),
   ),
   handler: async (ctx, args) => {
@@ -313,6 +325,10 @@ export const browseCollectionTexts = query({
       // could not see a stale-engine row, so a Hebrew preview kept its old
       // consonant-only line until the card was opened elsewhere.
       const needsAnnotationBackfill = content.hasMissingAnnotation;
+      // `formPending` is per language; the row is what the client batches.
+      const needsRenderingRewrite = content.translations.some(
+        (tr) => tr.formPending === true,
+      );
       return {
         _id: row.text._id,
         text: sourceTextFromContent(content, row.text),
@@ -333,6 +349,7 @@ export const browseCollectionTexts = query({
         audioRecordings: content.audioRecordings,
         missingTranslationLanguages,
         needsAnnotationBackfill,
+        needsRenderingRewrite,
       };
     });
 
@@ -458,6 +475,16 @@ export async function scheduleMissingTranslationsForText(
     llmPriority?: LlmPriority;
     requestedByUserId?: string;
     stamps?: RenderingStampCollector;
+    /**
+     * The course's sentence-form settings, when the caller is a browse
+     * surface that should render them. Passing them runs the variant sweep
+     * for this text, TEXT ONLY (`skipTts`), which is Paul's 2026-08-28 rule
+     * for browse surfaces: they may buy a translation, never a clip. Without
+     * it a collection preview showed the canonical wording no matter what
+     * politeness level the course had set, since only the review ensure path
+     * ever asked for a variant.
+     */
+    renderingSettings?: RenderingSettings;
   },
 ): Promise<number> {
   const ownStampCollector = opts?.stamps === undefined;
@@ -568,6 +595,28 @@ export async function scheduleMissingTranslationsForText(
       scheduled++;
     }
   }
+  // The rendering the course's sentence-form settings ask for, so a browse
+  // surface shows the level the learner picked instead of the canonical
+  // wording. Text only: `skipTts` keeps the browse-surface rule that a
+  // preview may buy a translation but never a clip. A course with no
+  // settings returns after zero reads.
+  if (opts?.renderingSettings !== undefined) {
+    const variants = await scheduleMissingRenderings(
+      ctx,
+      text._id,
+      text,
+      wantedLanguages,
+      [],
+      opts.renderingSettings,
+      {
+        skipTts: true,
+        stamps,
+        requestedByUserId: opts?.requestedByUserId,
+        llmPriority: opts?.llmPriority,
+      },
+    );
+    scheduled += variants.translationsScheduled;
+  }
   if (ownStampCollector) {
     await flushRenderingStamps(ctx, stamps, opts?.requestedByUserId);
   }
@@ -611,6 +660,9 @@ export const requestPreviewTranslations = mutation({
     // One collector for the batch, so the classifier is asked once per
     // language per 25 rows instead of once per text.
     const stamps = newRenderingStampCollector();
+    const renderingSettings = renderingSettingsOf(
+      await getCourseSettings(ctx, course._id),
+    );
     let translationsScheduled = 0;
     for (const textId of textIds) {
       const text = await ctx.db.get(textId);
@@ -629,7 +681,7 @@ export const requestPreviewTranslations = mutation({
         languages,
         // Explicit preview request: the viewing user caused this spend. The
         // prewarm sibling below stays unattributed (speculative work).
-        { requestedByUserId: userId, stamps },
+        { requestedByUserId: userId, stamps, renderingSettings },
       );
     }
     await flushRenderingStamps(ctx, stamps, userId);
@@ -678,13 +730,16 @@ export const prewarmPreviewTranslations = mutation({
     );
 
     const stamps = newRenderingStampCollector();
+    const renderingSettings = renderingSettingsOf(
+      await getCourseSettings(ctx, course._id),
+    );
     let translationsScheduled = 0;
     for (const text of texts) {
       translationsScheduled += await scheduleMissingTranslationsForText(
         ctx,
         text,
         languages,
-        { stamps },
+        { stamps, renderingSettings },
       );
     }
     await flushRenderingStamps(ctx, stamps);

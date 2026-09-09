@@ -3,6 +3,7 @@ import { getCourseSettings } from '../db/courseSettings';
 import { MutationCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
 import { asVoiceGender } from '../types';
+import type { LanguageRendering } from '../../lib/preferenceResolution';
 import {
   carriedAnnotationFields,
   clearedAnnotationFields,
@@ -24,7 +25,7 @@ import {
   viewOfCard,
   type ServedTranslation,
   audioPointer,
-  renderingForView,
+  sourceRenderingForView,
   renderingSettingsOf,
   renderingTextOf,
   resolveServedRendering,
@@ -77,6 +78,15 @@ export type CardEditPlan = {
    * read this; Path A patches the live rows by id.
    */
   servedTranslationMap: Map<string, ServedTranslation>;
+  /**
+   * language → the rendering `resolveServedRendering` resolved for it. Keyed
+   * by the course language like every map here. Carried on the plan rather
+   * than recomputed, because resolving it needs the canonical row's
+   * `regionVariant`: a mixed code maps the same level set onto different
+   * forms per dialect (Spain tú at "polite", Latin American usted), so a
+   * re-derivation without the dialect computes a key the card never reads.
+   */
+  renderingMap: Map<string, LanguageRendering>;
   /**
    * The wording the card shows for a course language. The served row, or
    * the source text for the source slot, also while the accent row it
@@ -168,7 +178,9 @@ export async function resolveCardEditPlan(
   );
   const existingTranslationMap = new Map<string, Doc<'translations'>>();
   const servedTranslationMap = new Map<string, ServedTranslation>();
+  const renderingMap = new Map<string, LanguageRendering>();
   rowBackedLanguages.forEach(([lang], i) => {
+    renderingMap.set(lang, servedRenderings[i].rendering);
     const served = servedRenderings[i].served;
     if (!served) return;
     existingTranslationMap.set(lang, served.live);
@@ -226,6 +238,7 @@ export async function resolveCardEditPlan(
     submittedMap,
     existingTranslationMap,
     servedTranslationMap,
+    renderingMap,
     shownText,
     changedLanguages,
     sourceWordingChanged,
@@ -549,21 +562,32 @@ export async function forkSharedTextForEdit(
     // its text. The copy is a user-owned text that reads canonical rows
     // only, so the pointer is copied without its key.
     const rowLang = rowLanguages.get(lang) ?? lang;
-    const rendering = renderingForView(
-      plan.view,
-      renderingTextOf(text),
-      card.textId,
-      rowLang,
-    );
+    // The rendering the plan already resolved WITH the canonical row's
+    // dialect. Recomputing it here without one resolved a mixed code under
+    // its default dialect (es_mixed → Spain, familiar split) while the served
+    // row had resolved under the row's own (es_latam, distance split), so the
+    // keyed lookup missed and the copy paired a variant wording with the
+    // canonical clip. The source slot of a card with no accent row is backed
+    // by no row, so it has no entry: its wording is the text and only the
+    // voice can vary.
+    const rendering =
+      plan.renderingMap.get(lang) ??
+      sourceRenderingForView(plan.view, renderingTextOf(text), card.textId);
+    const keyed = rendering.audioVariantKey
+      ? await audioPointer(ctx, card.textId, rowLang, rendering.audioVariantKey)
+      : null;
+    // Fall back to the canonical pointer only when the canonical wording is
+    // what the card shows. When a variant row with its own wording is served,
+    // the canonical clip speaks a different sentence, so copying it would
+    // pair this wording with that audio for good. Copy nothing and let the
+    // fork's own ensure sweep voice the carried wording.
+    const servesOwnVariantWording =
+      served !== undefined && served.row.variantKey !== undefined;
     const row =
-      (rendering.audioVariantKey
-        ? await audioPointer(
-            ctx,
-            card.textId,
-            rowLang,
-            rendering.audioVariantKey,
-          )
-        : null) ?? (await audioPointer(ctx, card.textId, rowLang));
+      keyed ??
+      (servesOwnVariantWording
+        ? null
+        : await audioPointer(ctx, card.textId, rowLang));
     if (row) {
       // The copy shares the same asset. Staleness (the asset's
       // ttsVersion stamp) travels with the asset itself.
