@@ -279,15 +279,17 @@ export const courseSettingsFields = {
   currentSessionId: v.optional(v.string()),
 } as const;
 
-// TRANSITIONAL (2026-09-10 cutover to rendering keys): the withdrawn course
-// gender choice, stored on dev and staging `courseSettings` and
-// `onboardingProgress` rows only; unset by the runAll-chained
-// `dropFirstPersonForms` / `dropOnboardingFirstPersonForms` migrations, then
-// dropped. Part of the tables and the DOCUMENT validators (a stored row must
-// validate on the way out), never of the settings field sets, so no
-// mutation accepts it.
-const transitionalFirstPersonForms = {
+// TRANSITIONAL (the withdrawn sentence-form settings): the course gender
+// choice and the politeness choice, stored on dev and staging
+// `courseSettings` and `onboardingProgress` rows only; unset by the
+// runAll-chained `dropFirstPersonForms` / `dropPolitenessLevels` and their
+// onboarding siblings, then dropped (kanban:
+// drop-rendering-cutover-columns). Part of the tables and the DOCUMENT
+// validators (a stored row must validate on the way out), never of the
+// settings field sets, so no mutation accepts one.
+const transitionalSentenceForms = {
   firstPersonForms: v.optional(v.any()),
+  politenessLevels: v.optional(v.any()),
 } as const;
 
 // Full `courseSettings` document validator (includes system fields).
@@ -295,7 +297,7 @@ export const courseSettingsDocValidator = v.object({
   _id: v.id('courseSettings'),
   _creationTime: v.number(),
   ...courseSettingsFields,
-  ...transitionalFirstPersonForms,
+  ...transitionalSentenceForms,
 });
 
 // The subset of course settings that `updateCourseSettings`
@@ -403,7 +405,7 @@ export const onboardingProgressDocValidator = v.object({
   _id: v.id('onboardingProgress'),
   _creationTime: v.number(),
   ...onboardingProgressFields,
-  ...transitionalFirstPersonForms,
+  ...transitionalSentenceForms,
 });
 
 export default defineSchema({
@@ -662,6 +664,10 @@ export default defineSchema({
     renderingStampRequestedAt: v.optional(v.any()),
     renderingStampAttempts: v.optional(v.any()),
     sameAsCanonical: v.optional(v.any()),
+    // TRANSITIONAL (the withdrawn politeness choice): rows the versioning
+    // prompt derived from another rendering. Unset by
+    // `dropVersionedFromText`, then dropped.
+    versionedFromText: v.optional(v.any()),
     /**
      * When a sweep last asked for this row's missing annotations
      * (romanization, IPA, furigana). A transient failure leaves the value
@@ -951,7 +957,7 @@ export default defineSchema({
   // above, shared with the onboarding query/mutation validators.
   onboardingProgress: defineTable({
     ...onboardingProgressFields,
-    ...transitionalFirstPersonForms,
+    ...transitionalSentenceForms,
   }).index('by_userId', ['userId']),
 
   // Courses table - stores user language learning courses
@@ -967,7 +973,7 @@ export default defineSchema({
   // Course settings table. Separated so changes don't trigger course re-fetches
   courseSettings: defineTable({
     ...courseSettingsFields,
-    ...transitionalFirstPersonForms,
+    ...transitionalSentenceForms,
   }).index('by_courseId', ['courseId']),
 
   // Decks table - one deck per course, auto-created
@@ -1052,6 +1058,14 @@ export default defineSchema({
     // not user-created. Cleared when an edit forks the text into a
     // user-owned copy. Never indexed.
     accentLanguage: v.optional(v.string()),
+    // TRANSITIONAL (the withdrawn sentence-form settings): the stamp that
+    // marked a card as following the course's politeness pick, and the
+    // Flag dialog's per-card corrections. A sentence has one rendering now,
+    // so nothing reads these; unset by `dropCardRenderingStamps`, then
+    // dropped (kanban: drop-rendering-cutover-columns).
+    followsCoursePreferences: v.optional(v.any()),
+    renderingGenderOverride: v.optional(v.any()),
+    renderingPolitenessOverride: v.optional(v.any()),
   })
     // INDEX BUDGET — read before adding an index here. This table carries 23
     // database indexes (limit 32) and EVERY card write pays for updating all
@@ -1810,9 +1824,8 @@ export default defineSchema({
     // user wait out the warm pool's queue. Matters most during onboarding:
     // the warmup translates exactly the texts a new user hits first.
     priority: v.optional(llmPriorityValidator),
-    // The rendering key the claimed job produces. Every job since
-    // 2026-09-10 is keyed; a claim without one is from before.
-    variantKey: v.optional(v.string()),
+    // TRANSITIONAL (the withdrawn politeness choice): see the TTS claim.
+    variantKey: v.optional(v.any()),
     // When the job's pool attempts were exhausted
     // (`onLlmTranslationComplete`). The claim is kept, workId cleared, and
     // blocks a new attempt for VARIANT_RETRY_COOLDOWN_MS

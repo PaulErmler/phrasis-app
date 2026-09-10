@@ -1288,6 +1288,139 @@ export const dropOnboardingFirstPersonForms = migrations.define({
   migrateOne: (_ctx, doc) => unsetPatch(doc, ['firstPersonForms']),
 });
 
+/**
+ * A pair cannot hold more live renderings than the withdrawn settings could
+ * ask for (three politeness forms x two voices), and the read only has to
+ * find the oldest.
+ */
+const MAX_LIVE_RENDERINGS = 16;
+
+/**
+ * Collapse a (text, language) that the withdrawn politeness choice left with
+ * several live renderings down to ONE
+ * (docs/architecture/rendering-keys.md). Each row decides on its own, so the
+ * batch order does not matter and a re-run is a no-op:
+ *
+ *  - a keyed row whose pair also has an UNKEYED live row is deleted (the
+ *    unkeyed wording is what every deployment shows today, production
+ *    included, so it is the one that survives);
+ *  - otherwise the OLDEST live row of the pair survives, with the form
+ *    dropped from its key, and every younger keyed row goes.
+ *
+ * An unkeyed row is never touched, so production, which has only those,
+ * comes through unchanged.
+ */
+export async function collapseLiveRenderingsOne(
+  ctx: MutationCtx,
+  doc: Doc<'translations'>,
+): Promise<Partial<Doc<'translations'>> | undefined> {
+  if (doc.variantKey === undefined || doc.supersededAt !== undefined) {
+    return undefined;
+  }
+  const live = await ctx.db
+    .query('translations')
+    .withIndex('by_text_language_supersededAt', (q) =>
+      q
+        .eq('textId', doc.textId)
+        .eq('targetLanguage', doc.targetLanguage)
+        .eq('supersededAt', undefined),
+    )
+    .take(MAX_LIVE_RENDERINGS);
+  if (live.some((row) => row.variantKey === undefined)) {
+    await ctx.db.delete(doc._id);
+    return undefined;
+  }
+  const survivor = live.reduce((oldest, row) =>
+    row._creationTime < oldest._creationTime ? row : oldest,
+  );
+  if (survivor._id !== doc._id) {
+    await ctx.db.delete(doc._id);
+    return undefined;
+  }
+  const voice = doc.variantKey.split('|')[0];
+  return voice === doc.variantKey ? undefined : { variantKey: voice };
+}
+
+/** The audio half of the collapse, by the same rule. */
+export async function collapseAudioPointerOne(
+  ctx: MutationCtx,
+  doc: Doc<'audioRecordings'>,
+): Promise<Partial<Doc<'audioRecordings'>> | undefined> {
+  if (doc.variantKey === undefined) return undefined;
+  const pointers = await ctx.db
+    .query('audioRecordings')
+    .withIndex('by_text_and_language', (q) =>
+      q.eq('textId', doc.textId).eq('language', doc.language),
+    )
+    .take(MAX_LIVE_RENDERINGS);
+  if (pointers.some((row) => row.variantKey === undefined)) {
+    await deleteAudioRow(ctx, doc, { keepAsset: true });
+    return undefined;
+  }
+  const survivor = pointers.reduce((oldest, row) =>
+    row._creationTime < oldest._creationTime ? row : oldest,
+  );
+  if (survivor._id !== doc._id) {
+    await deleteAudioRow(ctx, doc, { keepAsset: true });
+    return undefined;
+  }
+  const voice = doc.variantKey.split('|')[0];
+  return voice === doc.variantKey ? undefined : { variantKey: voice };
+}
+
+export const collapseLiveRenderings = migrations.define({
+  table: 'translations',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (ctx, doc) => collapseLiveRenderingsOne(ctx, doc),
+});
+
+export const collapseAudioPointers = migrations.define({
+  table: 'audioRecordings',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (ctx, doc) => collapseAudioPointerOne(ctx, doc),
+});
+
+export const dropVersionedFromText = migrations.define({
+  table: 'translations',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => unsetPatch(doc, ['versionedFromText']),
+});
+
+export const dropCardRenderingStamps = migrations.define({
+  table: 'cards',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) =>
+    unsetPatch(doc, [
+      'followsCoursePreferences',
+      'renderingGenderOverride',
+      'renderingPolitenessOverride',
+    ]),
+});
+
+export const dropLlmClaimKeys = migrations.define({
+  table: 'llmTranslationClaims',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => unsetPatch(doc, ['variantKey']),
+});
+
+export const dropTtsClaimKeys = migrations.define({
+  table: 'ttsGenerationClaims',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => unsetPatch(doc, ['variantKey']),
+});
+
+export const dropPolitenessLevels = migrations.define({
+  table: 'courseSettings',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => unsetPatch(doc, ['politenessLevels']),
+});
+
+export const dropOnboardingPolitenessLevels = migrations.define({
+  table: 'onboardingProgress',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => unsetPatch(doc, ['politenessLevels']),
+});
+
 export const runAll = migrations.runner([
   internal.migrations.perModeSettingsBackfill,
   internal.migrations.stripTrailingUnderscores,
@@ -1324,4 +1457,12 @@ export const runAll = migrations.runner([
   internal.migrations.dropGenderCorrectionAttempts,
   internal.migrations.dropFirstPersonForms,
   internal.migrations.dropOnboardingFirstPersonForms,
+  internal.migrations.collapseLiveRenderings,
+  internal.migrations.collapseAudioPointers,
+  internal.migrations.dropVersionedFromText,
+  internal.migrations.dropCardRenderingStamps,
+  internal.migrations.dropLlmClaimKeys,
+  internal.migrations.dropTtsClaimKeys,
+  internal.migrations.dropPolitenessLevels,
+  internal.migrations.dropOnboardingPolitenessLevels,
 ]);
