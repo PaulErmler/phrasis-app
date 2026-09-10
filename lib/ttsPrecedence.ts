@@ -7,7 +7,7 @@
  * the language is switched to this provider. Providers not listed are kept
  * as-is (existing audio still plays; no regen).
  *
- * Read by `scheduleMissingContent` in convex/features/decks.ts. Legacy rows
+ * Read by `ensureTextContent` in convex/lib/contentScheduling.ts. Legacy rows
  * with no `ttsProvider` field are treated as 'google' there before this
  * function sees them.
  */

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -31,7 +31,7 @@ import {
   courseAsksPoliteness,
   coursePolitenessRows,
   type PolitenessLevel,
-  POLITENESS_LEVELS,
+  recommendedPolitenessLevels,
 } from '@/lib/languageForms';
 import { PolitenessRows } from '@/components/course/PolitenessRows';
 
@@ -56,11 +56,12 @@ export function CreateCourseDialog({
   // Step 5: the politeness setting (lib/languageForms.ts), asked only when
   // the target marks it (the dialog then has four steps). Its rows come
   // from the picked languages, so the state is the stored global levels.
-  // Every level starts ticked, so a learner who does not care can continue
-  // straight through.
-  const [politenessLevels, setPolitenessLevels] = useState<PolitenessLevel[]>([
-    ...POLITENESS_LEVELS,
-  ]);
+  // The recommended set for those languages starts ticked (below, once the
+  // rows are known), so a learner who does not care can continue straight
+  // through.
+  const [politenessLevels, setPolitenessLevels] = useState<PolitenessLevel[]>(
+    [],
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Course created by a partially-failed submit, stamped with the answers it
   // was created FROM. A retry reuses it instead of creating a duplicate, but
@@ -105,6 +106,10 @@ export function CreateCourseDialog({
         : [],
     [targetLanguage, baseLanguage],
   );
+  // Picking a language (re)starts from its recommendation.
+  useEffect(() => {
+    setPolitenessLevels(recommendedPolitenessLevels(politenessRows));
+  }, [politenessRows]);
 
   const resetForm = () => {
     setStep(1);
@@ -113,7 +118,7 @@ export function CreateCourseDialog({
     setDifficulty(null);
     setDailyGoal(null);
     setCustomGoal('');
-    setPolitenessLevels([...POLITENESS_LEVELS]);
+    setPolitenessLevels([]);
     setIsSubmitting(false);
     createdCourseRef.current = null;
   };
@@ -411,7 +416,7 @@ export function CreateCourseDialog({
                 selected={politenessLevels}
                 onChange={setPolitenessLevels}
                 compact
-                recommendAll
+                recommendDefault
               />
             </div>
           )}

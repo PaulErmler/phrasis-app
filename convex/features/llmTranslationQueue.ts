@@ -1,9 +1,5 @@
 import { v, Infer } from 'convex/values';
-import {
-  NonRetryableError,
-  vOnCompleteArgs,
-  type WorkId,
-} from '@convex-dev/workpool';
+import { vOnCompleteArgs, type WorkId } from '@convex-dev/workpool';
 import {
   internalAction,
   internalMutation,
@@ -19,6 +15,7 @@ import {
   normalizeModelOutput,
   translateBestOfN,
   translateTextWithLLM,
+  type TranslationPromptArgs,
 } from './translationLLM';
 import {
   ACCENT_REWRITE_STAGES,
@@ -33,12 +30,20 @@ import {
   resolveTranslationStages,
   ROMANIZATION_LANGUAGES,
   TRANSLATION_RULES,
-  type AccentRewriteConfig,
   type TranslationRuleId,
 } from '../../lib/languages';
 import { SOURCE_VERBATIM_TRANSLATION_SOURCE } from '../../lib/translationProvenance';
-import { getPolitenessConfig } from '../../lib/languageForms';
-import type { TranslationPromptArgs } from './translationLLM';
+import {
+  languageMarksFirstPerson,
+  NO_FORM,
+  politenessFormById,
+  sentenceAddressesSomeone,
+  type PolitenessForm,
+} from '../../lib/languageForms';
+import {
+  parseRenderingKey,
+  primaryRenderingKey,
+} from '../../lib/preferenceResolution';
 import {
   storeTranslationAndScheduleTTSHandler,
   verbatimTranslationArgs,
@@ -48,7 +53,6 @@ import { getRomanizationSource } from '../lib/localRomanization';
 import { romanizationAfterFailure } from '../lib/textAnnotations';
 import { llmPool, llmWarmPool, type PoolRunResult } from '../lib/workpools';
 import {
-  asVoiceGender,
   llmPriorityValidator,
   ttsPriorityValidator,
   translationReasonValidator,
@@ -60,45 +64,50 @@ import {
   resolveRetranslationIfPending,
 } from './cardEditAudit';
 import { captureGeneration } from '../lib/posthogAi';
+import { verifyRendering, type RenderingVerdict } from './renderingClassification';
 
 /**
- * LLM translation pipeline, built on the `llmPool` / `llmWarmPool` workpools
+ * LLM rendering pipeline, built on the `llmPool` / `llmWarmPool` workpools
  * (convex/lib/workpools.ts; the tier comes from `llmPriority`, see
- * `llmPriorityValidator`). Per translation:
+ * `llmPriorityValidator`). One job renders a LIST of rendering keys for one
+ * (text, language) (docs/architecture/rendering-keys.md):
  *
- *   1. `claimLlmTranslationIfAvailable` (called from `scheduleMissingContent`
- *      / `flagTranslation`) atomically reserves the (textId, language) slot.
+ *   1. `enqueueRenderingJob` (convex/lib/contentScheduling.ts) claims every
+ *      key in the mutation (`claimLlmTranslationIfAvailable`), so the job
+ *      never waits for another job.
  *   2. `enqueueLlmTranslation` enqueues `processLlmTranslationForCard` into
- *      the pool and stamps the pool's workId onto the claim: the claim now
- *      lives exactly as long as the pool job.
- *   3. The worker calls `translateTextWithLLM` (with the language's model-
- *      stage fallback chain). On success it writes via
- *      `storeTranslationAndScheduleTTS` (the same mutation the Google path
- *      uses, so romanization/TTS downstream is unchanged). On failure it
- *      THROWS: the pool retries with jittered exponential backoff.
+ *      the pool and stamps the pool's workId onto each claim: the claims
+ *      now live exactly as long as the pool job.
+ *   3. The worker renders the PRIMARY key first when it is in the list (a
+ *      fresh translation for the text's voice and primary form), then every
+ *      other key by versioning the primary wording, verifies each wording
+ *      against its key with the rendering classifier (one retry), and
+ *      writes each row via `storeTranslationAndScheduleTTS`. On a
+ *      translation failure it THROWS: the pool retries with jittered
+ *      exponential backoff.
  *   4. `onLlmTranslationComplete` (guaranteed to run on success, failure, and
- *      cancellation) releases the claim: or, when the pool's retry budget is
- *      exhausted, enqueues the Google Translate fallback and re-points the
- *      claim at the fallback job. `onGoogleFallbackComplete` then releases it.
+ *      cancellation) releases the claims, or, when the pool's retry budget
+ *      is exhausted, keeps them marked failed for a cooldown. There is no
+ *      machine-translation fallback: a key the model cannot render stays
+ *      empty until the cooldown passes.
  */
 
 /**
- * Per-(textId, language) LLM claim freshness window. The claim is released by
- * the pool job's onComplete (guaranteed), so staleness is only a catastrophic
- * backstop, e.g. the onComplete handler itself failing. Generous on purpose:
- * a pool job (retries included) can legitimately run for several minutes, and
- * a premature "stale" verdict makes a concurrent reconcile double-enqueue.
- * Exported so callers like `scheduleMissingContent` can decide whether to
- * defer a TTS enqueue while an LLM retranslation is in flight for the row.
+ * Per-(textId, language, key) LLM claim freshness window. The claim is
+ * released by the pool job's onComplete (guaranteed), so staleness is only a
+ * catastrophic backstop, e.g. the onComplete handler itself failing.
+ * Generous on purpose: a pool job (retries included) can legitimately run
+ * for several minutes, and a premature "stale" verdict makes a concurrent
+ * reconcile double-enqueue. Exported so callers like `ensureTextContent`
+ * can decide whether to defer a TTS enqueue while a job is in flight for
+ * the row.
  */
 export const CLAIM_STALE_MS = 10 * 60 * 1000;
 
 /**
- * Point-read the (textId, targetLanguage, variant) LLM translation claim,
- * if any. `variantKey` undefined is the canonical job; a rendering variant
- * (docs/architecture/translation-variants.md) holds its own claim, so two
- * learners with the same preference share one job and a variant never
- * blocks the canonical fill.
+ * Point-read the (textId, targetLanguage, key) LLM claim, if any. Every
+ * job since the rendering keys is keyed; `variantKey` undefined only
+ * matches a claim from before.
  */
 export async function getLlmClaim(
   ctx: QueryCtx | MutationCtx,
@@ -123,52 +132,20 @@ export function isClaimFresh(claim: { claimedAt: number }): boolean {
 }
 
 /**
- * How long a rendering variant whose rewrite attempts were exhausted holds
- * its claim (`variantFailedAt`) before the ensure path may buy another
- * attempt. A sentence the model refuses is otherwise re-bought on every
- * card view, since the card keeps reporting the variant as missing.
+ * How long a key whose attempts were exhausted holds its claim
+ * (`variantFailedAt`) before the ensure path may buy another attempt. A
+ * sentence the model refuses is otherwise re-bought on every card view,
+ * since the card keeps reporting the key as missing.
  */
 export const VARIANT_RETRY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
-/** True while an exhausted variant claim is still inside its cooldown. */
+/** True while an exhausted claim is still inside its cooldown. */
 function variantFailureHolds(claim: { variantFailedAt?: number }): boolean {
   return (
     claim.variantFailedAt !== undefined &&
     Date.now() - claim.variantFailedAt < VARIANT_RETRY_COOLDOWN_MS
   );
 }
-
-/**
- * Every VARIANT claim of (text, language), whatever the key: the index
- * range past the canonical claim. For `retireVariantRenderings`, which
- * releases them with the variant rows.
- */
-export async function variantLlmClaims(
-  ctx: QueryCtx | MutationCtx,
-  textId: Id<'texts'>,
-  targetLanguage: string,
-): Promise<Doc<'llmTranslationClaims'>[]> {
-  return await ctx.db
-    .query('llmTranslationClaims')
-    .withIndex('by_text_language_variant', (q) =>
-      q
-        .eq('textId', textId)
-        .eq('targetLanguage', targetLanguage)
-        .gt('variantKey', ''),
-    )
-    .take(64);
-}
-
-/**
- * Retry budget for the Google fallback job (the LLM pool default of 8
- * attempts belongs to the quality path; the fallback is a last resort and
- * fails terminally after 3).
- */
-const GOOGLE_FALLBACK_RETRY = {
-  maxAttempts: 3,
-  initialBackoffMs: 2_000,
-  base: 3,
-} as const;
 
 /**
  * Would `claimLlmTranslationIfAvailable` at `priority` return null against this
@@ -180,9 +157,9 @@ function llmClaimBlocksPriority(
   claim: Doc<'llmTranslationClaims'>,
   priority: LlmPriority | undefined,
 ): boolean {
-  // An exhausted variant rewrite blocks every caller for its cooldown and
-  // nobody after it: the job is over, there is nothing to take over, and
-  // asking again inside the cooldown would buy the same refusal.
+  // An exhausted job blocks every caller for its cooldown and nobody after
+  // it: the job is over, there is nothing to take over, and asking again
+  // inside the cooldown would buy the same refusal.
   if (claim.variantFailedAt !== undefined) return variantFailureHolds(claim);
   const fresh = isClaimFresh(claim);
   const takeover =
@@ -193,11 +170,9 @@ function llmClaimBlocksPriority(
 /**
  * True when a claim exists that `claimLlmTranslationIfAvailable` at `priority`
  * would respect (return null against). Used by the probe path in
- * `scheduleTranslationForLanguage`: a background-held slot probed at
- * interactive priority must classify as NEEDY, because the real run would take
- * the claim over (cancel the warm job, re-enqueue interactively), and that is a
- * write. A priority-blind check would report it handled and leave the user
- * waiting out `llmWarmPool`'s queue.
+ * `enqueueRenderingJob`: a background-held slot probed at interactive
+ * priority must classify as NEEDY, because the real run would take the claim
+ * over (cancel the warm job, re-enqueue interactively), and that is a write.
  */
 export async function hasBlockingLlmClaim(
   ctx: QueryCtx | MutationCtx,
@@ -211,10 +186,10 @@ export async function hasBlockingLlmClaim(
 }
 
 /**
- * Atomically check-and-insert an LLM translation claim. Returns the new claim's
- * `_id` iff the caller acquired the claim (and should enqueue the job), or null
- * when a fresh claim already holds the slot. Stale claims (older than
- * CLAIM_STALE_MS) are reclaimed.
+ * Atomically check-and-insert an LLM claim for one key. Returns the new
+ * claim's `_id` iff the caller acquired the claim (and should enqueue the
+ * job), or null when a fresh claim already holds the slot. Stale claims
+ * (older than CLAIM_STALE_MS) are reclaimed.
  *
  * One exception to "fresh claim wins", mirroring `claimTtsIfAvailable`: an
  * interactive caller takes over a fresh claim held at priority 'background'.
@@ -261,15 +236,19 @@ const llmJobArgsValidator = v.object({
   sourceLanguage: v.string(),
   targetLanguage: v.string(),
   text: v.string(),
+  // The rendering keys this job produces, `"<male|female>|<formId|none>"`
+  // (lib/preferenceResolution.ts). The primary key of (text, language), when
+  // present, is rendered first as a fresh translation; every other key is
+  // versioned from the primary wording (which must already exist, or be in
+  // this list). Every key was claimed by the enqueuing mutation.
+  renderingKeys: v.array(v.string()),
   // The user whose deliberate action caused this job (custom card, card
   // edit, translation flag, chat approval, …). Cost events bill to them as
   // "spend this user caused" (paired with shared_content, see
   // convex/lib/posthogAi.ts). Absent for background/self-heal work, which
   // stays in the system:content-pipeline bucket.
   requestedByUserId: v.optional(v.string()),
-  audioSpeakerGender: v.optional(v.string()),
-  // Retranslation flag forwarded to `storeTranslationAndScheduleTTS` (and
-  // through the fallback to `processTranslationForCard`). Set by
+  // Retranslation flag forwarded to `storeTranslationAndScheduleTTS`. Set by
   // `flagTranslation` so the new LLM output overwrites the displayed text.
   replaceExisting: v.optional(v.boolean()),
   // Optional rule override forwarded to `resolveTranslationStages`. Used by
@@ -277,22 +256,25 @@ const llmJobArgsValidator = v.object({
   // the language's normal routing. Worker validates against TRANSLATION_RULES
   // and silently falls back to the language's rule on unknown values.
   ruleOverride: v.optional(v.string()),
-  // Single-writer token: the claim doc this job was enqueued under (stamped
-  // by `enqueueLlmTranslation` from its own claim lookup). The worker forwards
-  // it to `storeTranslationAndScheduleTTS` as `expectedClaimId`, so a job
-  // whose claim was reclaimed mid-flight (delete + reinsert → new _id) skips
-  // its write instead of clobbering the new owner's result.
-  claimId: v.optional(v.id('llmTranslationClaims')),
-  // Mixed-dialect pin: the `regionVariant` of a translation row that was
-  // deleted before this regeneration was enqueued (the version-stale sweep
-  // captures it pre-delete). The worker prefers it over a fresh
-  // `resolveMixedVariant` pick so a card's dialect never flips on regen.
+  // Single-writer tokens: the claim doc of each key this job was enqueued
+  // under (stamped by `enqueueLlmTranslation` from its own claim lookup).
+  // The worker forwards the key's token to `storeTranslationAndScheduleTTS`
+  // as `expectedClaimId`, so a job whose claim was reclaimed mid-flight
+  // (delete + reinsert → new _id) skips its write instead of clobbering the
+  // new owner's result.
+  claimIds: v.optional(
+    v.array(
+      v.object({ key: v.string(), claimId: v.id('llmTranslationClaims') }),
+    ),
+  ),
+  // Mixed-dialect pin: the `regionVariant` of the row this job renders next
+  // to. The worker prefers it over a fresh `resolveMixedVariant` pick so a
+  // card's dialect never flips.
   preferredRegionVariant: v.optional(v.string()),
   // Translation-only mode: forwarded to `storeTranslationAndScheduleTTS` so
-  // the landing translation does NOT auto-enqueue TTS. Set by the collection
-  // preview (`requestPreviewTranslations`), audio there is generated only on
-  // an explicit audio-icon click, or by the normal ensure path once the text
-  // becomes a card.
+  // the landing translation does NOT auto-enqueue TTS. Set by the browse
+  // surfaces; audio there is generated only on an explicit audio-icon click,
+  // or by the normal ensure path once the text becomes a card.
   skipTts: v.optional(v.boolean()),
   // TTS priority, forwarded to `storeTranslationAndScheduleTTS` so the audio
   // this translation triggers lands in the tier the content was requested at
@@ -302,61 +284,65 @@ const llmJobArgsValidator = v.object({
   // about the audio it triggers. Read only by `enqueueLlmTranslation`, to pick
   // the pool and to stamp the claim; the worker itself makes no scheduling
   // decisions, so it is deliberately NOT forwarded into the worker's args.
-  // The Google fallback reads its copy from the completion context below.
-  // See llmPriorityValidator.
   llmPriority: v.optional(llmPriorityValidator),
   // Wording a user typed when manually editing a curriculum card's
   // translation, forwarded to the prompt as a fenced, sanitized
   // <user_suggested_translation> hint. Set only by
   // `suggestCurriculumFixesForEdit` (features/scheduling.ts).
-  //
-  // Deliberately absent from `llmCompletionContextValidator` below: the
-  // Google Translate fallback has nowhere to put a suggestion, so leaving the
-  // field out of the completion context makes it structurally impossible for
-  // one to leak down that path.
   userSuggestedTranslation: v.optional(v.string()),
   // WHY this translation was requested. The worker branches on it for the
-  // "the user says this is wrong" prompt block, which previously had to be
-  // reconstructed from `replaceExisting` + a rules-slug allowlist — a
-  // conjunction that conflated the storage semantic with the user's intent.
-  // Absent means 'fill' (jobs enqueued before this field existed).
+  // "the user says this is wrong" prompt block. Absent means 'fill'.
   translationReason: v.optional(translationReasonValidator),
+  // The wording a flag disputes, for the prompt's reconsider block. Passed
+  // by the flag path, which knows the row the learner saw (keyed or legacy).
+  previousTranslation: v.optional(v.string()),
   // The `cardEditRetranslations` row this job resolves, so the write choke
-  // point can record which outcome this attempt reached. A reason is a
-  // category; resolving an audit row needs the instance, since two users can
-  // each queue an attempt against the same (text, language) and only one wins
-  // the claim. Absent on every ordinary fill.
+  // point can record which outcome this attempt reached. Resolved by the
+  // LAST key's write, which is the key the gesture was about.
   retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
-  // Rendering VARIANT job (docs/architecture/translation-variants.md): the
-  // `translations` row this job produces, keyed `textVariantKey`, with the
-  // form and gender the wording must take and the canonical wording it is
-  // a REWRITE of (`buildRenderingRewritePrompt`). Such a job never falls
-  // back to Google Translate. Absent on canonical jobs.
-  variantKey: v.optional(v.string()),
-  requestedGender: v.optional(v.union(v.literal('male'), v.literal('female'))),
-  requestedForm: v.optional(
-    v.object({ id: v.string(), label: v.string(), prompt: v.string() }),
-  ),
-  rewriteOf: v.optional(v.string()),
-  // The audio pointer the landing wording is voiced under
-  // (`audioVariantKey`); absent = the canonical pointer.
-  audioVariantKey: v.optional(v.string()),
+  // Adoption: the primary key may be a verified copy of the legacy row's
+  // wording instead of a fresh translation (`ensureRenderingRow`).
+  adoptLegacy: v.optional(v.boolean()),
+  // A flag or curriculum fix on a card still reading a LEGACY row: the one
+  // key in `renderingKeys` (the text's primary key) says which voice and
+  // form to render, but the wording is claimed and stored under the legacy
+  // slot (no key), replacing the row the learner disputed. The only path
+  // that ever writes a legacy row after the cutover
+  // (docs/architecture/rendering-keys.md).
+  replacesLegacyRow: v.optional(v.boolean()),
 });
 
 /**
- * onComplete context: everything the Google fallback needs to run — the job
- * args minus the fields that must not survive the handoff. `ruleOverride`
- * and `claimId` are meaningful only to the LLM worker run they were stamped
- * for (the completion handler re-resolves the claim itself), and omitting
- * `userSuggestedTranslation` keeps it structurally impossible for a
- * suggestion to leak down the Google path (see the notes on each field
- * above). `translationReason` and `retranslationAuditId` stay: the
- * completion handler resolves the audit row itself — a fallback handoff and
- * a terminal failure both land here, never in the worker.
+ * Which axes a versioned key changes against the primary key, on a
+ * language that marks them: the form when the ids differ (a key carries a
+ * form only where the language marks one), the gender when the voices
+ * differ and the language inflects the first person. Neither: the primary
+ * wording is copied under the key without a call.
+ */
+export function versioningChanges(
+  concreteCode: string,
+  key: string,
+  primaryKey: string,
+): { form: boolean; gender: boolean } {
+  const requested = parseRenderingKey(key);
+  const primary = parseRenderingKey(primaryKey);
+  return {
+    form: requested.formId !== primary.formId,
+    gender:
+      requested.voice !== primary.voice &&
+      languageMarksFirstPerson(concreteCode),
+  };
+}
+
+/**
+ * onComplete context: the job args minus the fields that are meaningful only
+ * to the worker run they were stamped for. `ruleOverride` and `claimIds`
+ * belong to one run (the completion handler re-resolves the claims itself),
+ * and `userSuggestedTranslation` never needs to outlive it.
  */
 const llmCompletionContextValidator = llmJobArgsValidator.omit(
   'ruleOverride',
-  'claimId',
+  'claimIds',
   'userSuggestedTranslation',
 );
 
@@ -366,18 +352,20 @@ type LlmJobArgs = Infer<typeof llmJobArgsValidator>;
 // `PoolRunResult` in convex/lib/workpools.ts for why.
 
 /**
- * Enqueue an LLM translation into the pool and stamp the pool's workId onto
- * the (textId, language) claim. Enqueue and claim update commit atomically,
- * so the claim is released exactly when THIS job's onComplete runs and a
- * superseded job's completion can't delete a newer owner's claim. The claim's
- * `_id` also rides along in the worker args (`claimId`) as the single-writer
- * token for the eventual `storeTranslationAndScheduleTTS` write.
+ * Enqueue a rendering job into the pool and stamp the pool's workId onto
+ * the claim of every key it renders. Enqueue and claim update commit
+ * atomically, so the claims are released exactly when THIS job's onComplete
+ * runs and a superseded job's completion can't delete a newer owner's claim.
+ * Each claim's `_id` also rides along in the worker args (`claimIds`) as the
+ * single-writer token for the eventual `storeTranslationAndScheduleTTS`
+ * write.
  *
- * No-ops when a live pool job already owns the claim (fresh + foreign
- * workId), see the guard below.
- *
- * The caller is expected to hold the claim already (via
- * `claimLlmTranslationIfAvailable`, usually in the same transaction).
+ * A key whose fresh claim is already stamped with another job's workId is
+ * dropped from the list: a live pool job owns it, and rendering it again
+ * would run the model twice and hijack that job's claim. Unreachable from
+ * the claim-then-enqueue callers (their fresh claims are workId-less); kept
+ * as a guard against callers that enqueue without re-claiming. No-ops when
+ * every key is dropped.
  */
 export const enqueueLlmTranslation = internalMutation({
   args: {
@@ -385,20 +373,21 @@ export const enqueueLlmTranslation = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx: MutationCtx, { args }: { args: LlmJobArgs }) => {
-    const claim = await getLlmClaim(
-      ctx,
-      args.textId,
-      args.targetLanguage,
-      args.variantKey,
-    );
-    // A fresh claim already stamped with another job's workId means a live
-    // pool job owns this (textId, language): enqueueing again would run the
-    // translation twice and hijack that job's claim. Unreachable from the
-    // claim-then-enqueue callers (their fresh claim is workId-less); kept as
-    // a guard against callers that enqueue without re-claiming.
-    if (claim && claim.workId !== undefined && isClaimFresh(claim)) {
-      return null;
+    const claims: {
+      key: string;
+      claim: Doc<'llmTranslationClaims'> | null;
+    }[] = [];
+    for (const key of args.renderingKeys) {
+      const claim = await getLlmClaim(
+        ctx,
+        args.textId,
+        args.targetLanguage,
+        args.replacesLegacyRow ? undefined : key,
+      );
+      if (claim && claim.workId !== undefined && isClaimFresh(claim)) continue;
+      claims.push({ key, claim });
     }
+    if (claims.length === 0) return null;
 
     // Priority = pool choice: interactive jobs go to llmPool, warm sweeps to
     // the low-parallelism llmWarmPool (see workpools.ts). Both pools share
@@ -407,29 +396,41 @@ export const enqueueLlmTranslation = internalMutation({
     // Both payloads are derived from `args` by omission, so a field added to
     // `llmJobArgsValidator` flows through the enqueue without a matching
     // hand-written spread line. `llmPriority` is deliberately not forwarded
-    // to the worker, and the worker's `claimId` is re-stamped from this
+    // to the worker, and the worker's `claimIds` are re-stamped from this
     // transaction's claim lookup (see the field comments on the validator).
     const { llmPriority, ...workerArgs } = args;
     const {
       ruleOverride,
-      claimId,
+      claimIds,
       userSuggestedTranslation,
       ...completionContext
     } = args;
+    void ruleOverride;
+    void claimIds;
+    void userSuggestedTranslation;
+    const renderingKeys = claims.map((c) => c.key);
     const pool = llmPriority === 'background' ? llmWarmPool : llmPool;
     const workId: string = await pool.enqueueAction(
       ctx,
       internal.features.llmTranslationQueue.processLlmTranslationForCard,
-      { ...workerArgs, claimId: claim?._id },
+      {
+        ...workerArgs,
+        renderingKeys,
+        claimIds: claims.flatMap((c) =>
+          c.claim ? [{ key: c.key, claimId: c.claim._id }] : [],
+        ),
+      },
       {
         onComplete:
           internal.features.llmTranslationQueue.onLlmTranslationComplete,
-        context: completionContext,
+        context: { ...completionContext, renderingKeys },
       },
     );
 
-    if (claim) {
-      await ctx.db.patch(claim._id, { workId, claimedAt: Date.now() });
+    for (const { claim } of claims) {
+      if (claim) {
+        await ctx.db.patch(claim._id, { workId, claimedAt: Date.now() });
+      }
     }
     return null;
   },
@@ -441,14 +442,15 @@ type TextRowForTranslation = {
   externalId?: string;
   text: string;
   language: string;
+  userCreated: boolean;
   addressesSomeone?: boolean;
   addresseeNumber?: string;
   speakerGender?: string;
-  /** The voice the card is spoken in; the prompt's fallback speaker gender. */
   audioSpeakerGender?: string;
   addresseeGender?: string;
   register?: string;
   referentGender?: string;
+  metadataSource?: string;
   collectionId: Id<'collections'>;
   collectionRank: number;
   arcId?: string;
@@ -456,25 +458,16 @@ type TextRowForTranslation = {
 
 type TranslationStage = ReturnType<typeof resolveTranslationStages>[number];
 
-/** The prompt payload shared by every stage attempt of one worker run. */
-type LlmPromptArgs = {
-  text: string;
-  sourceLang: string;
-  targetLang: string;
-  targetLangName: string;
-  targetLangNativeName: string;
-  targetRegion: ReturnType<
-    typeof getTranslationConfigForLanguage
-  >['targetRegion'];
-  addressesSomeone: boolean;
-  referentGender: 'male' | 'female';
-  speakerGender: 'male' | 'female' | 'neutral' | undefined;
-  addresseeGender: 'male' | 'female' | undefined;
-  formality: 'formal' | 'informal' | 'neutral' | undefined;
-  arcContext: { preceding: string[]; following: string[] } | undefined;
-  previousTranslation: string | undefined;
-  userSuggestedTranslation: string | undefined;
-  accentRewrite: AccentRewriteConfig | undefined;
+/** The prompt payload shared by every stage attempt of one rendering. */
+type LlmPromptArgs = TranslationPromptArgs;
+
+/** The stored row the worker reads for the dialect pin and adoption. */
+type StoredTranslationRow = {
+  translatedText: string;
+  romanizedText?: string;
+  romanizationSource?: string;
+  regionVariant?: string;
+  translationSource?: string;
 };
 
 /**
@@ -484,26 +477,23 @@ type LlmPromptArgs = {
  * lets the audio player synthesize with the matching accent.
  *
  * Variant pin: prefer (a) the regionVariant already persisted on the
- * existing translation row, then (b) the one captured before a sweep
- * deleted the row (`preferredRegionVariant`), then (c) a fresh
- * deterministic pick, so a regeneration can never flip the card's
- * dialect out from under existing audio. Non-mixed targets resolve to the
- * target language itself with no variant.
+ * legacy row (every keyed row inherits it), then (b) the one the enqueuing
+ * sweep captured (`preferredRegionVariant`), then (c) a fresh deterministic
+ * pick, so a regeneration can never flip the card's dialect out from under
+ * existing audio. Non-mixed targets resolve to the target language itself
+ * with no variant.
  */
 async function resolveMixedVariantPin(
   ctx: ActionCtx,
   args: LlmJobArgs,
+  legacyRow: StoredTranslationRow | null,
 ): Promise<{ cfgLanguageCode: string; regionVariant: string | undefined }> {
   let mixed: ReturnType<typeof resolveMixedVariant> = null;
   if (isMixedLanguage(args.targetLanguage)) {
-    const existingRow: { regionVariant?: string } | null = await ctx.runQuery(
-      internal.features.decks.getTranslationForTextLanguage,
-      { textId: args.textId, targetLanguage: args.targetLanguage },
-    );
-    if (existingRow?.regionVariant) {
+    if (legacyRow?.regionVariant) {
       mixed = getMixedVariantByRegion(
         args.targetLanguage,
-        existingRow.regionVariant,
+        legacyRow.regionVariant,
       );
     }
     if (!mixed && args.preferredRegionVariant) {
@@ -519,7 +509,7 @@ async function resolveMixedVariantPin(
       // a genuinely new pick, and that one is decorrelated from the speaker
       // gender (2026-09-08 review).
       mixed =
-        existingRow === null
+        legacyRow === null
           ? pickMixedVariantForNewRow(
               args.targetLanguage,
               args.textId as string,
@@ -533,10 +523,28 @@ async function resolveMixedVariantPin(
   };
 }
 
+/** What one rendering key asks the model for. */
+type KeyRequest = {
+  key: string;
+  voice: 'male' | 'female';
+  form: PolitenessForm | null;
+};
+
+function keyRequest(key: string, concreteCode: string): KeyRequest {
+  const { voice, formId } = parseRenderingKey(key);
+  return {
+    key,
+    voice,
+    form: formId === NO_FORM ? null : (politenessFormById(concreteCode, formId) ?? null),
+  };
+}
+
 /**
- * Resolve the speaker/addressee/referent metadata, the arc-sibling window,
- * and the previous-translation block into the prompt payload. The worker is
- * the single source of truth for "what metadata fields land in the prompt".
+ * Resolve the addressee/referent metadata, the arc-sibling window, and the
+ * reconsider block into the prompt payload for one key. The worker is the
+ * single source of truth for "what metadata fields land in the prompt". The
+ * speaker gender is the key's voice, always concrete: the row is written
+ * for that speaker and spoken in that voice.
  */
 async function resolvePromptMetadata(
   ctx: ActionCtx,
@@ -544,11 +552,11 @@ async function resolvePromptMetadata(
   text: TextRowForTranslation,
   cfg: ReturnType<typeof getTranslationConfigForLanguage>,
   cfgLanguageCode: string,
+  request: KeyRequest,
 ): Promise<LlmPromptArgs> {
   // addressesSomeone: prefer the explicit boolean; fall back to
   // (addresseeNumber !== 'not_applicable') for legacy rows.
-  const addressesSomeone =
-    text.addressesSomeone ?? text.addresseeNumber !== 'not_applicable';
+  const addressesSomeone = sentenceAddressesSomeone(text);
 
   // referentGender: fall back to a deterministic coin-flip seeded the same
   // way the backfill seeds it (`externalId || _id`, salt `'referent'`), so
@@ -559,34 +567,10 @@ async function resolvePromptMetadata(
       ? text.referentGender
       : legacyReferentGenderFallback(text.externalId, text._id as string);
 
-  // A definitive verdict is the sentence's own gender. Otherwise the voice
-  // the card is spoken in guides the wording, so a neutral first-person
-  // sentence in a marked language agrees with its clip instead of drifting
-  // to the masculine default. On an unclassified curriculum text both
-  // fields hold the same coin flip; once the classifier has stamped the
-  // row they separate, and this is where the fallback matters.
-  const speakerGender: 'male' | 'female' | 'neutral' | undefined =
-    text.speakerGender === 'male' || text.speakerGender === 'female'
-      ? text.speakerGender
-      : text.audioSpeakerGender === 'male' ||
-          text.audioSpeakerGender === 'female'
-        ? text.audioSpeakerGender
-        : text.speakerGender === 'neutral'
-          ? 'neutral'
-          : undefined;
-
   const addresseeGender =
     addressesSomeone &&
     (text.addresseeGender === 'male' || text.addresseeGender === 'female')
       ? (text.addresseeGender as 'male' | 'female')
-      : undefined;
-
-  const formality =
-    addressesSomeone &&
-    (text.register === 'formal' ||
-      text.register === 'informal' ||
-      text.register === 'neutral')
-      ? (text.register as 'formal' | 'informal' | 'neutral')
       : undefined;
 
   // Fetch the sliding window of arc siblings (≤ 5 preceding + ≤ 3
@@ -610,26 +594,12 @@ async function resolvePromptMetadata(
     }
   }
 
-  // Gate the "previous translation" prompt block to the retranslations a
-  // USER asked for. Read straight off `translationReason` rather than
-  // reconstructed from `replaceExisting` (a storage semantic) plus a
-  // rules-slug allowlist (a model-routing choice): neither says anything
-  // about intent, so a future caller that overwrote a row for some other
-  // reason — a model-swap migration, say — would have inherited the "the
-  // user flagged this as wrong" framing, which would be a lie.
-  let previousTranslation: string | undefined;
-  if (isRetranslationReason(args.translationReason)) {
-    const existing: { translatedText: string } | null = await ctx.runQuery(
-      internal.features.decks.getTranslationForTextLanguage,
-      {
-        textId: args.textId,
-        targetLanguage: args.targetLanguage,
-      },
-    );
-    if (existing && existing.translatedText.length > 0) {
-      previousTranslation = existing.translatedText;
-    }
-  }
+  // The "previous translation" prompt block is gated to the retranslations
+  // a USER asked for, read straight off `translationReason`; the wording is
+  // the one the flag path saw on the learner's card.
+  const previousTranslation = isRetranslationReason(args.translationReason)
+    ? args.previousTranslation
+    : undefined;
 
   return {
     text: text.text,
@@ -644,9 +614,8 @@ async function resolvePromptMetadata(
     targetRegion: cfg.targetRegion,
     addressesSomeone,
     referentGender,
-    speakerGender,
+    speakerGender: request.voice,
     addresseeGender,
-    formality,
     arcContext,
     previousTranslation,
     // No gate needed, unlike previousTranslation: this arrives only from
@@ -660,67 +629,13 @@ async function resolvePromptMetadata(
     // so a stale `sourceLanguage` can never turn a rewrite into a
     // translation.
     accentRewrite: getAccentRewriteConfig(args.targetLanguage, text.language),
-    ...requestedRendering(args, text, cfgLanguageCode),
-  };
-}
-
-/**
- * The sentence-form request a job carries (docs/architecture/
- * translation-variants.md). A VARIANT job (`variantKey`) rewrites the
- * canonical wording for its gender and form. A CANONICAL job of a
- * predicate- or particle-marking language (ja, ko, th, fil) ALWAYS requests
- * a form, because the prompt's addressee gate would otherwise starve it:
- * the level its register metadata names ('informal' = casual, 'formal' =
- * polite), else the language's `defaultLevel`. That is how new shared
- * Japanese rows stop leaning casual (Paul, 2026-09-06). Every other
- * canonical job is unchanged.
- */
-function requestedRendering(
-  args: LlmJobArgs,
-  text: TextRowForTranslation,
-  cfgLanguageCode: string,
-): Partial<
-  Pick<
-    TranslationPromptArgs,
-    'requestedGender' | 'requestedForm' | 'rewriteOf' | 'promptWording'
-  >
-> {
-  if (args.variantKey !== undefined) {
-    return {
-      requestedGender: args.requestedGender,
-      requestedForm: args.requestedForm,
-      rewriteOf: args.rewriteOf,
-      promptWording: 'literature',
-    };
-  }
-  // Languages whose politeness lives on the predicate or a particle mark
-  // every sentence, so the prompt's addressee gate (no <register> without
-  // a "you") starves them. Their canonical jobs always request a form: the
-  // metadata's level when the classifier gave one ('informal' = casual,
-  // 'formal' = the safe polite level, as the metadata prompt defines it),
-  // else the language's default.
-  const config = getPolitenessConfig(cfgLanguageCode);
-  if (
-    !config ||
-    (config.marking !== 'predicate' && config.marking !== 'particle') ||
-    config.defaultLevel === undefined
-  ) {
-    return {};
-  }
-  const level =
-    text.register === 'informal'
-      ? 'casual'
-      : text.register === 'formal'
-        ? 'polite'
-        : config.defaultLevel;
-  const form = config.forms[level];
-  return {
-    requestedForm: {
-      id: form.id,
-      label: form.promptLabel,
-      prompt: form.prompt,
-    },
-    promptWording: 'literature',
+    requestedForm: request.form
+      ? {
+          id: request.form.id,
+          label: request.form.promptLabel,
+          prompt: request.form.prompt,
+        }
+      : undefined,
   };
 }
 
@@ -734,8 +649,8 @@ function requestedRendering(
  *
  * Returns the winning text plus the stage that produced it (persisted as
  * `translationSource`). If the whole chain fails, THROWS: the pool retries
- * this job with backoff, and after the last attempt onComplete schedules
- * Google Translate as the final safety net.
+ * this job with backoff, and after the last attempt onComplete marks the
+ * keys failed for a cooldown.
  */
 async function runTranslationStageChain(
   ctx: ActionCtx,
@@ -875,40 +790,117 @@ async function runTranslationStageChain(
   return { translatedText: result.text, winningStage: winningStage! };
 }
 
+/** One rendered wording, ready to store. */
+type RenderedWording = {
+  translatedText: string;
+  translationSource: string;
+  /** Carried from an adopted legacy row; else romanized at the store step. */
+  romanizedText?: string;
+  romanizationSource?: string;
+  renderingVerified: boolean | undefined;
+  versionedFromText: string | undefined;
+  isVerbatimAccentRewrite: boolean;
+};
+
 /**
- * Success tail: optionally romanize the translation, resolve the voice and
- * the source stamps, and write via `storeTranslationAndScheduleTTS` (same
- * path as Google).
+ * Run the stage chain for one key, then verify the wording against the key
+ * with the rendering classifier and retry once on a mismatch, with the
+ * failed attempt in the prompt. A second mismatch is stored as it is, marked
+ * unverified. An accent rewrite (English) is never verified: it marks no
+ * axis.
  */
-async function storeLlmTranslationResult(
+async function renderWithVerification(
+  ctx: ActionCtx,
+  args: LlmJobArgs,
+  stages: TranslationStage[],
+  promptArgs: LlmPromptArgs,
+  request: KeyRequest,
+  concreteCode: string,
+): Promise<{
+  translatedText: string;
+  winningStage: TranslationStage;
+  renderingVerified: boolean | undefined;
+}> {
+  let { translatedText, winningStage } = await runTranslationStageChain(
+    ctx,
+    args,
+    stages,
+    promptArgs,
+  );
+  if (promptArgs.accentRewrite) {
+    return { translatedText, winningStage, renderingVerified: undefined };
+  }
+  let verdict: RenderingVerdict = (
+    await verifyRendering(ctx, {
+      sentence: translatedText,
+      language: concreteCode,
+      key: request.key,
+      userId: args.requestedByUserId,
+    })
+  ).verdict;
+  if (verdict === 'mismatch') {
+    const retry = await runTranslationStageChain(ctx, args, stages, {
+      ...promptArgs,
+      previousAttempt: translatedText,
+    });
+    translatedText = retry.translatedText;
+    winningStage = retry.winningStage;
+    verdict = (
+      await verifyRendering(ctx, {
+        sentence: translatedText,
+        language: concreteCode,
+        key: request.key,
+        userId: args.requestedByUserId,
+      })
+    ).verdict;
+  }
+  return {
+    translatedText,
+    winningStage,
+    renderingVerified: verdict === 'unknown' ? undefined : verdict === 'ok',
+  };
+}
+
+/**
+ * Store tail: optionally romanize the translation, resolve the voice and
+ * the source stamps, and write via `storeTranslationAndScheduleTTS`.
+ */
+async function storeRenderedWording(
   ctx: ActionCtx,
   args: LlmJobArgs,
   pin: { cfgLanguageCode: string; regionVariant: string | undefined },
-  translatedText: string,
-  winningStage: TranslationStage,
-  /**
-   * An accent rewrite that came back as the source text, which most
-   * catalogue sentences do. Stored as a verbatim row with the same wording,
-   * so the audio clip stays shared across accents and nothing claims the
-   * model did work it did not do.
-   */
-  isVerbatimAccentRewrite: boolean,
+  request: KeyRequest,
+  wording: RenderedWording,
+  resolvesAudit: boolean,
 ): Promise<void> {
   // `romanizeText` already retries up to 3 times internally; on full
   // exhaustion we persist an empty-string sentinel so ensureContent
   // doesn't reschedule another burst on every call. A TRANSIENT failure
   // (rate limit, missing key) leaves the field undefined instead, so the
   // annotation sweep asks again later (`romanizationAfterFailure`).
-  let romanizedText: string | undefined;
-  if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
+  let romanizedText = wording.romanizedText;
+  let romanizationSource = wording.romanizationSource;
+  if (
+    romanizedText === undefined &&
+    ROMANIZATION_LANGUAGES.has(args.targetLanguage)
+  ) {
     try {
-      romanizedText = await romanizeText(translatedText, args.targetLanguage);
+      romanizedText = await romanizeText(
+        wording.translatedText,
+        args.targetLanguage,
+      );
     } catch (err) {
       romanizedText = romanizationAfterFailure(
         err,
         `[llmTranslationQueue] ${args.targetLanguage}`,
       );
     }
+    // Source resolved from `cfgLanguageCode` (the sub-code for mixed
+    // dialects) so the recorded source matches what `romanizeText` ran on.
+    romanizationSource =
+      romanizedText !== undefined
+        ? getRomanizationSource(pin.cfgLanguageCode)
+        : undefined;
   }
 
   // For mixed languages, pick a voice matching the resolved regional
@@ -919,22 +911,8 @@ async function storeLlmTranslationResult(
     args.targetLanguage,
     args.textId,
     pin.regionVariant,
-    args.audioSpeakerGender,
+    request.voice,
   );
-
-  // Source resolved from `cfgLanguageCode` (the sub-code for mixed
-  // dialects) so the recorded source matches what `romanizeText` ran on.
-  const romanizationSource =
-    romanizedText !== undefined
-      ? getRomanizationSource(pin.cfgLanguageCode)
-      : undefined;
-
-  // Translation source: derived from the stage that actually produced
-  // the result (not the primary), so a row that succeeded on a fallback
-  // is tagged with the fallback's model/reasoning.
-  const translationSource = isVerbatimAccentRewrite
-    ? SOURCE_VERBATIM_TRANSLATION_SOURCE
-    : getTranslationSourceFromStage(winningStage);
 
   await ctx.runMutation(
     internal.features.decks.storeTranslationAndScheduleTTS,
@@ -942,44 +920,44 @@ async function storeLlmTranslationResult(
       textId: args.textId,
       targetLanguage: args.targetLanguage,
       requestedByUserId: args.requestedByUserId,
-      translatedText,
+      translatedText: wording.translatedText,
       voiceName,
       romanizedText,
       romanizationSource,
-      translationSource,
+      translationSource: wording.translationSource,
       regionVariant: pin.regionVariant,
       replaceExisting: args.replaceExisting,
       translationReason: args.translationReason,
-      speakerGender: asVoiceGender(args.audioSpeakerGender),
+      speakerGender: request.voice,
       // Single-writer gate: skip the write if the claim this job was
       // enqueued under has been reclaimed by a newer job mid-flight.
-      expectedClaimId: args.claimId,
+      expectedClaimId: args.claimIds?.find((c) => c.key === request.key)
+        ?.claimId,
       skipTts: args.skipTts,
       priority: args.priority,
-      variantKey: args.variantKey,
-      audioVariantKey: args.audioVariantKey,
-      // The wording this rewrite was made from; the store drops the result
-      // when the canonical row has moved on since.
-      rewriteOf: args.rewriteOf,
+      variantKey: args.replacesLegacyRow ? undefined : request.key,
+      versionedFromText: wording.versionedFromText,
+      renderingVerified: wording.renderingVerified,
       // Resolved at the write choke point, which is the only place that
       // knows which of its several outcomes this attempt actually reached.
-      retranslationAuditId: args.retranslationAuditId,
+      retranslationAuditId: resolvesAudit
+        ? args.retranslationAuditId
+        : undefined,
     },
   );
 }
 
 /**
- * Worker action: read the texts row for metadata, call the LLM (running the
- * language's model-stage fallback chain in-call), and write the result via
- * `storeTranslationAndScheduleTTS` (same path as Google). Reads as the
- * orchestration of the named steps above: dialect pin → stage resolution →
- * prompt metadata → stage chain → store.
+ * Worker action: read the texts row for metadata, render every key of the
+ * job (the primary first as a fresh translation, the others versioned from
+ * the primary wording), verify each wording, and write each row via
+ * `storeTranslationAndScheduleTTS`.
  *
- * Failure contract: THROW on any failure. The pool retries with backoff up to
- * its budget; the final failure lands in `onLlmTranslationComplete`, which
- * schedules the Google fallback. Config errors (a non-openrouter language
- * reaching this worker) throw `NonRetryableError` so the pool skips straight
- * to the fallback instead of burning retries on a deterministic failure.
+ * Failure contract: THROW on any failure. The pool retries with backoff up
+ * to its budget; the final failure lands in `onLlmTranslationComplete`,
+ * which marks the keys failed for a cooldown. Keys already stored by an
+ * earlier attempt of the same job are skipped on a retry through the
+ * store's own single-writer and fill-if-missing semantics.
  */
 export const processLlmTranslationForCard = internalAction({
   args: llmJobArgsValidator.fields,
@@ -993,16 +971,20 @@ export const processLlmTranslationForCard = internalAction({
     );
     if (!text) {
       // Cascade-deleted mid-flight. Nothing to translate; returning success
-      // lets onComplete release the claim.
+      // lets onComplete release the claims.
       console.error('[llmTranslationQueue] text row missing', {
         textId: args.textId,
       });
       return null;
     }
 
-    const pin = await resolveMixedVariantPin(ctx, args);
-
+    const legacyRow: StoredTranslationRow | null = await ctx.runQuery(
+      internal.features.decks.getTranslationForTextLanguage,
+      { textId: args.textId, targetLanguage: args.targetLanguage },
+    );
+    const pin = await resolveMixedVariantPin(ctx, args, legacyRow);
     const cfg = getTranslationConfigForLanguage(pin.cfgLanguageCode);
+    const concreteCode = pin.cfgLanguageCode;
     // Validate the rule override before passing it through. An unknown
     // string would crash `resolveTranslationStages`. Unknown values silently
     // fall back to the language's normal routing.
@@ -1010,59 +992,224 @@ export const processLlmTranslationForCard = internalAction({
       args.ruleOverride && args.ruleOverride in TRANSLATION_RULES
         ? (args.ruleOverride as TranslationRuleId)
         : undefined;
-    const promptArgs = await resolvePromptMetadata(
-      ctx,
-      args,
+
+    const primaryKey = primaryRenderingKey({
       text,
-      cfg,
-      pin.cfgLanguageCode,
-    );
+      textId: args.textId,
+      code: concreteCode,
+    });
+    // The primary first: every other key is versioned from its wording.
+    const keys = [
+      ...args.renderingKeys.filter((key) => key === primaryKey),
+      ...args.renderingKeys.filter((key) => key !== primaryKey),
+    ];
+    const auditKey = keys[keys.length - 1];
 
-    // An accent sibling of the text's own language runs the fixed rewrite
-    // chain whatever the target's translation rule or a flag's override
-    // says: the job is a copy-edit, not a translation, and the rules were
-    // tuned for the latter. `promptArgs.accentRewrite`, derived from the
-    // text row, is the one place the job decides it is a rewrite.
-    const stages = promptArgs.accentRewrite
-      ? ACCENT_REWRITE_STAGES
-      : resolveTranslationStages(
-          pin.cfgLanguageCode,
-          text.text.length,
-          ruleOverride ? { ruleOverride } : undefined,
-        );
-
-    if (cfg.provider !== 'openrouter' || stages.length === 0) {
-      // Misrouted: the pool worker should only ever receive openrouter
-      // languages. Deterministic config error, retrying can't help, so
-      // NonRetryableError sends it straight to onComplete's Google fallback.
-      throw new NonRetryableError(
-        `[llmTranslationQueue] non-openrouter language reached worker: ` +
-          `${args.targetLanguage} (resolved ${pin.cfgLanguageCode}, ${stages.length} stages)`,
+    let primary: { text: string; source: string } | null = null;
+    if (!keys.includes(primaryKey)) {
+      const row: StoredTranslationRow | null = await ctx.runQuery(
+        internal.features.decks.getTranslationForTextLanguage,
+        {
+          textId: args.textId,
+          targetLanguage: args.targetLanguage,
+          variantKey: primaryKey,
+        },
       );
+      if (row) {
+        primary = {
+          text: row.translatedText,
+          source: row.translationSource ?? 'unknown',
+        };
+      }
     }
 
-    const { translatedText, winningStage } = await runTranslationStageChain(
-      ctx,
-      args,
-      stages,
-      promptArgs,
-    );
+    for (const key of keys) {
+      const request = keyRequest(key, concreteCode);
+      const isPrimary = key === primaryKey;
+      let wording: RenderedWording | null = null;
 
-    // The reply was normalised on its way out of the LLM call
-    // (`normalizeModelOutput`), so the source goes through the same step
-    // before the comparison. A sentence wrapped in quotation marks is still
-    // verbatim when the model returns it unchanged.
-    const isVerbatimAccentRewrite =
-      promptArgs.accentRewrite !== undefined &&
-      translatedText === normalizeModelOutput(args.targetLanguage, text.text);
-    await storeLlmTranslationResult(
-      ctx,
-      args,
-      pin,
-      translatedText,
-      winningStage,
-      isVerbatimAccentRewrite,
-    );
+      // A retried action skips the keys an earlier attempt already landed:
+      // their claims were released by the store. The primary's wording is
+      // then read back for the keys versioned from it.
+      const claimId = args.claimIds?.find((c) => c.key === key)?.claimId;
+      if (
+        claimId !== undefined &&
+        !(await ctx.runQuery(
+          internal.features.llmTranslationQueue.isLlmClaimHeld,
+          { claimId },
+        ))
+      ) {
+        if (isPrimary) {
+          const row: StoredTranslationRow | null = await ctx.runQuery(
+            internal.features.decks.getTranslationForTextLanguage,
+            {
+              textId: args.textId,
+              targetLanguage: args.targetLanguage,
+              variantKey: args.replacesLegacyRow ? undefined : primaryKey,
+            },
+          );
+          if (row) {
+            primary = {
+              text: row.translatedText,
+              source: row.translationSource ?? 'unknown',
+            };
+          }
+        }
+        continue;
+      }
+
+      // Adoption: the legacy row stands in for the primary key when its
+      // wording already is that rendering.
+      if (isPrimary && args.adoptLegacy && legacyRow) {
+        const { verdict } = await verifyRendering(ctx, {
+          sentence: legacyRow.translatedText,
+          language: concreteCode,
+          key,
+          userId: args.requestedByUserId,
+        });
+        if (verdict === 'ok') {
+          wording = {
+            translatedText: legacyRow.translatedText,
+            translationSource: legacyRow.translationSource ?? 'unknown',
+            romanizedText: legacyRow.romanizedText,
+            romanizationSource: legacyRow.romanizationSource,
+            renderingVerified: true,
+            versionedFromText: undefined,
+            isVerbatimAccentRewrite: false,
+          };
+        }
+      }
+
+      if (
+        wording === null &&
+        (isPrimary ||
+          primary === null ||
+          isRetranslationReason(args.translationReason))
+      ) {
+        // A fresh translation for this key. A non-primary key with no
+        // primary wording to version from (the primary row vanished under
+        // the job) is rendered fresh too rather than dropped, and so is a
+        // flagged or corrected one: the learner disputed THIS rendering,
+        // and the versioning prompt carries neither the rejected wording
+        // nor the suggestion. The fresh row stands on its own from then on
+        // (no `versionedFromText`).
+        const promptArgs = await resolvePromptMetadata(
+          ctx,
+          args,
+          text,
+          cfg,
+          concreteCode,
+          request,
+        );
+        // An accent sibling of the text's own language runs the fixed
+        // rewrite chain whatever the target's translation rule or a flag's
+        // override says: the job is a copy-edit, not a translation, and the
+        // rules were tuned for the latter.
+        const stages = promptArgs.accentRewrite
+          ? ACCENT_REWRITE_STAGES
+          : resolveTranslationStages(
+              concreteCode,
+              text.text.length,
+              ruleOverride ? { ruleOverride } : undefined,
+            );
+        if (stages.length === 0) {
+          throw new Error(
+            `[llmTranslationQueue] no translation stages for ${args.targetLanguage} (resolved ${concreteCode})`,
+          );
+        }
+        const rendered = await renderWithVerification(
+          ctx,
+          args,
+          stages,
+          promptArgs,
+          request,
+          concreteCode,
+        );
+        // The reply was normalised on its way out of the LLM call
+        // (`normalizeModelOutput`), so the source goes through the same step
+        // before the comparison. A sentence wrapped in quotation marks is
+        // still verbatim when the model returns it unchanged.
+        const isVerbatimAccentRewrite =
+          promptArgs.accentRewrite !== undefined &&
+          rendered.translatedText ===
+            normalizeModelOutput(args.targetLanguage, text.text);
+        wording = {
+          translatedText: rendered.translatedText,
+          translationSource: isVerbatimAccentRewrite
+            ? SOURCE_VERBATIM_TRANSLATION_SOURCE
+            : getTranslationSourceFromStage(rendered.winningStage),
+          renderingVerified: rendered.renderingVerified,
+          versionedFromText: undefined,
+          isVerbatimAccentRewrite,
+        };
+      } else if (wording === null && primary !== null) {
+        // Versioned from the primary wording. Only an axis the key CHANGES
+        // against the primary key can move the wording, and only where the
+        // language marks it; a key that changes nothing the language marks
+        // gets a copy with no call.
+        const changes = versioningChanges(concreteCode, key, primaryKey);
+        if (!changes.form && !changes.gender) {
+          wording = {
+            translatedText: primary.text,
+            translationSource: primary.source,
+            renderingVerified: undefined,
+            versionedFromText: primary.text,
+            isVerbatimAccentRewrite: false,
+          };
+        } else {
+          const promptArgs = {
+            ...(await resolvePromptMetadata(
+              ctx,
+              args,
+              text,
+              cfg,
+              concreteCode,
+              request,
+            )),
+            rewriteOf: primary.text,
+            rewriteChangesGender: changes.gender,
+          };
+          const stages = resolveTranslationStages(
+            concreteCode,
+            text.text.length,
+            ruleOverride ? { ruleOverride } : undefined,
+          );
+          const rendered = await renderWithVerification(
+            ctx,
+            args,
+            stages,
+            promptArgs,
+            request,
+            concreteCode,
+          );
+          wording = {
+            translatedText: rendered.translatedText,
+            translationSource: getTranslationSourceFromStage(
+              rendered.winningStage,
+            ),
+            renderingVerified: rendered.renderingVerified,
+            versionedFromText: primary.text,
+            isVerbatimAccentRewrite: false,
+          };
+        }
+      }
+
+      if (wording === null) continue;
+      if (isPrimary) {
+        primary = {
+          text: wording.translatedText,
+          source: wording.translationSource,
+        };
+      }
+      await storeRenderedWording(
+        ctx,
+        args,
+        pin,
+        request,
+        wording,
+        key === auditKey,
+      );
+    }
     return null;
   },
 });
@@ -1071,14 +1218,13 @@ export const processLlmTranslationForCard = internalAction({
  * Pool onComplete for `processLlmTranslationForCard`. Guaranteed to run on
  * success, failure, and cancellation.
  *
- * - success / canceled → release the claim (ownership-gated on `workId`, so
- *   a superseded job's completion can't delete a newer owner's claim).
- * - failed (pool retry budget exhausted, or NonRetryableError) → enqueue the
- *   Google Translate fallback and re-point the claim at the fallback job, so
- *   a concurrent `scheduleMissingContent` can't route the same (textId, lang)
- *   through the LLM again mid-fallback. The fallback fires ONLY while this
- *   job still owns the claim: a superseded job spawning one would race the
- *   current owner's write and duplicate provider spend.
+ * - success / canceled → release the claims (ownership-gated on `workId`,
+ *   so a superseded job's completion can't delete a newer owner's claim).
+ * - failed (pool retry budget exhausted, or NonRetryableError) → keep the
+ *   owned claims marked failed, so the ensure path does not buy the same
+ *   refusal again on every view until VARIANT_RETRY_COOLDOWN_MS has passed.
+ *   An accent rewrite falls back to the source text verbatim instead: the
+ *   same-language "translation" has a safe answer, the catalogue wording.
  */
 export const onLlmTranslationComplete = internalMutation({
   args: vOnCompleteArgs(llmCompletionContextValidator),
@@ -1095,17 +1241,21 @@ export const onLlmTranslationComplete = internalMutation({
       result: PoolRunResult;
     },
   ) => {
-    const claim = await getLlmClaim(
-      ctx,
-      context.textId,
-      context.targetLanguage,
-      context.variantKey,
-    );
-    const ownsClaim =
-      claim !== null && (claim.workId === undefined || claim.workId === workId);
+    const owned: Doc<'llmTranslationClaims'>[] = [];
+    for (const key of context.renderingKeys) {
+      const claim = await getLlmClaim(
+        ctx,
+        context.textId,
+        context.targetLanguage,
+        context.replacesLegacyRow ? undefined : key,
+      );
+      if (claim && (claim.workId === undefined || claim.workId === workId)) {
+        owned.push(claim);
+      }
+    }
 
     if (result.kind !== 'failed') {
-      if (claim && ownsClaim) {
+      for (const claim of owned) {
         await ctx.db.delete(claim._id);
       }
       // A success normally resolved the audit row at the write choke point
@@ -1126,21 +1276,18 @@ export const onLlmTranslationComplete = internalMutation({
       return null;
     }
 
-    if (!claim || !ownsClaim) {
-      // Superseded: another job reclaimed this (textId, language) while this
-      // one was queued/retrying (or the claim is already gone). The current
-      // owner drives its own fallback; spawning one here would race the
-      // owner's write and duplicate provider spend.
+    if (owned.length === 0) {
+      // Superseded: another job reclaimed these keys while this one was
+      // queued/retrying (or the claims are already gone). The current owner
+      // drives its own attempt.
       console.warn(
-        '[llmTranslationQueue] LLM attempts exhausted on a superseded job — skipping Google fallback',
+        '[llmTranslationQueue] LLM attempts exhausted on a superseded job',
         {
           textId: context.textId,
           targetLanguage: context.targetLanguage,
           error: result.error,
         },
       );
-      // Same verdict the write choke point would have reached had this job got
-      // that far: a newer job owns the row, so this attempt is dead.
       await resolveRetranslation(
         ctx,
         context.retranslationAuditId,
@@ -1149,40 +1296,16 @@ export const onLlmTranslationComplete = internalMutation({
       return null;
     }
 
-    if (context.variantKey !== undefined) {
-      // A rendering variant has no Google fallback: a machine translation
-      // cannot take a requested gender or form, and the canonical row keeps
-      // serving the card meanwhile. The claim stays, marked failed, so the
-      // ensure path does not buy the same refusal again on every view
-      // until VARIANT_RETRY_COOLDOWN_MS has passed (a canonical wording
-      // change releases it earlier, `retireVariantRenderings`).
-      console.warn(
-        '[llmTranslationQueue] variant rewrite attempts exhausted — canonical keeps serving',
-        {
-          textId: context.textId,
-          targetLanguage: context.targetLanguage,
-          variantKey: context.variantKey,
-          error: result.error,
-        },
-      );
-      await ctx.db.patch(claim._id, {
-        workId: undefined,
-        variantFailedAt: Date.now(),
-      });
-      return null;
-    }
-
     // Off the text row, like the worker (`resolvePromptMetadata`), never off
     // the job's `sourceLanguage`. A stale arg must not turn a rewrite into
-    // a Google translation, or the reverse.
+    // a translation, or the reverse.
     const textRow = await ctx.db.get(context.textId);
     if (
       textRow &&
       getAccentRewriteConfig(context.targetLanguage, textRow.language)
     ) {
-      // An accent rewrite has no Google fallback: same-language "translation"
-      // is meaningless there. The source text itself is the safety net, the
-      // same row the verbatim path writes, under this job's claim so a
+      // An accent rewrite has a safe answer: the source text itself, the
+      // same row the verbatim path writes, under this job's claims so a
       // concurrent re-drive cannot race the write. Released right after,
       // like a success.
       console.warn(
@@ -1193,135 +1316,45 @@ export const onLlmTranslationComplete = internalMutation({
           error: result.error,
         },
       );
-      await storeTranslationAndScheduleTTSHandler(ctx, {
-        ...verbatimTranslationArgs(textRow, context.targetLanguage, {
-          audioSpeakerGender: context.audioSpeakerGender,
-          skipTts: context.skipTts,
-          priority: context.priority,
-          requestedByUserId: context.requestedByUserId,
-          replaceExisting: context.replaceExisting,
-          translationReason: context.translationReason,
-        }),
-        expectedClaimId: claim._id,
-        retranslationAuditId: context.retranslationAuditId,
-      });
-      await ctx.db.delete(claim._id);
+      for (const claim of owned) {
+        await storeTranslationAndScheduleTTSHandler(ctx, {
+          ...verbatimTranslationArgs(
+            textRow,
+            context.targetLanguage,
+            context.replacesLegacyRow
+              ? undefined
+              : (claim.variantKey ?? context.renderingKeys[0]),
+            {
+              skipTts: context.skipTts,
+              priority: context.priority,
+              requestedByUserId: context.requestedByUserId,
+              replaceExisting: context.replaceExisting,
+              translationReason: context.translationReason,
+            },
+          ),
+          expectedClaimId: claim._id,
+          retranslationAuditId: context.retranslationAuditId,
+        });
+        // The store released the claim with the row.
+      }
       return null;
     }
 
     console.warn(
-      '[llmTranslationQueue] LLM attempts exhausted — falling back to Google',
+      '[llmTranslationQueue] rendering attempts exhausted — keys held for the cooldown',
       {
         textId: context.textId,
         targetLanguage: context.targetLanguage,
+        renderingKeys: context.renderingKeys,
         error: result.error,
       },
     );
-    // An intermediate state: if Google succeeds, the write choke point
-    // overwrites this with the real outcome; if it fails too,
-    // `onGoogleFallbackComplete` lands 'failed'. A row still reading
-    // 'fell_back_to_google' means the fallback never reported either way.
-    await resolveRetranslation(
-      ctx,
-      context.retranslationAuditId,
-      'fell_back_to_google',
-    );
-    // Stay on the tier the LLM attempt ran at: a warm translation's fallback
-    // must not jump onto the interactive pool.
-    const fallbackPool =
-      context.llmPriority === 'background' ? llmWarmPool : llmPool;
-    const fallbackWorkId: string = await fallbackPool.enqueueAction(
-      ctx,
-      internal.features.decks.processTranslationForCard,
-      {
-        textId: context.textId,
-        sourceLanguage: context.sourceLanguage,
-        targetLanguage: context.targetLanguage,
-        text: context.text,
-        audioSpeakerGender: context.audioSpeakerGender,
-        requestedByUserId: context.requestedByUserId,
-        replaceExisting: context.replaceExisting,
-        translationReason: context.translationReason,
-        preferredRegionVariant: context.preferredRegionVariant,
-        skipTts: context.skipTts,
-        priority: context.priority,
-        // The claim keeps its _id across the re-point below, so the fallback
-        // inherits the same single-writer token.
-        claimId: claim._id,
-        retranslationAuditId: context.retranslationAuditId,
-      },
-      {
-        retry: GOOGLE_FALLBACK_RETRY,
-        onComplete:
-          internal.features.llmTranslationQueue.onGoogleFallbackComplete,
-        context: {
-          textId: context.textId,
-          targetLanguage: context.targetLanguage,
-          retranslationAuditId: context.retranslationAuditId,
-        },
-      },
-    );
-    await ctx.db.patch(claim._id, {
-      workId: fallbackWorkId,
-      claimedAt: Date.now(),
-    });
-    return null;
-  },
-});
-
-/**
- * Pool onComplete for the Google fallback (also used by the direct Google
- * path in `scheduleMissingContent`, which holds no claim. The lookup then
- * no-ops).
- *
- * Terminal failure (LLM chain AND Google both failed) deliberately KEEPS the
- * claim: letting it expire via CLAIM_STALE_MS gives a backoff before the next
- * reconcile re-drives this (textId, lang), preventing a retry hot-loop.
- */
-export const onGoogleFallbackComplete = internalMutation({
-  args: vOnCompleteArgs(
-    v.object({
-      textId: v.id('texts'),
-      targetLanguage: v.string(),
-      retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
-    }),
-  ),
-  returns: v.null(),
-  handler: async (
-    ctx: MutationCtx,
-    {
-      workId,
-      context,
-      result,
-    }: {
-      workId: string;
-      context: {
-        textId: Id<'texts'>;
-        targetLanguage: string;
-        retranslationAuditId?: Id<'cardEditRetranslations'>;
-      };
-      result: PoolRunResult;
-    },
-  ) => {
-    if (result.kind === 'failed') {
-      console.error(
-        '[llmTranslationQueue] terminal translation failure (LLM + Google both failed):',
-        {
-          textId: context.textId,
-          targetLanguage: context.targetLanguage,
-          error: result.error,
-        },
-      );
-      await resolveRetranslation(ctx, context.retranslationAuditId, 'failed');
-      return null;
-    }
-    const claim = await getLlmClaim(
-      ctx,
-      context.textId,
-      context.targetLanguage,
-    );
-    if (claim && (claim.workId === undefined || claim.workId === workId)) {
-      await ctx.db.delete(claim._id);
+    await resolveRetranslation(ctx, context.retranslationAuditId, 'failed');
+    for (const claim of owned) {
+      await ctx.db.patch(claim._id, {
+        workId: undefined,
+        variantFailedAt: Date.now(),
+      });
     }
     return null;
   },
@@ -1352,6 +1385,13 @@ function legacyReferentGenderFallback(
 }
 
 /** Internal query for the action to read the texts row inside its single-tx read window. */
+/** Whether a claim still exists: released claims are landed keys. */
+export const isLlmClaimHeld = internalQuery({
+  args: { claimId: v.id('llmTranslationClaims') },
+  returns: v.boolean(),
+  handler: async (ctx, { claimId }) => (await ctx.db.get(claimId)) !== null,
+});
+
 export const getTextRowForTranslation = internalQuery({
   args: { textId: v.id('texts') },
   returns: v.union(
@@ -1361,6 +1401,7 @@ export const getTextRowForTranslation = internalQuery({
       externalId: v.optional(v.string()),
       text: v.string(),
       language: v.string(),
+      userCreated: v.boolean(),
       addressesSomeone: v.optional(v.boolean()),
       addresseeNumber: v.optional(v.string()),
       speakerGender: v.optional(v.string()),
@@ -1368,6 +1409,7 @@ export const getTextRowForTranslation = internalQuery({
       addresseeGender: v.optional(v.string()),
       register: v.optional(v.string()),
       referentGender: v.optional(v.string()),
+      metadataSource: v.optional(v.string()),
       // Arc-context plumbing fields. Present for premade-dataset texts that
       // carry an arcId; undefined for legacy or user-created rows (which the
       // worker then skips the arc-window lookup for).
@@ -1384,6 +1426,7 @@ export const getTextRowForTranslation = internalQuery({
       externalId: row.externalId,
       language: row.language,
       text: row.text,
+      userCreated: row.userCreated,
       addressesSomeone: row.addressesSomeone,
       addresseeNumber: row.addresseeNumber,
       speakerGender: row.speakerGender,
@@ -1391,6 +1434,7 @@ export const getTextRowForTranslation = internalQuery({
       addresseeGender: row.addresseeGender,
       register: row.register,
       referentGender: row.referentGender,
+      metadataSource: row.metadataSource,
       collectionId: row.collectionId,
       collectionRank: row.collectionRank,
       arcId: row.arcId,

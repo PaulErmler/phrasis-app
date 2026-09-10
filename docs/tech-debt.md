@@ -107,38 +107,37 @@ correctness/cost/velocity noted per item.
       into one write and add a scheduled recount. Effort M. Impact: OCC retries on busy
       decks; silent drift persistence.
 
-- [ ] **C36 — Stranded rendering-variant rows.** A course that switches its
-      first-person or politeness setting keeps the previous variant rows and clips
-      (docs/architecture/translation-variants.md: nothing is deleted on a switch, so
-      switching back is free). Nothing collects a variant no card reads any more.
+- [ ] **C36 — Stranded keyed rows.** A course that switches its politeness
+      setting keeps the previous key's rows and clips
+      (docs/architecture/rendering-keys.md: nothing is deleted on a switch, so
+      switching back is free). Nothing collects a keyed row no card reads any more.
       Small and shared; revisit with a usage-aware sweep if volume warrants. Effort M.
-- [ ] **C37 — Collection previews stay canonical for preference users.** The
-      collection preview and `requestPreviewTranslations` read the rendering a new card
-      would get (`previewView`) but only the review ensure path generates variants, so a
-      preview shows canonical wording until the text becomes a card and is reviewed.
-      Paul's 2026-08-28 rule (browse surfaces trigger variant translations, never TTS)
-      is not wired for previews yet. Effort S.
+- [x] **C37 — Collection previews stay canonical for preference users.** Resolved
+      2026-09-10: every reader without a card resolves a key like a new card would,
+      and `ensureTextContent` is the one sweep for the review, warm and browse
+      surfaces (browse passes `skipTts`), so a preview requests the keyed row.
 - [ ] **C38 — Per-language sentence-form copy is English only.** The row labels,
       descriptions and examples in `lib/languageForms.ts` (43 languages) reach the German
       UI untranslated; the wizard and settings chrome around them is bilingual. Either
       translate the config copy or key it into messages/\*.json. Effort M.
 - [ ] **C41 — Sentence-metadata calls are one per text.** The curriculum
-      reclassification (`requestSentenceMetadataIfNeeded`) sends one classifier
-      call per text, capped at five per many-text pass. Batching several source
-      sentences into one call would cut the per-row overhead but needs a prompt
-      change and its own `pnpm eval:metadata` run. Effort S.
+      classification (`requestSentenceMetadataIfNeeded`, asked by the sweep's
+      metadata gate before a text's first keyed row) sends one classifier call per
+      text. Batching several source sentences into one call would cut the per-row
+      overhead but needs a prompt change and its own `pnpm eval:metadata` run.
+      Effort S.
 - [ ] **C42 — No way to clear a per-card rendering override.** The Flag dialog
       writes `cards.renderingGenderOverride` / `renderingPolitenessOverride`; nothing
       lets the learner undo one short of a card edit (which forks the text and clears
       both). The edit dialog is the natural home. Effort S.
-- [ ] **C43 — Gender/politeness pipeline cleanups (2026-09-09 review).** Twenty-odd
-      simplifications found in the pre-push review of `gender-choice-live`, none a
-      bug: one entry point for the paired content sweeps, one batched served-rendering
-      accessor, the coin flip written into `texts.speakerGender`, the ad hoc
-      "marks politeness without a you" rule, duplicated constants and prompt strings,
-      small read savings. Each with a proposed shape and effort in
-      `.scratch/speaker-gender-politeness/cleanups.md`. Effort M in total; A1 and A2
-      there are the ones worth doing first.
+- [x] **C43 — Gender/politeness pipeline cleanups (2026-09-09 review).** Resolved
+      2026-09-10 by the rendering-keys restructuring
+      (docs/architecture/rendering-keys.md): one sweep entry point, one batched
+      served-rendering accessor, the flip kept out of `texts.speakerGender`, the
+      addressee rule in `formAxisApplies`, the prompt helpers in
+      `lib/renderingPrompts.ts`. The rest of
+      `.scratch/speaker-gender-politeness/cleanups.md` went with the machinery it
+      described (stamps, canonical/variant split, correction sweep).
 - [ ] **C40 — Sentence-form evals still owed.** The politeness corpus covers ten
       languages (de es fr hi ja ko pt ru th zh); the plan wanted vi, fil, id, pl, cs, tr,
       it, pt_pt, uz, bn and ar_eg with the traps from the review table, and nine

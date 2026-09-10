@@ -20,10 +20,11 @@ function renderStep(selected: PolitenessLevel[], onChange = vi.fn()) {
 }
 
 describe('PolitenessStep: the recommended answer', () => {
-  it('preselects every level on entry with nothing ticked', () => {
+  // Japanese recommends casual and polite; keigo is left for later.
+  it('preselects the recommended set on entry with nothing ticked', () => {
     const { onChange } = renderStep([]);
     expect(onChange).toHaveBeenCalledTimes(1);
-    expect(onChange).toHaveBeenCalledWith(['casual', 'polite', 'formal']);
+    expect(onChange).toHaveBeenCalledWith(['casual', 'polite']);
   });
 
   it('leaves an existing pick alone', () => {
@@ -31,21 +32,21 @@ describe('PolitenessStep: the recommended answer', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('marks the all-levels card as the recommended, pressed option', () => {
-    renderStep(['casual', 'polite', 'formal']);
-    const all = screen.getByTestId('politeness-all');
-    expect(all).toHaveAttribute('aria-pressed', 'true');
-    expect(all.textContent).toContain('all.badge');
+  it('marks the recommended-default card as pressed when that set is ticked', () => {
+    renderStep(['casual', 'polite']);
+    const card = screen.getByTestId('politeness-recommended');
+    expect(card).toHaveAttribute('aria-pressed', 'true');
+    expect(card.textContent).toContain('recommended.badge');
   });
 
-  it('ticks every row when the all-levels card is pressed', async () => {
+  it('ticks the recommended rows when the card is pressed', async () => {
     const user = userEvent.setup();
     const { onChange } = renderStep(['polite']);
-    expect(screen.getByTestId('politeness-all')).toHaveAttribute(
+    expect(screen.getByTestId('politeness-recommended')).toHaveAttribute(
       'aria-pressed',
       'false',
     );
-    await user.click(screen.getByTestId('politeness-all'));
-    expect(onChange).toHaveBeenLastCalledWith(['casual', 'polite', 'formal']);
+    await user.click(screen.getByTestId('politeness-recommended'));
+    expect(onChange).toHaveBeenLastCalledWith(['casual', 'polite']);
   });
 });

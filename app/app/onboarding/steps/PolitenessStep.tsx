@@ -3,9 +3,9 @@
 import { useEffect, useRef } from 'react';
 import { useTranslations } from 'next-intl';
 import {
-  allPolitenessLevels,
   coursePolitenessRows,
   formCopyCode,
+  recommendedPolitenessLevels,
   type PolitenessLevel,
 } from '@/lib/languageForms';
 import { PolitenessRows } from '@/components/course/PolitenessRows';
@@ -21,9 +21,10 @@ import { PolitenessRows } from '@/components/course/PolitenessRows';
  * (`levelsFromTickedRows`), so the stored set stays right when a language
  * with more forms is added later.
  *
- * Every level is the recommended answer: the rows' "All levels" card
- * (`recommendAll`) is preselected on entry, so a learner who just continues
- * gets the mix. The rows below are for narrowing it.
+ * The recommended set (`recommendedPolitenessLevels`: casual and polite
+ * for Japanese and Korean) is preselected on entry through the rows'
+ * "Use the default we recommend" card (`recommendDefault`), so a learner
+ * who just continues gets it. The rows below are for changing it.
  */
 
 interface Props {
@@ -47,7 +48,7 @@ export function PolitenessStep({
   const intro = introCode
     ? tForms(`politeness.${formCopyCode(introCode)}.intro`)
     : '';
-  const allLevels = allPolitenessLevels(rows);
+  const recommended = recommendedPolitenessLevels(rows);
   // Preselect the recommended answer once, on entry with nothing ticked. A
   // learner who unticks every row afterwards keeps the empty set (Continue
   // stays disabled), so the effect must not re-fire on later renders.
@@ -55,8 +56,8 @@ export function PolitenessStep({
   useEffect(() => {
     if (preselectedRef.current) return;
     preselectedRef.current = true;
-    if (selected.length === 0 && allLevels.length > 0) onChange(allLevels);
-  }, [selected, allLevels, onChange]);
+    if (selected.length === 0 && recommended.length > 0) onChange(recommended);
+  }, [selected, recommended, onChange]);
 
   return (
     <div
@@ -73,7 +74,7 @@ export function PolitenessStep({
           selected={selected}
           onChange={onChange}
           showExamples
-          recommendAll
+          recommendDefault
         />
       </div>
     </div>

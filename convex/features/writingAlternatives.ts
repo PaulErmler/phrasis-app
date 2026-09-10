@@ -18,7 +18,6 @@ import {
 import { internal } from '../_generated/api';
 import { getCourseSettings } from '../db/courseSettings';
 import {
-  hasRenderingOverride,
   resolveCardRendering,
 } from '../../lib/preferenceResolution';
 import type { Id } from '../_generated/dataModel';
@@ -328,22 +327,15 @@ export const getAlternativeContext = internalQuery({
     if (!row) return null;
     const card = await ctx.db.get(row.cardId);
     const text = card ? await ctx.db.get(card.textId) : null;
-    // The voice the card is spoken in: its rendering when the course has
-    // sentence-form settings or the card carries its own correction (which
-    // needs no settings, hence the empty stand-in, like `viewOfCard`), else
-    // the text's resolved audio speaker
-    // (docs/architecture/translation-variants.md).
-    const deck = card ? await ctx.db.get(card.deckId) : null;
-    const settings = deck
-      ? renderingSettingsOf(await getCourseSettings(ctx, deck.courseId))
-      : undefined;
-    const renderingCard = card ? renderingCardOf(card) : null;
+    // The voice the card is spoken in: the text's own, or the card's
+    // Flag-dialog correction (docs/architecture/rendering-keys.md). Only a
+    // card without a text falls back to a flip seeded on the alternative.
     const primaryGender =
-      text && renderingCard && (settings || hasRenderingOverride(renderingCard))
+      text && card
         ? resolveCardRendering({
             text: renderingTextOf(text),
             textId: text._id,
-            card: renderingCard,
+            card: renderingCardOf(card),
           }).voiceGender
         : resolveAudioSpeakerGender(
             text?.audioSpeakerGender ?? text?.speakerGender,

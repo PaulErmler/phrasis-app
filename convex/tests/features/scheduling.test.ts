@@ -14,7 +14,7 @@ import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataS
 import { llmPool } from '@/convex/lib/workpools';
 import { CLAIM_STALE_MS } from '../../features/llmTranslationQueue';
 import { resolveAudioPayload } from '../../lib/audioAssets';
-import { scheduleMissingContent } from '../../features/decks';
+import { ensureTextContent } from '../../features/decks';
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
@@ -165,22 +165,34 @@ describe('features/scheduling', () => {
 
     // The chips travel through `translationValidator`, so a field the
     // content builder emits but the validator does not declare fails the
-    // QUERY, not the builder. The variant suites assert on
+    // QUERY, not the builder. The rendering suites assert on
     // `buildTextContentBatchForLanguages` directly and never see that, which
     // is how `formLanguage` shipped undeclared (2026-09-09).
     it('returns the chip fields through the query validator', async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedCardWithCourse(t);
       await t.run(async (ctx) => {
-        // A premade text so the card can carry a rendering at all, with a
-        // target row the classifier has stamped.
-        await ctx.db.patch(textId, { userCreated: false, userId: undefined });
+        // A premade German text on the card, voiced male, with a keyed
+        // Japanese row in the polite form: the chip reads the key.
+        await ctx.db.patch(textId, {
+          userCreated: false,
+          userId: undefined,
+          audioSpeakerGender: 'male',
+          addressesSomeone: false,
+        });
+        const card = (await ctx.db
+          .query('cards')
+          .withIndex('by_textId', (q) => q.eq('textId', textId))
+          .first())!;
+        await ctx.db.patch(card._id, { followsCoursePreferences: true });
+        const course = (await ctx.db.get((await ctx.db.get(card.deckId))!.courseId))!;
+        await ctx.db.patch(course._id, { targetLanguages: ['ja'] });
         await ctx.db.insert('translations', {
           textId,
-          targetLanguage: 'en',
-          translatedText: 'Hello',
-          renderedPoliteness: 'polite',
-          renderedGender: 'feminine',
+          targetLanguage: 'ja',
+          translatedText: '疲れました。',
+          variantKey: 'male|desu-masu',
+          speakerGender: 'male',
         });
       });
       const asUser = t.withIdentity({ subject: 'user_A' });
@@ -188,9 +200,10 @@ describe('features/scheduling', () => {
         api.features.scheduling.getCardForReview,
         {},
       );
-      const en = res?.translations.find((tr) => tr.language === 'en');
-      expect(en?.renderedPoliteness).toBe('polite');
-      expect(en?.formLanguage).toBe('en');
+      const ja = res?.translations.find((tr) => tr.language === 'ja');
+      expect(ja?.politenessLevel).toBe('polite');
+      expect(ja?.formLanguage).toBe('ja');
+      expect(ja?.voiceGender).toBe('male');
     });
 
     it("returns due card for user's active deck", async () => {
@@ -1530,7 +1543,7 @@ describe('features/scheduling', () => {
 
       const after = await t.run(async (ctx) => {
         const text = (await ctx.db.get(newTextId))!;
-        await scheduleMissingContent(ctx, newTextId, text, ['en'], ['sv']);
+        await ensureTextContent(ctx, newTextId, text, ['en'], ['sv']);
         return {
           translation: await liveTranslation(ctx, newTextId, 'en'),
           audio: await ctx.db
@@ -1795,7 +1808,7 @@ describe('features/scheduling', () => {
      * Seed a card backed by a USER-OWNED text (userCreated && userId matches)
      * so editCard takes Path A: reuse the textId and patch translations/audio
      * rows in place instead of creating a new text. Audio rows exist for both
-     * languages (gemini rows so the precedence sweep in scheduleMissingContent
+     * languages (gemini rows so the precedence sweep in ensureTextContent
      * leaves them alone; wordTimings set so no backfill is scheduled).
      */
     async function seedOwnedCardWithAudio(t: ReturnType<typeof convexTest>) {
@@ -3438,7 +3451,7 @@ describe('features/scheduling', () => {
       const card = await t.run((ctx) => ctx.db.get(cardId));
       expect(card?.renderingGenderOverride).toBe('female');
       expect(card?.renderingPolitenessOverride).toBeUndefined();
-      const classify = await pendingJobs(t, 'fetchSentenceMetadata');
+      const classify = await pendingJobs(t, 'classifyCurriculumText');
       expect(classify).toHaveLength(1);
       expect(classify[0].args[0]).toMatchObject({
         textId,

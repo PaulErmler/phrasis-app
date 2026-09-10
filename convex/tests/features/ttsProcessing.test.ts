@@ -1106,10 +1106,13 @@ describe('features/ttsProcessing', () => {
         }),
       );
 
+      // A legacy card's view: legacy pointers are maintained by the cards
+      // that play them (docs/architecture/rendering-keys.md).
       await t.mutation(internal.features.decks.prepareCardContent, {
         textId,
         baseLanguages: ['sw'],
         targetLanguages: ['sw'],
+        renderingCard: {},
       });
 
       const left = await t.run(async (ctx) => ctx.db.get(audioId));
@@ -1175,10 +1178,13 @@ describe('features/ttsProcessing', () => {
         return rowId;
       });
 
+      // A legacy card's view: legacy pointers are maintained by the cards
+      // that play them (docs/architecture/rendering-keys.md).
       await t.mutation(internal.features.decks.prepareCardContent, {
         textId,
         baseLanguages: ['es'],
         targetLanguages: ['es'],
+        renderingCard: {},
       });
 
       const left = await t.run(async (ctx) => ctx.db.get(audioId));
@@ -1212,6 +1218,7 @@ describe('features/ttsProcessing', () => {
         textId,
         baseLanguages: ['en'],
         targetLanguages: ['es'],
+        renderingCard: {},
       });
       // The backfill holds a TTS claim while scheduled.
       expect(await getClaim(t, textId)).not.toBeNull();
@@ -1226,6 +1233,7 @@ describe('features/ttsProcessing', () => {
         textId,
         baseLanguages: ['en'],
         targetLanguages: ['es'],
+        renderingCard: {},
       });
       expect(await getClaim(t, textId)).toBeNull();
     });

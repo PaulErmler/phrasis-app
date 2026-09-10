@@ -12,9 +12,6 @@ describe('aiCosts', () => {
       expect(costForCharacters('googleTts', 1_000_000)).toBe(
         AI_COST_RATES.googleTts.usdPerUnit,
       );
-      expect(costForCharacters('googleTranslate', 1_000_000)).toBe(
-        AI_COST_RATES.googleTranslate.usdPerUnit,
-      );
     });
 
     it('scales linearly below a million characters', () => {

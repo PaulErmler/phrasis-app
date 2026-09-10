@@ -12,7 +12,7 @@ import {
 // asserted by key.
 const ROWS = coursePolitenessRows(['ja', 'en']);
 
-function renderRows(selected: PolitenessLevel[], recommendAll = true) {
+function renderRows(selected: PolitenessLevel[], recommendDefault = true) {
   const onChange = vi.fn();
   render(
     <PolitenessRows
@@ -20,33 +20,39 @@ function renderRows(selected: PolitenessLevel[], recommendAll = true) {
       selected={selected}
       onChange={onChange}
       compact
-      recommendAll={recommendAll}
+      recommendDefault={recommendDefault}
     />,
   );
   return onChange;
 }
 
-describe('PolitenessRows: the all-levels card', () => {
-  it('is pressed and badged when every row is ticked', () => {
-    renderRows(['casual', 'polite', 'formal']);
-    const all = screen.getByTestId('politeness-all');
-    expect(all).toHaveAttribute('aria-pressed', 'true');
-    expect(all.textContent).toContain('all.badge');
+describe('PolitenessRows: the recommended-default card', () => {
+  it('is pressed and badged when exactly the recommended set is ticked', () => {
+    // Japanese recommends casual and polite; keigo is left for later.
+    renderRows(['casual', 'polite']);
+    const card = screen.getByTestId('politeness-recommended');
+    expect(card).toHaveAttribute('aria-pressed', 'true');
+    expect(card.textContent).toContain('recommended.badge');
+    expect(card.textContent).toContain('recommended.title');
   });
 
-  it('ticks every row when pressed', async () => {
-    const user = userEvent.setup();
-    const onChange = renderRows(['formal']);
-    expect(screen.getByTestId('politeness-all')).toHaveAttribute(
+  it('is not pressed when every row is ticked', () => {
+    renderRows(['casual', 'polite', 'formal']);
+    expect(screen.getByTestId('politeness-recommended')).toHaveAttribute(
       'aria-pressed',
       'false',
     );
-    await user.click(screen.getByTestId('politeness-all'));
-    expect(onChange).toHaveBeenCalledWith(['casual', 'polite', 'formal']);
+  });
+
+  it('ticks the recommended rows when pressed', async () => {
+    const user = userEvent.setup();
+    const onChange = renderRows(['formal']);
+    await user.click(screen.getByTestId('politeness-recommended'));
+    expect(onChange).toHaveBeenCalledWith(['casual', 'polite']);
   });
 
   it('is absent unless asked for', () => {
     renderRows(['casual'], false);
-    expect(screen.queryByTestId('politeness-all')).toBeNull();
+    expect(screen.queryByTestId('politeness-recommended')).toBeNull();
   });
 });

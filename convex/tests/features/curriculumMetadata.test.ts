@@ -1,8 +1,8 @@
 /// <reference types="vite/client" />
 import { vi as vitestMock } from 'vitest';
-// The lazy metadata request schedules the classifier action; keep it off
-// the network (an empty verdict leaves the row unstamped, which is what a
-// bad answer does in production too).
+// The metadata request schedules the classifier action; keep it off the
+// network (an empty verdict leaves the row unstamped, which is what a bad
+// answer does in production too).
 vitestMock.mock('ai', () => ({
   generateText: vitestMock.fn(async () => ({ text: '{}' })),
 }));
@@ -17,9 +17,9 @@ import { internal } from '../../_generated/api';
 import type { Id } from '../../_generated/dataModel';
 import { llmPool, ttsPool } from '@/convex/lib/workpools';
 import {
-  needsSentenceMetadata,
-  newMetadataCallBudget,
-  scheduleMissingContent,
+  ensureTextContent,
+  MAX_METADATA_ATTEMPTS,
+  metadataState,
 } from '../../lib/contentScheduling';
 import { audioPointer, liveTranslation } from '../../db/translationReads';
 import { getTtsProviderForLanguage } from '../../../lib/languages';
@@ -33,12 +33,12 @@ const modules = import.meta.glob('/convex/**/*.ts');
 drainSchedulerAfterEach();
 
 /**
- * Curriculum sentence metadata as evidence (lib/sentenceMetadataSource.ts):
- * the sweep asks the classifier for a curriculum text it has not judged,
- * from the source alone and under a claim; a verdict stamps the source;
- * and once a definitive gender is on the text, the canonical clip is
- * re-voiced and a wording the rendering stamp proves wrong is regenerated
- * in place, once.
+ * Curriculum sentence metadata as the precondition of a rendering key
+ * (docs/architecture/rendering-keys.md): the sweep asks the classifier for
+ * a curriculum text it has not judged, from the source alone and under a
+ * claim, and waits for the verdict before it computes any key; a verdict
+ * stamps the source; a text the classifier keeps failing on renders from
+ * defaults after `MAX_METADATA_ATTEMPTS`.
  */
 
 // An English base also asks for the text's accent row (en_gb / en_au) by
@@ -52,6 +52,8 @@ const llmEnqueues = () =>
         c[2] as {
           textId: Id<'texts'>;
           targetLanguage: string;
+          renderingKeys: string[];
+          adoptLegacy?: boolean;
           replaceExisting?: boolean;
           translationReason?: string;
         },
@@ -76,9 +78,9 @@ const pendingJobs = (t: TestConvex<typeof schema>, name: string) =>
   );
 
 /**
- * A premade English text with a Japanese and a German canonical row and
- * clips, voiced male (the coin flip). `metadata` puts the text at the
- * current classifier source with the given verdict.
+ * A premade English text with a Japanese and a German LEGACY row and clips,
+ * voiced male (the coin flip). `metadata` puts the text at the current
+ * classifier source with the given verdict.
  */
 async function seed(
   t: TestConvex<typeof schema>,
@@ -86,9 +88,8 @@ async function seed(
     userCreated?: boolean;
     metadata?: { speakerGender: 'male' | 'female' | 'neutral' };
     metadataRequestedAt?: number;
-    jaGender?: 'masculine' | 'feminine' | 'unmarked' | 'none';
-    /** The gender the ja row was generated under (default the coin flip). */
-    jaRowSpeakerGender?: 'male' | 'female';
+    metadataAttempts?: number;
+    keyedRows?: boolean;
   } = {},
 ) {
   return t.run(async (ctx) => {
@@ -103,7 +104,7 @@ async function seed(
       ...(opts.userCreated ? { userId: 'user_A' } : {}),
       collectionId,
       collectionRank: 1,
-      speakerGender: opts.metadata?.speakerGender ?? 'male',
+      speakerGender: opts.metadata?.speakerGender ?? undefined,
       audioSpeakerGender: 'male',
       addressesSomeone: false,
       ipaText: '',
@@ -114,24 +115,15 @@ async function seed(
       ...(opts.metadataRequestedAt !== undefined
         ? { metadataRequestedAt: opts.metadataRequestedAt }
         : {}),
+      ...(opts.metadataAttempts !== undefined
+        ? { metadataAttempts: opts.metadataAttempts }
+        : {}),
     });
     const rows: Record<string, Id<'translations'>> = {};
-    for (const [lang, text] of [
-      ['ja', '僕たちは兄弟だ。'],
-      ['de', 'Wir sind Brüder.'],
+    for (const [lang, text, key] of [
+      ['ja', '僕たちは兄弟だ。', 'male|desu-masu'],
+      ['de', 'Wir sind Brüder.', 'male|none'],
     ] as const) {
-      const jaGender = opts.jaGender ?? 'masculine';
-      const stamps: {
-        renderedGender?: 'masculine' | 'feminine' | 'unmarked';
-        renderedPoliteness?: 'casual' | 'unmarked';
-      } = {};
-      if (lang !== 'ja') {
-        stamps.renderedGender = 'unmarked';
-        stamps.renderedPoliteness = 'unmarked';
-      } else if (jaGender !== 'none') {
-        stamps.renderedGender = jaGender;
-        stamps.renderedPoliteness = 'casual';
-      }
       rows[lang] = await ctx.db.insert('translations', {
         textId,
         targetLanguage: lang,
@@ -140,10 +132,9 @@ async function seed(
         ipaText: '',
         furiganaText: '',
         translationSource: 'openai/gpt-5.6-sol:floor-minimal',
-        speakerGender:
-          lang === 'ja' ? (opts.jaRowSpeakerGender ?? 'male') : 'male',
+        speakerGender: 'male',
         translationVersion: 99,
-        ...stamps,
+        ...(opts.keyedRows ? { variantKey: key } : {}),
       });
       await insertAudioFixture(ctx, {
         textId,
@@ -154,6 +145,7 @@ async function seed(
         ttsProvider: getTtsProviderForLanguage(lang),
         voiceGender: 'male',
         spokenText: text,
+        ...(opts.keyedRows ? { variantKey: key } : {}),
       });
     }
     await insertAudioFixture(ctx, {
@@ -173,57 +165,57 @@ async function seed(
 const sweep = (
   t: TestConvex<typeof schema>,
   textId: Id<'texts'>,
-  opts?: Parameters<typeof scheduleMissingContent>[5],
+  opts?: Parameters<typeof ensureTextContent>[5],
 ) =>
   t.run(async (ctx) => {
     const text = (await ctx.db.get(textId))!;
-    return scheduleMissingContent(
-      ctx,
-      textId,
-      text,
-      ['en'],
-      ['ja', 'de'],
-      opts,
-    );
+    return ensureTextContent(ctx, textId, text, ['en'], ['ja', 'de'], opts);
   });
 
-describe('needsSentenceMetadata', () => {
-  it('only an unclassified curriculum text outside the cooldown', () => {
-    expect(needsSentenceMetadata({ userCreated: false })).toBe(true);
-    expect(needsSentenceMetadata({ userCreated: true })).toBe(false);
+describe('metadataState', () => {
+  it('current for a user text or the current source, else needed, in flight, or exhausted', () => {
+    expect(metadataState({ userCreated: false })).toBe('needed');
+    expect(metadataState({ userCreated: true })).toBe('current');
     expect(
-      needsSentenceMetadata({
+      metadataState({
         userCreated: false,
         metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
       }),
-    ).toBe(false);
+    ).toBe('current');
     expect(
-      needsSentenceMetadata({
+      metadataState({
         userCreated: false,
         metadataSource: 'some-older-build-v0',
       }),
-    ).toBe(true);
+    ).toBe('needed');
     expect(
-      needsSentenceMetadata({
+      metadataState({
         userCreated: false,
         metadataRequestedAt: Date.now() - 60_000,
       }),
-    ).toBe(false);
+    ).toBe('in_flight');
     expect(
-      needsSentenceMetadata({
+      metadataState({
         userCreated: false,
         metadataRequestedAt: Date.now() - 20 * 60 * 1000,
       }),
-    ).toBe(true);
+    ).toBe('needed');
+    expect(
+      metadataState({
+        userCreated: false,
+        metadataAttempts: MAX_METADATA_ATTEMPTS,
+      }),
+    ).toBe('exhausted');
   });
 });
 
-describe('the lazy metadata request', () => {
-  it('asks the classifier for an unclassified curriculum text, from the source alone, under a claim', async () => {
+describe('the metadata precondition', () => {
+  it('asks the classifier for an unclassified curriculum text, from the source alone, and waits', async () => {
     const t = convexTest(schema, modules);
     const { textId } = await seed(t);
-    await sweep(t, textId);
-    const jobs = await pendingJobs(t, 'fetchSentenceMetadata');
+    const result = await sweep(t, textId);
+    expect(result).toEqual({ translationsScheduled: 1, audioScheduled: 0 });
+    const jobs = await pendingJobs(t, 'classifyCurriculumText');
     expect(jobs).toHaveLength(1);
     expect(jobs[0].args[0]).toMatchObject({
       textId,
@@ -232,9 +224,13 @@ describe('the lazy metadata request', () => {
     });
     const text = await t.run((ctx) => ctx.db.get(textId));
     expect(text?.metadataRequestedAt).toBeDefined();
-    // The coin flip keeps serving meanwhile: nothing else was touched.
+    expect(text?.metadataAttempts).toBe(1);
+    // No key was computed from a guess: nothing else was asked for.
     expect(llmEnqueues()).toEqual([]);
     expect(ttsEnqueues()).toEqual([]);
+    expect(
+      await t.run((ctx) => liveTranslation(ctx, textId, 'de', 'male|none')),
+    ).toBeNull();
   });
 
   it('does not ask again inside the cooldown, nor for a classified or user-written text', async () => {
@@ -247,28 +243,61 @@ describe('the lazy metadata request', () => {
     });
     const { textId: own } = await seed(t, { userCreated: true });
     for (const id of [inFlight, classified, own]) await sweep(t, id);
-    expect(await pendingJobs(t, 'fetchSentenceMetadata')).toHaveLength(0);
+    expect(await pendingJobs(t, 'classifyCurriculumText')).toHaveLength(0);
   });
 
-  it('a many-text pass spends its call budget and stops asking', async () => {
+  it('a text in flight is left alone until the verdict lands', async () => {
     const t = convexTest(schema, modules);
-    const { textId: first } = await seed(t);
-    const { textId: second } = await seed(t);
-    const budget = newMetadataCallBudget();
-    budget.remaining = 1;
-    await sweep(t, first, { metadataCalls: budget });
-    await sweep(t, second, { metadataCalls: budget });
-    const jobs = await pendingJobs(t, 'fetchSentenceMetadata');
-    expect(jobs).toHaveLength(1);
-    expect(jobs[0].args[0]).toMatchObject({ textId: first });
-    expect(budget.remaining).toBe(0);
+    const { textId } = await seed(t, {
+      metadataRequestedAt: Date.now() - 1000,
+    });
+    expect(await sweep(t, textId)).toEqual({
+      translationsScheduled: 0,
+      audioScheduled: 0,
+    });
+    expect(llmEnqueues()).toEqual([]);
+  });
+
+  it('a classified text goes on to its keyed rows: the legacy rows are offered for adoption', async () => {
+    const t = convexTest(schema, modules);
+    const { textId } = await seed(t, {
+      metadata: { speakerGender: 'neutral' },
+    });
+    await sweep(t, textId);
+    // ja: a form key on a legacy wording of unknown form, and de: a
+    // form-free key on a language whose wording marks the first person.
+    // Both legacy rows may stand in for the primary key, once verified.
+    const jobs = llmEnqueues();
+    expect(jobs.map((j) => [j.targetLanguage, j.renderingKeys, j.adoptLegacy]))
+      .toEqual(
+        expect.arrayContaining([
+          ['ja', ['male|desu-masu'], true],
+          ['de', ['male|none'], true],
+        ]),
+      );
+  });
+
+  it('a text the classifier keeps failing on renders from defaults', async () => {
+    const t = convexTest(schema, modules);
+    const { textId } = await seed(t, {
+      metadataAttempts: MAX_METADATA_ATTEMPTS,
+    });
+    await sweep(t, textId);
+    expect(await pendingJobs(t, 'classifyCurriculumText')).toHaveLength(0);
+    expect(llmEnqueues().map((j) => j.targetLanguage).sort()).toEqual([
+      'de',
+      'ja',
+    ]);
   });
 });
 
 describe('the source stamp', () => {
   it('a verdict with a speaker gender stamps the current source; the unblock call and a partial patch do not', async () => {
     const t = convexTest(schema, modules);
-    const { textId } = await seed(t, { metadataRequestedAt: Date.now() });
+    const { textId } = await seed(t, {
+      metadataRequestedAt: Date.now(),
+      metadataAttempts: 1,
+    });
     const apply = (metadata: Record<string, unknown> | undefined) =>
       t.mutation(
         internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
@@ -292,32 +321,41 @@ describe('the source stamp', () => {
     const text = await t.run((ctx) => ctx.db.get(textId));
     expect(text?.metadataSource).toBe(CURRENT_SENTENCE_METADATA_SOURCE);
     expect(text?.metadataRequestedAt).toBeUndefined();
+    expect(text?.metadataAttempts).toBeUndefined();
     expect(text?.speakerGender).toBe('female');
     expect(text?.audioSpeakerGender).toBe('female');
-    // No definitive referent: the coin flip stands in, as before.
+    // No definitive referent: the seeded flip stands in.
     expect(['male', 'female']).toContain(text?.referentGender);
   });
 
-  it('a definitive referent gender replaces the coin flip', async () => {
+  it('a definitive referent gender replaces the flip, and the flip is seeded on the text', async () => {
     const t = convexTest(schema, modules);
     const { textId } = await seed(t);
-    await t.run((ctx) => ctx.db.patch(textId, { referentGender: 'male' }));
-    await t.mutation(
-      internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
-      {
-        textId,
-        metadata: { speakerGender: 'neutral', referentGender: 'female' },
-        schedulePrepareCard: false,
-        baseLanguages: ['en'],
-        targetLanguages: ['ja', 'de'],
-      },
+    const apply = (metadata: Record<string, unknown>) =>
+      t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata,
+          schedulePrepareCard: false,
+          baseLanguages: ['en'],
+          targetLanguages: ['ja', 'de'],
+        },
+      );
+    await apply({ speakerGender: 'neutral', referentGender: 'neutral' });
+    const first = (await t.run((ctx) => ctx.db.get(textId)))?.referentGender;
+    await t.run((ctx) => ctx.db.patch(textId, { referentGender: undefined }));
+    await apply({ speakerGender: 'neutral', referentGender: 'neutral' });
+    expect((await t.run((ctx) => ctx.db.get(textId)))?.referentGender).toBe(
+      first,
     );
+    await apply({ speakerGender: 'neutral', referentGender: 'female' });
     expect((await t.run((ctx) => ctx.db.get(textId)))?.referentGender).toBe(
       'female',
     );
   });
 
-  it('the sweep keeps a classified neutral verdict instead of writing the coin flip over it', async () => {
+  it('the sweep keeps a classified neutral verdict and never writes the flip into speakerGender', async () => {
     const t = convexTest(schema, modules);
     const { textId } = await seed(t, {
       metadata: { speakerGender: 'neutral' },
@@ -327,196 +365,31 @@ describe('the source stamp', () => {
     expect(text?.speakerGender).toBe('neutral');
     expect(text?.audioSpeakerGender).toBe('male');
   });
-});
 
-describe('what a definitive verdict regenerates', () => {
-  it('re-voices the canonical clips and regenerates the row the stamp proves wrong, in place', async () => {
+  it("the verdict's reschedule buys audio only when the text is somebody's card", async () => {
     const t = convexTest(schema, modules);
-    const { textId, rows } = await seed(t, {
-      metadata: { speakerGender: 'female' },
-      jaGender: 'masculine',
-    });
-    // The verdict mirrored into the voice, as `applyTextMetadata` does.
-    await t.run((ctx) =>
-      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
-    );
-    await sweep(t, textId);
-
-    // The Japanese wording was written in the masculine under the coin
-    // flip: one in-place regeneration, with its own reason.
-    const regen = llmEnqueues();
-    expect(regen.map((j) => j.targetLanguage)).toEqual(['ja']);
-    expect(regen[0]).toMatchObject({
-      replaceExisting: true,
-      translationReason: 'metadata_correction',
-    });
-    // The row itself survives until the new wording lands.
-    expect(await t.run((ctx) => ctx.db.get(rows.ja))).not.toBeNull();
-
-    // The German clip and the source clip were in the wrong voice: dropped
-    // (asset kept) and re-voiced. The Japanese clip waits for its wording.
-    expect(await t.run((ctx) => audioPointer(ctx, textId, 'de'))).toBeNull();
-    expect(
-      ttsEnqueues()
-        .filter((j) => j.voiceGender === 'female')
-        .map((j) => j.language)
-        .sort(),
-    ).toEqual(['de', 'en']);
-  });
-
-  it('leaves an unmarked or unstamped row alone', async () => {
-    const t = convexTest(schema, modules);
-    for (const seedOpts of [
-      { jaGender: 'unmarked' as const },
-      { jaGender: 'none' as const },
-    ]) {
-      vi.mocked(llmPool.enqueueAction).mockClear();
-      const { textId } = await seed(t, {
-        metadata: { speakerGender: 'female' },
-        ...seedOpts,
-      });
-      await t.run((ctx) =>
-        ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
+    const { textId } = await seed(t);
+    const apply = () =>
+      t.mutation(
+        internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+        {
+          textId,
+          metadata: { speakerGender: 'neutral' },
+          schedulePrepareCard: true,
+          baseLanguages: ['en'],
+          targetLanguages: ['ja', 'de'],
+        },
       );
-      await sweep(t, textId);
-      expect(llmEnqueues()).toEqual([]);
-      expect(
-        await t.run((ctx) => liveTranslation(ctx, textId, 'ja')),
-      ).not.toBeNull();
-    }
-  });
-
-  it('retries a row already generated under the verdict once, then stops', async () => {
-    const t = convexTest(schema, modules);
-    // Generated under the verdict (female) and STILL stamped masculine: the
-    // model ignored `<speaker_gender>`, so a second sample is worth a call.
-    const { textId, rows } = await seed(t, {
-      metadata: { speakerGender: 'female' },
-      jaGender: 'masculine',
-      jaRowSpeakerGender: 'female',
-    });
-    await t.run((ctx) =>
-      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
-    );
-
-    await sweep(t, textId);
-    expect(llmEnqueues()).toMatchObject([
-      { targetLanguage: 'ja', translationReason: 'metadata_correction' },
-    ]);
-    expect(
-      (await t.run((ctx) => ctx.db.get(rows.ja)))?.genderCorrectionAttempts,
-    ).toBe(1);
-
-    // The retry is spent. A wording the model will not change cannot put the
-    // sweep in a loop, so the next pass asks for nothing. (Releasing the
-    // claim the enqueue took, which would otherwise defer the pass on its
-    // own and prove nothing about the counter.)
-    vi.mocked(llmPool.enqueueAction).mockClear();
+    await apply();
+    let jobs = await pendingJobs(t, 'prepareCardContent');
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].args[0]).toMatchObject({ textId, skipTts: true });
     await t.run(async (ctx) => {
-      for (const claim of await ctx.db
-        .query('llmTranslationClaims')
+      for (const job of await ctx.db.system
+        .query('_scheduled_functions')
         .collect()) {
-        await ctx.db.delete(claim._id);
+        await ctx.scheduler.cancel(job._id);
       }
-    });
-    await sweep(t, textId);
-    expect(llmEnqueues()).toEqual([]);
-  });
-
-  // 2026-09-08 review. The regeneration a first correction buys can come back
-  // byte-identical: the model was already writing the sentence in a way it
-  // will not change (the audit found exactly this, `<speaker_gender>` being
-  // ignored). `replaceForVersionBump` restamped only the version, and the
-  // row's own `speakerGender` is patched solely on the differing-wording
-  // branch, so `firstGenderCorrection` stayed true and the counter, which is
-  // only spent on the RETRY branch, was never reached. Every ensure pass
-  // bought another translation, for good.
-  it('an identical-wording correction terminates instead of billing on every pass', async () => {
-    const t = convexTest(schema, modules);
-    const { textId, rows } = await seed(t, {
-      metadata: { speakerGender: 'female' },
-      jaGender: 'masculine',
-    });
-    await t.run((ctx) =>
-      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
-    );
-
-    const before = await t.run((ctx) => ctx.db.get(rows.ja));
-    await sweep(t, textId);
-    expect(llmEnqueues()).toMatchObject([
-      { targetLanguage: 'ja', translationReason: 'metadata_correction' },
-    ]);
-
-    // The regeneration lands, and the model returns the wording unchanged.
-    await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
-      textId,
-      targetLanguage: 'ja',
-      translatedText: before!.translatedText,
-      translationReason: 'metadata_correction',
-      speakerGender: 'female',
-      replaceExisting: true,
-      // The wording is unchanged, so nothing needs voicing; a real voice
-      // name is not the subject here.
-      voiceName: 'ja-test-female',
-      skipTts: true,
-    });
-
-    // Each further pass gets a clean slate: the claim the previous enqueue
-    // took would defer the sweep on its own and prove nothing.
-    const passes: number[] = [];
-    for (let i = 0; i < 5; i++) {
-      vi.mocked(llmPool.enqueueAction).mockClear();
-      await t.run(async (ctx) => {
-        for (const claim of await ctx.db
-          .query('llmTranslationClaims')
-          .collect()) {
-          await ctx.db.delete(claim._id);
-        }
-      });
-      await sweep(t, textId);
-      passes.push(llmEnqueues().length);
-    }
-
-    // At most the one counted retry, then silence. Before the fix every pass
-    // enqueued, so this was [1, 1, 1, 1, 1].
-    expect(passes.reduce((a, b) => a + b, 0)).toBeLessThanOrEqual(1);
-    expect(passes[passes.length - 1]).toBe(0);
-    // The row now records the gender it was regenerated under, which is what
-    // moves it off the free first-correction branch.
-    expect((await t.run((ctx) => ctx.db.get(rows.ja)))?.speakerGender).toBe(
-      'female',
-    );
-  });
-
-  it('never touches a user-written text', async () => {
-    const t = convexTest(schema, modules);
-    const { textId } = await seed(t, {
-      userCreated: true,
-      metadata: { speakerGender: 'female' },
-      jaGender: 'masculine',
-    });
-    await t.run((ctx) =>
-      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
-    );
-    await sweep(t, textId);
-    expect(llmEnqueues()).toEqual([]);
-  });
-});
-
-describe('a gender correction under an existing card', () => {
-  it('archives the old wording instead of overwriting it', async () => {
-    const t = convexTest(schema, modules);
-    const { textId, rows } = await seed(t, {
-      metadata: { speakerGender: 'female' },
-      jaGender: 'masculine',
-    });
-    // The verdict mirrored into the voice, as `applyTextMetadata` does.
-    await t.run((ctx) =>
-      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
-    );
-    // A card on the shared text. `replaceForVersionBump` archives only for a
-    // referencing card, and archiving needs the live clip's asset.
-    await t.run(async (ctx) => {
       const courseId = await ctx.db.insert('courses', {
         userId: 'user_A',
         baseLanguages: ['en'],
@@ -538,118 +411,45 @@ describe('a gender correction under an existing card', () => {
         preReviewCount: 0,
       });
     });
-
-    const before = await t.run((ctx) => ctx.db.get(rows.ja));
-    await sweep(t, textId);
-    expect(llmEnqueues()).toMatchObject([
-      { targetLanguage: 'ja', translationReason: 'metadata_correction' },
-    ]);
-    // The clip stays attached through the sweep. Detaching it here is what
-    // used to make the archive below silently skip: `replaceForVersionBump`
-    // looks the pointer up again when the job lands, minutes later.
-    expect(
-      await t.run((ctx) => audioPointer(ctx, textId, 'ja')),
-    ).not.toBeNull();
-
-    // The correction lands with a new wording.
-    await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
-      textId,
-      targetLanguage: 'ja',
-      translatedText: '私たちは姉妹です。',
-      translationReason: 'metadata_correction',
-      speakerGender: 'female',
-      replaceExisting: true,
-      // A curated Gemini voice: the wording changed, so the write
-      // schedules TTS and `enqueueTtsForVoice` rejects an invented name.
-      voiceName: 'Leda',
-    });
-
-    // The old wording survives as a superseded revision, so a card pinned to
-    // it keeps reading what it learned.
-    const revisions = await t.run((ctx) =>
-      ctx.db
-        .query('translations')
-        .withIndex('by_textId', (q) => q.eq('textId', textId))
-        .collect(),
-    );
-    const archived = revisions.filter(
-      (r) => r.targetLanguage === 'ja' && r.supersededAt !== undefined,
-    );
-    expect(archived.map((r) => r.translatedText)).toEqual([
-      before!.translatedText,
-    ]);
-    expect(
-      (await t.run((ctx) => liveTranslation(ctx, textId, 'ja')))
-        ?.translatedText,
-    ).toBe('私たちは姉妹です。');
+    await apply();
+    jobs = await pendingJobs(t, 'prepareCardContent');
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].args[0]).toMatchObject({ textId, skipTts: false });
   });
 });
 
-describe('2026-09-09 review: the clip waits for the wording it belongs to', () => {
-  it('a verdict on an unstamped row holds the re-voice until the stamp lands', async () => {
+describe('a user-written text follows the verdict', () => {
+  it('re-keys its rows and detaches the clips of the old voice when the voice moves', async () => {
     const t = convexTest(schema, modules);
-    const { textId } = await seed(t, {
-      metadata: { speakerGender: 'female' },
-      jaGender: 'none',
+    const { textId, rows } = await seed(t, {
+      userCreated: true,
+      keyedRows: true,
     });
     await t.run((ctx) =>
-      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
+      ctx.db.patch(textId, { speakerGender: undefined, metadataSource: undefined }),
     );
-    await sweep(t, textId);
-    // German (stamped unmarked) and the source clip are re-voiced at once.
-    // The Japanese wording may be about to be corrected, which only the
-    // stamp can tell, so its clip stays where the archive will find it
-    // instead of being replaced by a male clip of a feminine sentence.
+    await t.mutation(
+      internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
+      {
+        textId,
+        metadata: { speakerGender: 'female' },
+        schedulePrepareCard: false,
+        baseLanguages: ['en'],
+        targetLanguages: ['ja', 'de'],
+      },
+    );
+    const ja = await t.run((ctx) => ctx.db.get(rows.ja));
+    expect(ja?.variantKey).toBe('female|desu-masu');
+    expect(ja?.speakerGender).toBe('female');
+    expect((await t.run((ctx) => ctx.db.get(rows.de)))?.variantKey).toBe(
+      'female|none',
+    );
     expect(
-      ttsEnqueues()
-        .filter((j) => j.voiceGender === 'female')
-        .map((j) => j.language)
-        .sort(),
-    ).toEqual(['de', 'en']);
-    expect(await t.run((ctx) => audioPointer(ctx, textId, 'ja'))).not.toBeNull();
-    expect(await pendingJobs(t, 'classifyAndStampTranslations')).toHaveLength(1);
-  });
-
-  it('a row the classifier gave up on is re-voiced anyway', async () => {
-    const t = convexTest(schema, modules);
-    const { textId, rows } = await seed(t, {
-      metadata: { speakerGender: 'female' },
-      jaGender: 'none',
-    });
-    await t.run(async (ctx) => {
-      await ctx.db.patch(textId, { audioSpeakerGender: 'female' });
-      await ctx.db.patch(rows.ja, { renderingStampAttempts: 3 });
-    });
-    await sweep(t, textId);
+      await t.run((ctx) => audioPointer(ctx, textId, 'ja', 'male|desu-masu')),
+    ).toBeNull();
+    // The clip's asset survives for the cache.
     expect(
-      ttsEnqueues()
-        .filter((j) => j.voiceGender === 'female')
-        .map((j) => j.language)
-        .sort(),
-    ).toEqual(['de', 'en', 'ja']);
-  });
-
-  it('a version-stale row under a verdict keeps its clip for the archive', async () => {
-    const t = convexTest(schema, modules);
-    const { textId, rows } = await seed(t, {
-      metadata: { speakerGender: 'female' },
-      jaGender: 'masculine',
-    });
-    await t.run(async (ctx) => {
-      await ctx.db.patch(textId, { audioSpeakerGender: 'female' });
-      // Below every configured version: the row is regenerated as a version
-      // bump, which takes precedence over the correction as the reason.
-      await ctx.db.patch(rows.ja, { translationVersion: 0 });
-    });
-    await sweep(t, textId);
-    expect(llmEnqueues()).toMatchObject([
-      { targetLanguage: 'ja', translationReason: 'version_bump' },
-    ]);
-    // The clip is in the wrong voice AND its wording is being replaced. It
-    // stays attached for `replaceForVersionBump` to archive; the replace
-    // drops it afterwards. Detaching it here skipped the archive and moved
-    // every pinned card onto the new wording.
-    expect(await t.run((ctx) => audioPointer(ctx, textId, 'ja'))).not.toBeNull();
-    expect(ttsEnqueues().some((j) => j.language === 'ja')).toBe(false);
+      await t.run(async (ctx) => (await ctx.db.query('audioAssets').collect()).length),
+    ).toBe(3);
   });
 });

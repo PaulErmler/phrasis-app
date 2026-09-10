@@ -8,7 +8,7 @@
  *
  * Ground truth by double generation: every sentence is translated through
  * the REAL production prompt and stage (`SOL_MINIMAL`, `buildPrompt` with
- * `requestedGender` male and then female). When the two renderings differ,
+ * `speakerGender` male and then female). When the two renderings differ,
  * the judge (Gemini 3.8 Flash) says whether the difference is speaker
  * gender agreement or something else (sampling noise, a synonym). A pair is
  * "relevant" when it differs AND the judge attributes the difference to
@@ -138,7 +138,7 @@ function promptArgs(
     targetRegion: config.targetRegion,
     addressesSomeone: /\byou\b|\byour\b|\bplease\b|\?$/i.test(text),
     referentGender: 'male',
-    requestedGender: gender,
+    speakerGender: gender,
   };
 }
 

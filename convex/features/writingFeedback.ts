@@ -48,7 +48,8 @@ import {
   TRANSCRIBE_GRADER_SYSTEM_PROMPT,
 } from '../lib/writingFeedbackPrompt';
 import { getCourseSettings } from '../db/courseSettings';
-import { voiceOf } from '../../lib/preferenceResolution';
+import { politenessFormForLevel } from '../../lib/languageForms';
+import { classificationLanguageForRow } from '../lib/renderingClassifier';
 
 /**
  * AI feedback for writing mode. One stateless grader call scores the user's
@@ -213,23 +214,20 @@ export const getGradingContext = internalQuery({
         view,
       });
       expected = rendering.served?.row.translatedText ?? null;
-      const row = rendering.served?.row;
-      // Every stored wording is stamped, canonical rows included (invariant 7
-      // in docs/architecture/translation-variants.md). The gate here used to
-      // be `variantKey !== undefined`, from when variants were the only
-      // stamped rows, so a card served the canonical row through the
-      // `canonicalSatisfies` shortcut fell back to `texts.register`, which
-      // describes the SOURCE sentence. That handed the grader
-      // "Register: neutral" for a です・ます card, and the shortcut is the
-      // common case once the corpus is stamped.
-      if (row) {
-        if (row.renderedPoliteness && row.renderedPoliteness !== 'unmarked') {
+      // A keyed row IS its key (docs/architecture/rendering-keys.md): the
+      // form it was generated in and the voice it was written for. A legacy
+      // row falls back to the text's own metadata, as before the keys.
+      if (rendering.servedKeyed) {
+        const form = rendering.rendering.form;
+        if (form) {
+          const formLanguage = classificationLanguageForRow(
+            rendering.served!.row,
+          );
+          const casual = politenessFormForLevel(formLanguage, 'casual');
           servedRegister =
-            row.renderedPoliteness === 'casual' ? 'informal' : 'formal';
+            casual && casual.id === form.id ? 'informal' : 'formal';
         }
-        if (row.renderedGender && row.renderedGender !== 'unmarked') {
-          servedSpeakerGender = voiceOf(row.renderedGender);
-        }
+        servedSpeakerGender = rendering.rendering.voiceGender;
       }
     }
     // A language the course does not teach is a bogus request (nothing on

@@ -468,7 +468,7 @@ export async function runSourceAnnotation(
     // it must not be recorded as one. Leaving the field undefined means the
     // row is picked up again on the next view.
     if (err instanceof TransientAnnotationError) throw err;
-    // Persist the empty-string sentinel so scheduleMissingContent doesn't
+    // Persist the empty-string sentinel so ensureTextContent doesn't
     // re-enqueue the same failing input on every ensureContent call.
     console.error(`Source ${kind} error (persisting sentinel):`, err);
     value = '';

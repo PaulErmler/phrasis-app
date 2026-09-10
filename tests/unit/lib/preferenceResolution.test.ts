@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   axisOf,
+  cardAcceptsLegacyRow,
   cardFollowsPreferences,
-  parseVariantKey,
+  NO_FORM,
+  parseRenderingKey,
   pickPolitenessForm,
+  primaryRenderingKey,
+  renderingKey,
   resolveCardRendering,
   resolveLanguageRendering,
   resolveSourceRendering,
@@ -19,12 +23,9 @@ const stamped: RenderingCard = { followsCoursePreferences: true };
 const legacy: RenderingCard = {};
 const textId = 'k17abcdef0123456789';
 
-/** The canonical (coin-flip) voice of `premade` and the other one. */
-const canonicalVoice = resolveCardSpeakerGenders(
-  premade,
-  textId,
-).audioSpeakerGender;
-const otherVoice = canonicalVoice === 'male' ? 'female' : 'male';
+/** The text's own (seeded) voice for `premade` and the other one. */
+const textVoice = resolveCardSpeakerGenders(premade, textId).audioSpeakerGender;
+const otherVoice = textVoice === 'male' ? 'female' : 'male';
 /** A card corrected to the other voice, the one way a card leaves its gender. */
 const corrected = (card: RenderingCard = stamped): RenderingCard => ({
   ...card,
@@ -49,17 +50,26 @@ function resolve(
   return { cardRendering, language };
 }
 
-describe('voiceOf / axisOf', () => {
+describe('keys', () => {
   it('map a gender axis onto its voice and back', () => {
     expect(voiceOf('masculine')).toBe('male');
     expect(voiceOf('feminine')).toBe('female');
     expect(axisOf('male')).toBe('masculine');
     expect(axisOf('female')).toBe('feminine');
   });
+
+  it('build and parse a rendering key', () => {
+    expect(renderingKey('female', 'desu-masu')).toBe('female|desu-masu');
+    expect(parseRenderingKey('male|none')).toEqual({
+      voice: 'male',
+      formId: NO_FORM,
+    });
+    expect(parseRenderingKey('female|v').formId).toBe('v');
+  });
 });
 
 describe('resolveSourceRendering', () => {
-  it('voices the source wording in the card voice and never rewrites it', () => {
+  it('voices the source wording in the card voice under a form-free key', () => {
     const card = resolveCardRendering({
       text: premade,
       textId,
@@ -67,18 +77,9 @@ describe('resolveSourceRendering', () => {
     });
     const source = resolveSourceRendering(card);
     expect(source.form).toBeNull();
-    expect(source.textVariantKey).toBeNull();
-    expect(source.audioVariantKey).toBe(`${otherVoice}|auto`);
+    expect(source.formId).toBe(NO_FORM);
+    expect(source.key).toBe(`${otherVoice}|none`);
     expect(source.voiceGender).toBe(otherVoice);
-  });
-
-  it('is canonical when the canonical voice already is the card voice', () => {
-    const card = resolveCardRendering({
-      text: premade,
-      textId,
-      card: { ...stamped, renderingGenderOverride: canonicalVoice },
-    });
-    expect(resolveSourceRendering(card).audioVariantKey).toBeNull();
   });
 });
 
@@ -89,33 +90,33 @@ describe('cardFollowsPreferences', () => {
     expect(cardFollowsPreferences(premade, legacy)).toBe(false);
     expect(cardFollowsPreferences({ userCreated: true }, stamped)).toBe(false);
   });
+
+  it('legacy rows are the answer for user texts and uncorrected legacy cards only', () => {
+    expect(cardAcceptsLegacyRow({ userCreated: true }, stamped)).toBe(true);
+    expect(cardAcceptsLegacyRow(premade, legacy)).toBe(true);
+    expect(cardAcceptsLegacyRow(premade, stamped)).toBe(false);
+    expect(cardAcceptsLegacyRow(premade, null)).toBe(false);
+    expect(
+      cardAcceptsLegacyRow(premade, { renderingPolitenessOverride: 'polite' }),
+    ).toBe(false);
+  });
 });
 
 describe('resolveCardRendering', () => {
-  it('no settings: canonical voice, no variant', () => {
+  it('the voice is always decided: the text voice without a correction', () => {
     const { cardRendering, language } = resolve('ru', {});
-    expect(cardRendering.gender).toBe('auto');
-    expect(cardRendering.voiceGender).toBe(
-      resolveCardSpeakerGenders(premade, textId).audioSpeakerGender,
-    );
-    expect(cardRendering.needsVoice).toBe(false);
-    expect(language.textVariantKey).toBeNull();
-    expect(language.audioVariantKey).toBeNull();
+    expect(cardRendering.voiceGender).toBe(textVoice);
+    expect(cardRendering.textVoiceGender).toBe(textVoice);
+    expect(cardRendering.acceptsLegacyRow).toBe(false);
+    expect(parseRenderingKey(language.key).voice).toBe(textVoice);
   });
 
-  it('there is no course gender: the settings alone never leave the canonical voice', () => {
+  it('the settings alone never leave the text voice', () => {
     const { cardRendering, language } = resolve('ru', {
       politenessLevels: ['casual', 'polite', 'formal'],
     });
-    expect(cardRendering.gender).toBe('auto');
-    expect(cardRendering.voiceGender).toBe(canonicalVoice);
-    expect(cardRendering.needsVoice).toBe(false);
-    // A politeness form may be picked; the gender axis of its keys is
-    // canonical and its clip is in the text's own voice.
-    expect(parseVariantKey(language.textVariantKey!).gender).toBe('auto');
-    expect(parseVariantKey(language.audioVariantKey!).gender).toBe(
-      canonicalVoice,
-    );
+    expect(cardRendering.voiceGender).toBe(textVoice);
+    expect(parseRenderingKey(language.key).voice).toBe(textVoice);
   });
 
   it('a corrected card sets the voice for every language', () => {
@@ -123,94 +124,66 @@ describe('resolveCardRendering', () => {
     const tr = resolve('tr', {}, premade, corrected());
     expect(ru.cardRendering.voiceGender).toBe(otherVoice);
     expect(tr.cardRendering.voiceGender).toBe(otherVoice);
-    expect(tr.cardRendering.gender).toBe(axisOf(otherVoice));
+    expect(tr.cardRendering.textVoiceGender).toBe(textVoice);
+    expect(parseRenderingKey(tr.language.key).voice).toBe(otherVoice);
   });
 
-  it('needsVoice only when the canonical coin flip landed on the other gender', () => {
-    expect(
-      resolve('tr', {}, premade, {
-        ...stamped,
-        renderingGenderOverride: canonicalVoice,
-      }).cardRendering.needsVoice,
-    ).toBe(false);
-    expect(
-      resolve('tr', {}, premade, corrected()).cardRendering.needsVoice,
-    ).toBe(true);
-  });
-
-  it("a curriculum text's speakerGender stamp is the coin flip, not evidence", () => {
-    // The sweep writes the canonical voice gender back onto premade texts
-    // (resolveCardSpeakerGenders case 3); the correction still applies.
-    const text: RenderingText = {
-      userCreated: false,
-      speakerGender: 'male',
-      audioSpeakerGender: 'male',
-    };
-    const { cardRendering, language } = resolve('ru', {}, text, {
-      ...stamped,
-      renderingGenderOverride: 'female',
-    });
-    expect(cardRendering.gender).toBe('feminine');
-    expect(cardRendering.voiceGender).toBe('female');
-    expect(cardRendering.needsVoice).toBe(true);
-    expect(language.textVariantKey).toBe('female|auto');
-  });
-
-  it('a legacy card ignores the settings', () => {
+  it('a legacy card accepts legacy rows and resolves to the primary key', () => {
     const { cardRendering, language } = resolve(
       'ja',
-      { politenessLevels: ['polite'] },
+      { politenessLevels: ['casual'] },
       premade,
       legacy,
     );
-    expect(cardRendering.gender).toBe('auto');
-    expect(language.textVariantKey).toBeNull();
-    expect(language.audioVariantKey).toBeNull();
+    expect(cardRendering.acceptsLegacyRow).toBe(true);
+    // The setting is ignored; the primary form of a ja sentence with no
+    // register metadata is the language default, です・ます.
+    expect(language.form?.id).toBe('desu-masu');
+    expect(language.key).toBe(`${textVoice}|desu-masu`);
   });
 
-  it('a user-written text ignores the settings', () => {
-    const { language } = resolve(
+  it('a user-written text is one rendering with no form, and accepts legacy rows', () => {
+    const { cardRendering, language } = resolve(
       'ja',
       { politenessLevels: ['polite'] },
-      { userCreated: true },
+      { userCreated: true, audioSpeakerGender: 'female' },
     );
-    expect(language.textVariantKey).toBeNull();
-    expect(language.audioVariantKey).toBeNull();
+    expect(cardRendering.acceptsLegacyRow).toBe(true);
+    expect(language.form).toBeNull();
+    expect(language.key).toBe('female|none');
   });
 });
 
 describe('resolveLanguageRendering', () => {
-  it('a marked language on a corrected card needs a text variant', () => {
-    const { language } = resolve('ru', {}, premade, corrected());
-    expect(language.textVariantKey).toBe(`${otherVoice}|auto`);
-    expect(language.audioVariantKey).toBe(`${otherVoice}|auto`);
-    expect(language.voiceGender).toBe(otherVoice);
-  });
-
-  it('an unmarked language on a corrected card needs audio only when the voice differs', () => {
-    const differs = resolve('tr', {}, premade, corrected()).language;
-    expect(differs.textVariantKey).toBeNull();
-    expect(differs.audioVariantKey).toBe(`${otherVoice}|auto`);
-    const matches = resolve('tr', {}, premade, {
-      ...stamped,
-      renderingGenderOverride: canonicalVoice,
-    }).language;
-    expect(matches.textVariantKey).toBeNull();
-    expect(matches.audioVariantKey).toBeNull();
-  });
-
   it('a single politeness level is a fixed form', () => {
     const { language } = resolve('ja', { politenessLevels: ['polite'] });
     expect(language.form?.id).toBe('desu-masu');
-    expect(language.textVariantKey).toBe('auto|desu-masu');
-    expect(language.audioVariantKey).toBe(`${language.voiceGender}|desu-masu`);
+    expect(language.key).toBe(`${textVoice}|desu-masu`);
+  });
+
+  it('no setting means the primary form: register decides, else the default', () => {
+    expect(resolve('ja', {}).language.form?.id).toBe('desu-masu');
+    expect(
+      resolve('ja', {}, { userCreated: false, register: 'informal' }).language
+        .form?.id,
+    ).toBe('plain');
+    expect(
+      resolve('de', {}, { userCreated: false, register: 'formal' }).language
+        .form?.id,
+    ).toBe('v');
+    expect(
+      resolve('de', {}, { userCreated: false, register: 'neutral' }).language
+        .form?.id,
+    ).toBe('t');
+    // Spanish is familiar-split: formal register is still the usted form.
+    expect(
+      resolve('es', {}, { userCreated: false, register: 'formal' }).language
+        .form?.id,
+    ).toBe('v');
   });
 
   // Spain Spanish is a FAMILIAR split (casual and polite both render tú), so
-  // this level set really does collapse to one form. Turkish, which this test
-  // used before, is a distance split: casual+polite is {t, v} there and the
-  // form alternates, so the old assertion only passed because the fixture id
-  // happened to hash to index 0.
+  // this level set really does collapse to one form.
   it('levels that map to one form on this language do not alternate', () => {
     const { language } = resolve('es', {
       politenessLevels: ['casual', 'polite'],
@@ -242,10 +215,7 @@ describe('resolveLanguageRendering', () => {
 
   // 2026-09-08 review: `fnv1a(seed) % 2` is the seed's character parity and
   // nothing more, so every two-way pick on one textId agreed with every other
-  // one whatever salt it used. The politeness form was a bit-for-bit copy of
-  // the speaker-gender coin: `du` on every male-voiced card, `Sie` on every
-  // female-voiced one, and never the other two combinations. Only ja and ko
-  // escaped, because three forms means `% 3`.
+  // one whatever salt it used.
   it('the form of a two-form language is independent of the speaker gender', () => {
     for (const [code, levels] of [
       ['de', ['casual', 'polite']],
@@ -260,8 +230,6 @@ describe('resolveLanguageRendering', () => {
         const key = `${audioSpeakerGender}|${form!.id}`;
         combinations.set(key, (combinations.get(key) ?? 0) + 1);
       }
-      // All four combinations occur, and none is rare enough to look like a
-      // leak: a perfect correlation shows up here as two missing keys.
       expect(combinations.size).toBe(4);
       for (const count of combinations.values()) {
         expect(count).toBeGreaterThan(300);
@@ -279,7 +247,7 @@ describe('resolveLanguageRendering', () => {
     }
   });
 
-  it('an address language without a "you" stays canonical', () => {
+  it('an address language without a "you" has no form: the key says none', () => {
     const noAddressee: RenderingText = {
       userCreated: false,
       addressesSomeone: false,
@@ -290,8 +258,10 @@ describe('resolveLanguageRendering', () => {
       noAddressee,
     );
     expect(language.form).toBeNull();
-    expect(language.textVariantKey).toBeNull();
-    expect(language.audioVariantKey).toBeNull();
+    expect(language.key).toBe(`${textVoice}|none`);
+    expect(resolve('tr', {}, noAddressee).language.key).toBe(
+      `${textVoice}|none`,
+    );
   });
 
   it('the legacy addressee fallback reads addresseeNumber', () => {
@@ -313,23 +283,30 @@ describe('resolveLanguageRendering', () => {
     ).toBe('v');
   });
 
-  it('a predicate language ignores the addressee gate', () => {
+  it('a predicate language marks every sentence', () => {
     const noAddressee: RenderingText = {
       userCreated: false,
       addressesSomeone: false,
     };
-    const { language } = resolve(
-      'ko',
-      { politenessLevels: ['formal'] },
-      noAddressee,
-    );
-    expect(language.form?.id).toBe('hapsyo');
+    expect(
+      resolve('ko', { politenessLevels: ['formal'] }, noAddressee).language
+        .form?.id,
+    ).toBe('hapsyo');
+    expect(resolve('ko', {}, noAddressee).language.form?.id).toBe('haeyo');
   });
 
-  it('an unmarked language ignores politeness', () => {
+  it('a pronoun language has a default form too', () => {
+    expect(resolve('vi', {}).language.form?.id).toBe('respectful');
+    expect(
+      resolve('vi', {}, { userCreated: false, register: 'informal' }).language
+        .form?.id,
+    ).toBe('peer');
+  });
+
+  it('an unmarked language is always form-free', () => {
     const { language } = resolve('sv', { politenessLevels: ['formal'] });
-    expect(language.textVariantKey).toBeNull();
-    expect(language.audioVariantKey).toBeNull();
+    expect(language.form).toBeNull();
+    expect(language.key).toBe(`${textVoice}|none`);
   });
 
   it('both axes combine into one key', () => {
@@ -337,27 +314,22 @@ describe('resolveLanguageRendering', () => {
       'ja',
       { politenessLevels: ['casual'] },
       premade,
-      {
-        ...stamped,
-        renderingGenderOverride: 'male',
-      },
+      { ...stamped, renderingGenderOverride: 'male' },
     );
-    expect(language.textVariantKey).toBe('male|plain');
-    expect(language.audioVariantKey).toBe('male|plain');
-    expect(parseVariantKey(language.textVariantKey!)).toEqual({
-      gender: 'male',
+    expect(language.key).toBe('male|plain');
+    expect(parseRenderingKey(language.key)).toEqual({
+      voice: 'male',
       formId: 'plain',
     });
   });
 
-  it('a politeness variant of a gender-unmarked language has one wording per form', () => {
+  it('a gender-unmarked language still keys its wording by the voice', () => {
     const settings: RenderingSettings = { politenessLevels: ['formal'] };
     const { language } = resolve('tr', settings, premade, {
       ...stamped,
       renderingGenderOverride: 'female',
     });
-    expect(language.textVariantKey).toBe('auto|v');
-    expect(language.audioVariantKey).toBe('female|v');
+    expect(language.key).toBe('female|v');
   });
 
   it('mixed dialects resolve through the concrete sub-code', () => {
@@ -368,16 +340,59 @@ describe('resolveLanguageRendering', () => {
   });
 });
 
+describe('primaryRenderingKey', () => {
+  it('is the text voice plus the primary form', () => {
+    expect(primaryRenderingKey({ text: premade, textId, code: 'ja' })).toBe(
+      `${textVoice}|desu-masu`,
+    );
+    expect(
+      primaryRenderingKey({
+        text: { userCreated: false, addressesSomeone: false },
+        textId,
+        code: 'de',
+      }),
+    ).toBe(`${textVoice}|none`);
+    expect(
+      primaryRenderingKey({
+        text: { userCreated: true, audioSpeakerGender: 'male' },
+        textId,
+        code: 'ja',
+      }),
+    ).toBe('male|none');
+  });
+
+  it('equals what a card with no override and no setting resolves to', () => {
+    for (const code of ['ja', 'de', 'tr', 'sv', 'es_mixed']) {
+      const { language } = resolve(code, {}, premade, null);
+      expect(primaryRenderingKey({ text: premade, textId, code })).toBe(
+        language.key,
+      );
+    }
+  });
+});
+
 describe('per-card overrides and sentence evidence', () => {
   const current = 'gemini-3.1-flash-lite-v1';
 
   it('the override applies to a legacy card without any settings', () => {
-    const { cardRendering, language } = resolve('ru', {}, premade, {
+    const descriptive: RenderingText = {
+      userCreated: false,
+      addressesSomeone: false,
+    };
+    const { cardRendering, language } = resolve('ru', {}, descriptive, {
       renderingGenderOverride: 'female',
     });
-    expect(cardRendering.gender).toBe('feminine');
     expect(cardRendering.voiceGender).toBe('female');
-    expect(language.textVariantKey).toBe('female|auto');
+    // The correction moves the card onto a keyed row; its legacy row is no
+    // longer the answer.
+    expect(cardRendering.acceptsLegacyRow).toBe(false);
+    expect(language.key).toBe('female|none');
+  });
+
+  it('a text with no addressee metadata at all is read as addressing someone', () => {
+    // The legacy fallback of the prompt: `addresseeNumber` undefined is not
+    // 'not_applicable', so the T form is the primary until a verdict lands.
+    expect(resolve('ru', {}, premade).language.form?.id).toBe('t');
   });
 
   it('a politeness override picks its own form without the settings', () => {
@@ -385,13 +400,10 @@ describe('per-card overrides and sentence evidence', () => {
       renderingPolitenessOverride: 'polite',
     });
     expect(language.form?.id).toBe('desu-masu');
-    expect(language.textVariantKey).toBe('auto|desu-masu');
+    expect(language.key).toBe(`${textVoice}|desu-masu`);
   });
 
   it('a politeness override on an address language ignores the addressee gate', () => {
-    // The classifier said the sentence addresses nobody; the learner says the
-    // "you" form is wrong. The override is the correction of exactly that
-    // verdict, so it renders instead of being nulled to canonical.
     const noAddressee: RenderingText = {
       userCreated: false,
       addressesSomeone: false,
@@ -399,8 +411,8 @@ describe('per-card overrides and sentence evidence', () => {
     const { language } = resolve('tr', {}, noAddressee, {
       renderingPolitenessOverride: 'formal',
     });
-    expect(language.form).not.toBeNull();
-    expect(language.textVariantKey).toBe(`auto|${language.form!.id}`);
+    expect(language.form?.id).toBe('v');
+    expect(language.key).toBe(`${textVoice}|v`);
   });
 
   it('a definitive speaker gender at the current source outranks the override', () => {
@@ -408,18 +420,18 @@ describe('per-card overrides and sentence evidence', () => {
       userCreated: false,
       speakerGender: 'male',
       audioSpeakerGender: 'male',
+      addressesSomeone: false,
       metadataSource: current,
     };
     const { cardRendering, language } = resolve('ru', {}, text, {
       followsCoursePreferences: true,
       renderingGenderOverride: 'female',
     });
-    expect(cardRendering.gender).toBe('auto');
     expect(cardRendering.voiceGender).toBe('male');
-    expect(language.textVariantKey).toBeNull();
+    expect(language.key).toBe('male|none');
   });
 
-  it('the coin flip written back on an unclassified text is not evidence', () => {
+  it('a flip written into speakerGender before the cutover is not evidence', () => {
     const text: RenderingText = {
       userCreated: false,
       speakerGender: 'male',
@@ -429,20 +441,20 @@ describe('per-card overrides and sentence evidence', () => {
       ...stamped,
       renderingGenderOverride: 'female',
     });
-    expect(cardRendering.gender).toBe('feminine');
+    expect(cardRendering.voiceGender).toBe('female');
   });
 
   it('an override is inert on a user-written text', () => {
     const { cardRendering, language } = resolve(
       'ru',
       {},
-      { userCreated: true },
+      { userCreated: true, audioSpeakerGender: 'male' },
       {
         renderingGenderOverride: 'female',
         renderingPolitenessOverride: 'polite',
       },
     );
-    expect(cardRendering.gender).toBe('auto');
-    expect(language.textVariantKey).toBeNull();
+    expect(cardRendering.voiceGender).toBe('male');
+    expect(language.key).toBe('male|none');
   });
 });

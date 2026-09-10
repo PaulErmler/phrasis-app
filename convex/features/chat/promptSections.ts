@@ -4,6 +4,7 @@ import {
   concreteLanguageCodes,
   selectedPolitenessForms,
 } from '../../../lib/languageForms';
+import { studiedFormsInstruction } from '../../../lib/renderingPrompts';
 
 /**
  * Dynamic prompt sections injected (uncached) after the agent's static
@@ -157,12 +158,12 @@ export function buildFormsSection(
     for (const code of codes) {
       for (const concrete of concreteLanguageCodes(code)) {
         const forms = selectedPolitenessForms(concrete, levels);
-        if (forms.length === 0) continue;
-        const named = forms.map((form) => form.promptLabel).join(' or ');
+        const studied = studiedFormsInstruction(languageName(concrete), forms);
+        if (!studied) continue;
         lines.push(
           forms.length === 1
-            ? `- ${languageName(concrete)} politeness: the learner studies the ${named}. ${forms[0].prompt} Use it in your examples and createCard entries unless the user asks for another form.`
-            : `- ${languageName(concrete)} politeness: the learner studies ${named} and sees them mixed. Use either in examples, and say which one a sentence is in when it matters.`,
+            ? `- ${studied} Use it in your examples and createCard entries unless the user asks for another form.`
+            : `- ${studied} Use either in examples, and say which one a sentence is in when it matters.`,
         );
       }
     }

@@ -71,7 +71,7 @@ describe('CardShell smoke', () => {
               isBaseLanguage: false,
               isTargetLanguage: true,
               voiceGender: 'male',
-              renderedPoliteness: 'casual',
+              politenessLevel: 'casual',
             },
           ],
         })}

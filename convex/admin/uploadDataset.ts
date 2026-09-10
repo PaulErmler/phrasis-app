@@ -91,7 +91,7 @@ export const upsertDatasetCollection = internalMutation({
  * On update: leaves textCount alone; the row already counted.
  *
  * Translations and audio are NOT generated here. They're produced lazily by
- * `scheduleMissingContent` (convex/features/decks.ts) the first time a user
+ * `ensureTextContent` (convex/lib/contentScheduling.ts) the first time a user
  * adds a card backing the text.
  */
 export const batchUpsertDatasetTexts = internalMutation({

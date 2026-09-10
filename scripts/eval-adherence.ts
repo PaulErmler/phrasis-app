@@ -12,21 +12,22 @@
  *               (no register for a sentence without a "you"), which is what
  *               every shared rendering was generated under, and the
  *               canonical wording every rewrite arm starts from.
- *   rw-W-P      the production mechanism for variants: the baseline output
- *               rewritten for the request with the rendering rewrite prompt.
+ *   rw-W-P      the production mechanism for the other keys: the baseline
+ *               output versioned for the request with the versioning prompt.
  *               W = wrapper, P = per-form prompts, each `current` (what
- *               production ships: `buildRenderingRewritePrompt` and the
+ *               production ships: `buildVersioningPrompt` and the
  *               lib/languageForms.ts strings) or `candidate` (the 2026-09-07
  *               8E proposal, snapshotted below: register rule dropped when a
  *               form is requested, requirement after the input, gender line
  *               first, carrier-list prompts with an example). Paul kept the
  *               current wording on 2026-09-07 because the candidate lost
  *               Japanese keigo on this path (78 -> 68) and gained nothing on
- *               the fresh path. `promptWording: 'literature'` on both, which
- *               is what the queue ships.
+ *               the fresh path.
  *   fresh-current / fresh-candidate
  *               the same two wordings on the fresh-translation path, which
- *               is what a canonical ja/ko job runs. Opt in with --arms.
+ *               is what every primary rendering runs since the rendering
+ *               keys (2026-09-10: one language-specific prompt, no shared
+ *               glossary). Opt in with --arms.
  *
  * For every language each distinct politeness form is requested once per
  * sentence, and for first-person-marking languages each gender once on the
@@ -51,7 +52,7 @@ import { resolve } from 'node:path';
 import { generateText } from 'ai';
 import {
   buildPrompt,
-  buildRenderingRewritePrompt,
+  buildVersioningPrompt,
   normalizeModelOutput,
   openrouterCallOptions,
   type TranslationPromptArgs,
@@ -350,7 +351,10 @@ const CANDIDATE_OUTPUT = `If the target language does not grammatically encode a
 /** The candidate `requestedFormInstruction`, literature wording: gender line
  *  first, the form line without the override, path-specific tail. */
 function candidateRequestedFormInstruction(
-  args: Pick<TranslationPromptArgs, 'requestedForm' | 'requestedGender'>,
+  args: {
+    requestedForm?: { id: string; label: string; prompt: string };
+    requestedGender?: 'male' | 'female';
+  },
   path: 'translate' | 'rewrite',
 ): string[] {
   const lines: string[] = [];
@@ -374,8 +378,8 @@ function candidateRequestedFormInstruction(
   return lines;
 }
 
-/** The candidate `buildRenderingRewritePrompt`: requirement after the
- *  translation. */
+/** The candidate versioning prompt (then `buildRenderingRewritePrompt`):
+ *  requirement after the translation. */
 function candidateRewritePrompt(args: {
   targetLangName: string;
   sourceText: string;
@@ -401,13 +405,15 @@ function candidateRewritePrompt(args: {
 
 /** The candidate `buildPrompt` for a request (no arc or flag context): the
  *  register rule left out, the requirement after the source. */
-function candidateFreshPrompt(args: TranslationPromptArgs): string {
+function candidateFreshPrompt(
+  args: TranslationPromptArgs & { formality?: string },
+): string {
   const fullName =
     args.targetLangNativeName !== args.targetLangName
       ? `${args.targetLangName} (${args.targetLangNativeName})`
       : args.targetLangName;
   const ctx = [
-    `  <speaker_gender>${args.requestedGender ?? args.speakerGender ?? 'unspecified'}</speaker_gender>`,
+    `  <speaker_gender>${args.speakerGender ?? 'unspecified'}</speaker_gender>`,
     `  <referent_gender>${args.referentGender}</referent_gender>`,
   ];
   if (args.addressesSomeone)
@@ -418,7 +424,10 @@ function candidateFreshPrompt(args: TranslationPromptArgs): string {
     ctx.push(`  <register>${args.requestedForm.id}</register>`);
   else if (args.addressesSomeone)
     ctx.push(`  <register>${args.formality ?? 'neutral'}</register>`);
-  const requirements = candidateRequestedFormInstruction(args, 'translate');
+  const requirements = candidateRequestedFormInstruction(
+    { requestedForm: args.requestedForm, requestedGender: args.speakerGender },
+    'translate',
+  );
   return [
     `You are a professional English-to-${fullName} translator. Translate the text inside <source> tags into ${fullName} (${args.targetLang}), suitable for ${args.targetRegion}.`,
     ``,
@@ -486,6 +495,7 @@ function formArg(
     id: form.id,
     label: form.promptLabel,
     prompt: prompts === 'candidate' && candidate ? candidate : form.prompt,
+    intro: getPolitenessConfig(lang)?.intro,
   };
 }
 
@@ -512,8 +522,7 @@ function requestArgs(
   return {
     ...baseArgs(lang, c),
     requestedForm: req.form ? formArg(lang, req.form, prompts) : undefined,
-    requestedGender: req.gender,
-    promptWording: 'literature',
+    speakerGender: req.gender,
   };
 }
 
@@ -533,18 +542,25 @@ function armPrompt(
   if (canonical === null) return null;
   const [, wrapper, prompts] = arm.split('-') as [string, Variant, Variant];
   const args = requestArgs(lang, c, req, prompts);
-  const rewriteArgs = {
-    targetLang: lang,
-    targetLangName: args.targetLangName,
-    sourceText: c.text,
-    canonicalText: canonical,
-    requestedGender: args.requestedGender,
-    requestedForm: args.requestedForm,
-    promptWording: 'literature' as const,
-  };
   return wrapper === 'candidate'
-    ? candidateRewritePrompt(rewriteArgs)
-    : buildRenderingRewritePrompt(rewriteArgs);
+    ? candidateRewritePrompt({
+        targetLangName: args.targetLangName,
+        sourceText: c.text,
+        canonicalText: canonical,
+        requestedGender: args.speakerGender,
+        requestedForm: args.requestedForm,
+      })
+    : buildVersioningPrompt({
+        targetLang: lang,
+        targetLangName: args.targetLangName,
+        sourceText: c.text,
+        primaryText: canonical,
+        speakerGender: args.speakerGender,
+        // The baseline wording was written for no speaker, so a gender
+        // request always moves the voice.
+        changesGender: args.speakerGender !== undefined,
+        requestedForm: args.requestedForm,
+      });
 }
 
 async function translate(

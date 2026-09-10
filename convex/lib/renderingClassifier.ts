@@ -1,15 +1,14 @@
 /**
  * The rendering classifier: given sentences in ONE language, say what each
- * wording actually is on the two axes the sentence-form settings control,
- * the speaker's gender as revealed by first-person forms and the politeness
- * form. Stamps `translations.renderedGender` / `renderedPoliteness`, which
- * drive the chips on the card and the "canonical already satisfies the
- * preference" shortcut in lib/preferenceResolution.ts.
+ * wording actually is on the two axes a rendering key names, the speaker's
+ * gender as revealed by first-person forms and the politeness form. Used as
+ * a VERIFIER: `verifyRendering` (convex/features/renderingClassification.ts)
+ * checks a freshly generated wording against its key
+ * (docs/architecture/rendering-keys.md).
  *
  * Convex-runtime-free (like translationAutofillPrompt.ts) so
  * scripts/eval-rendering-detection.ts grades through the exact production
- * prompt. The action that calls the model is
- * convex/features/renderingClassification.ts.
+ * prompt.
  *
  * Categories come from lib/languageForms.ts, so the prompt names the
  * language's own forms (です・ます, du/Sie, pan/pani) with their examples.

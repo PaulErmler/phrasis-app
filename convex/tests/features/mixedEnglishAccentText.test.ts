@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import schema from '../../schema';
 import type { Id } from '../../_generated/dataModel';
 import { api } from '../../_generated/api';
-import { scheduleMissingContent } from '../../features/decks';
+import { ensureTextContent } from '../../features/decks';
 import { scheduleMissingTranslationsForText } from '../../features/collections';
 import {
   buildCardSearchableText,
@@ -23,6 +23,7 @@ import {
 import { llmPool, ttsPool } from '../../lib/workpools';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
+import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -70,6 +71,8 @@ async function seedEnglishTextWithAccentRow(
         collectionRank: 1,
         speakerGender: 'female',
         audioSpeakerGender: 'female',
+        addressesSomeone: false,
+        metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
       });
     });
     if (getMixedAccentTextLanguage('en', textId) === wanted) return textId;
@@ -81,7 +84,7 @@ async function seedEnglishTextWithAccentRow(
 async function sweep(t: TestConvex<typeof schema>, textId: Id<'texts'>) {
   return t.run(async (ctx) => {
     const text = (await ctx.db.get(textId))!;
-    return scheduleMissingContent(ctx, textId, text, ['en'], ['es']);
+    return ensureTextContent(ctx, textId, text, ['en'], ['es']);
   });
 }
 
@@ -211,7 +214,7 @@ describe('Mixed English reads the accent row its card stored', () => {
 
       await t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
-        return scheduleMissingContent(ctx, textId, text, ['de'], ['es']);
+        return ensureTextContent(ctx, textId, text, ['de'], ['es']);
       });
 
       expect(

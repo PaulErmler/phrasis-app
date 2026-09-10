@@ -2,32 +2,32 @@
 import { convexTest, type TestConvex } from 'convex-test';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
-// Isolate the fan-out contract from `scheduleMissingContent`'s heavy
+// Isolate the fan-out contract from `ensureTextContent`'s heavy
 // internals (workpool enqueues + TTS/LLM/STT network). We only want to
 // assert that the placement sweep bounds each transaction to one batch and
 // that the upfront-queued batch workers cover the whole corpus. The
 // primitive itself is exercised end-to-end in `collectionBrowseAdd.test.ts`.
-const { scheduleMissingContentSpy, defaultScheduleMissingContent } = vi.hoisted(
+const { ensureTextContentSpy, defaultEnsureTextContent } = vi.hoisted(
   () => {
-    const defaultScheduleMissingContent = async () => ({
+    const defaultEnsureTextContent = async () => ({
       translationsScheduled: 1,
       audioScheduled: 1,
     });
     return {
-      defaultScheduleMissingContent,
+      defaultEnsureTextContent,
       // Declared with a rest signature so the poison tests can install
       // per-textId implementations without fighting the inferred zero-arg type.
-      scheduleMissingContentSpy: vi.fn<
+      ensureTextContentSpy: vi.fn<
         (
           ...args: unknown[]
         ) => Promise<{ translationsScheduled: number; audioScheduled: number }>
-      >(defaultScheduleMissingContent),
+      >(defaultEnsureTextContent),
     };
   },
 );
-vi.mock('../../features/decks', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../features/decks')>()),
-  scheduleMissingContent: scheduleMissingContentSpy,
+vi.mock('../../lib/contentScheduling', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/contentScheduling')>()),
+  ensureTextContent: ensureTextContentSpy,
 }));
 
 import schema from '../../schema';
@@ -45,7 +45,7 @@ afterEach(() => {
   vi.clearAllMocks();
   // `clearAllMocks` clears calls but keeps implementations. Restore the
   // default so a test's poisoned impl can't leak into the next one.
-  scheduleMissingContentSpy.mockImplementation(defaultScheduleMissingContent);
+  ensureTextContentSpy.mockImplementation(defaultEnsureTextContent);
 });
 
 /**
@@ -84,7 +84,7 @@ async function seedPlacementCorpus(
 
 describe('placement content sweep: upfront batch fan-out', () => {
   // Regression guard for the "too many system operations" timeout: the sweep
-  // must NOT run `scheduleMissingContent` over the whole corpus inline.
+  // must NOT run `ensureTextContent` over the whole corpus inline.
   it('bounds the entry invocation to one page and covers the whole corpus via the fanned-out batches', async () => {
     const t = convexTest(schema, modules);
     const CORPUS = PLACEMENT_CONTENT_BATCH_SIZE + 3; // spans two batches
@@ -100,7 +100,7 @@ describe('placement content sweep: upfront batch fan-out', () => {
       internal.features.onboarding.ensureAudioForTestTranslations,
       { targetLanguage: 'es', sourceLanguage: 'en' },
     );
-    expect(scheduleMissingContentSpy).toHaveBeenCalledTimes(
+    expect(ensureTextContentSpy).toHaveBeenCalledTimes(
       PLACEMENT_CONTENT_BATCH_SIZE,
     );
     // Mock returns {1,1} per sentence, so the returned tally reflects exactly
@@ -113,14 +113,14 @@ describe('placement content sweep: upfront batch fan-out', () => {
 
     // Every placement sentence's text is processed exactly once, no more.
     // The disjoint batches cover the corpus without duplicating work.
-    expect(scheduleMissingContentSpy).toHaveBeenCalledTimes(CORPUS);
-    const processedTextIds = scheduleMissingContentSpy.mock.calls.map(
+    expect(ensureTextContentSpy).toHaveBeenCalledTimes(CORPUS);
+    const processedTextIds = ensureTextContentSpy.mock.calls.map(
       (call) => call[1] as Id<'texts'>,
     );
     expect(new Set(processedTextIds)).toEqual(new Set(textIds));
   });
 
-  it('passes source + target languages through to scheduleMissingContent', async () => {
+  it('passes source + target languages through to ensureTextContent', async () => {
     const t = convexTest(schema, modules);
     await seedPlacementCorpus(t, 1);
 
@@ -134,9 +134,9 @@ describe('placement content sweep: upfront batch fan-out', () => {
     );
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
-    expect(scheduleMissingContentSpy).toHaveBeenCalledTimes(1);
+    expect(ensureTextContentSpy).toHaveBeenCalledTimes(1);
     const [, , , baseLanguages, targetLanguages] =
-      scheduleMissingContentSpy.mock.calls[0];
+      ensureTextContentSpy.mock.calls[0];
     // The sweep covers the text's own language ("en") on its own and never
     // translates into it, so the two chosen languages go through unfiltered
     // as targets and no base language is passed. (A user who chose Mixed
@@ -157,7 +157,7 @@ describe('placement content sweep: upfront batch fan-out', () => {
     const textIds = await seedPlacementCorpus(t, CORPUS);
     // First text of the FIRST scheduled batch (the inline page is [0, BATCH)).
     const poisonedId = textIds[PLACEMENT_CONTENT_BATCH_SIZE];
-    scheduleMissingContentSpy.mockImplementation(async (...args: unknown[]) => {
+    ensureTextContentSpy.mockImplementation(async (...args: unknown[]) => {
       if (args[1] === poisonedId)
         throw new Error('poisoned placement sentence');
       return { translationsScheduled: 1, audioScheduled: 1 };
@@ -176,7 +176,7 @@ describe('placement content sweep: upfront batch fan-out', () => {
     // Every text of the SECOND scheduled batch was processed even though the
     // first scheduled batch died mid-transaction.
     const processed = new Set(
-      scheduleMissingContentSpy.mock.calls.map(
+      ensureTextContentSpy.mock.calls.map(
         (call) => call[1] as Id<'texts'>,
       ),
     );
@@ -193,7 +193,7 @@ describe('placement content sweep: upfront batch fan-out', () => {
     const CORPUS = PLACEMENT_CONTENT_BATCH_SIZE + 3;
     const textIds = await seedPlacementCorpus(t, CORPUS);
     const poisonedId = textIds[0];
-    scheduleMissingContentSpy.mockImplementation(async (...args: unknown[]) => {
+    ensureTextContentSpy.mockImplementation(async (...args: unknown[]) => {
       if (args[1] === poisonedId)
         throw new Error('poisoned placement sentence');
       return { translationsScheduled: 1, audioScheduled: 1 };
@@ -210,7 +210,7 @@ describe('placement content sweep: upfront batch fan-out', () => {
     // The rolled-back entry left no scheduled batches behind: the poisoned
     // first call is the only one that ever happened.
     await t.finishAllScheduledFunctions(vi.runAllTimers);
-    expect(scheduleMissingContentSpy).toHaveBeenCalledTimes(1);
+    expect(ensureTextContentSpy).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -229,7 +229,7 @@ describe('placement content sweep: batch self-retry', () => {
     // the slice.
     const poisonedId = textIds[PLACEMENT_CONTENT_BATCH_SIZE];
     let poisonedCalls = 0;
-    scheduleMissingContentSpy.mockImplementation(async (...args: unknown[]) => {
+    ensureTextContentSpy.mockImplementation(async (...args: unknown[]) => {
       if (args[1] === poisonedId && poisonedCalls++ === 0) {
         throw new Error('transient placement failure');
       }
@@ -250,7 +250,7 @@ describe('placement content sweep: batch self-retry', () => {
     // including the ones AFTER the poisoned text in the failed batch. Was
     // processed.
     const processed = new Set(
-      scheduleMissingContentSpy.mock.calls.map(
+      ensureTextContentSpy.mock.calls.map(
         (call) => call[1] as Id<'texts'>,
       ),
     );
@@ -264,7 +264,7 @@ describe('placement content sweep: batch self-retry', () => {
     const CORPUS = PLACEMENT_CONTENT_BATCH_SIZE * 2 + 3; // inline page + 2 scheduled batches
     const textIds = await seedPlacementCorpus(t, CORPUS);
     const poisonedId = textIds[PLACEMENT_CONTENT_BATCH_SIZE];
-    scheduleMissingContentSpy.mockImplementation(async (...args: unknown[]) => {
+    ensureTextContentSpy.mockImplementation(async (...args: unknown[]) => {
       if (args[1] === poisonedId)
         throw new Error('permanent placement failure');
       return { translationsScheduled: 1, audioScheduled: 1 };
@@ -283,7 +283,7 @@ describe('placement content sweep: batch self-retry', () => {
     await t.finishAllScheduledFunctions(vi.runAllTimers);
 
     // The poisoned text was attempted exactly once per attempt, then given up.
-    const poisonedCalls = scheduleMissingContentSpy.mock.calls.filter(
+    const poisonedCalls = ensureTextContentSpy.mock.calls.filter(
       (call) => call[1] === poisonedId,
     ).length;
     expect(poisonedCalls).toBe(PLACEMENT_BATCH_MAX_ATTEMPTS);
@@ -291,7 +291,7 @@ describe('placement content sweep: batch self-retry', () => {
     // Inline page and the second scheduled batch are unaffected by the
     // doomed batch's retries.
     const processed = new Set(
-      scheduleMissingContentSpy.mock.calls.map(
+      ensureTextContentSpy.mock.calls.map(
         (call) => call[1] as Id<'texts'>,
       ),
     );

@@ -7,7 +7,9 @@
  * of the Convex codebase (sentenceMetadata.ts, customTexts.ts).
  *
  * Prompt = the XML-structured Prompt B that won the eval (see
- * data_preparation/translation_eval/prompts.py).
+ * data_preparation/translation_eval/prompts.py), with the language-specific
+ * politeness block of the rendering keys (docs/architecture/rendering-keys.md)
+ * in place of Prompt B's one register glossary for every language.
  *
  * Reasoning level is decided by the caller (the translation rule's matching
  * `ModelStage` in `lib/languages.ts → TRANSLATION_RULES`). This function
@@ -25,6 +27,11 @@
 
 import { generateText, type JSONValue } from 'ai';
 import { tryGetOpenRouter } from '../lib/openrouter';
+import {
+  languagePolitenessBlock,
+  politenessInstruction,
+  speakerInstruction,
+} from '../../lib/renderingPrompts';
 import { openrouterCostUsd, openrouterGenerationId } from '../lib/posthogAi';
 import {
   postProcessTranslation,
@@ -116,18 +123,18 @@ export type LlmTranslationResult =
   | LlmTranslationFailure;
 
 /**
- * Prompt B (XML-structured), extended with a <referent_gender> tag.
+ * The agreement instructions of Prompt B (XML-structured), minus its register
+ * glossary. Politeness is asked for per language instead: the language block
+ * (`languagePolitenessBlock`) names this language's forms and the requested
+ * one, and a language that marks no form is told nothing about register.
  *
  * Conditional rendering (handled in `buildPrompt` below):
- *   - `<speaker_gender>`: always emitted; falls back to 'unspecified'.
+ *   - `<speaker_gender>`: always emitted, the key's voice.
  *   - `<referent_gender>`: always emitted; 'male' or 'female'.
- *   - `<addressee_gender>` and `<register>`: only emitted when
- *     `addressesSomeone === true`. Descriptive sentences omit them entirely.
- *
- * 'neutral' register is intentionally treated as informal in the instructions
- * so German doesn't default to Sie, French to vous, etc.
+ *   - `<addressee_gender>`: only emitted when `addressesSomeone === true`.
+ *   - `<politeness_form>`: only when a form is requested.
  */
-export const PROMPT_B_INSTRUCTIONS = `Use the supplied speaker, referent, and (if present) addressee gender for any grammatical agreement (verb conjugation, adjective inflection, pronoun choice, gendered noun forms) the target language requires. The referent_gender drives third-party noun forms like German Übersetzer/-in, French traducteur/-rice, Spanish profesor/-a. It applies ONLY where the source leaves the third party's gender open (a unisex noun such as "the doctor", "my friend", "a teacher"): when the source itself fixes that person's gender — a pronoun ("he", "she", "him", "her"), a gendered kinship or role noun, an unambiguous name — the SOURCE wins and referent_gender is ignored. Never translate "he" as "she" or vice versa because referent_gender says otherwise. Use the requested register. Three levels exist: casual (the familiar T-form: du/tú/tu/ты, Japanese plain form with 君 or the name for "you", Korean 반말), polite (the level that is safe with anyone: vous/usted/вы/आप, Japanese です・ます, Korean 해요체) and formal (the distance or honorific level: Sie, keigo 尊敬語・謙譲語, Korean 합쇼체). 'informal' and 'neutral' both mean casual; 'formal' means polite. Never the aggressive おまえ. DO NOT default to the polite form when the register is neutral, unless a required politeness form below says otherwise. If the target language does not grammatically encode a given feature, translate naturally and ignore it. Do not output any field as a literal word. Only return one translation. Do not return multiple alternative translations or explanations — when several renderings are possible, silently pick the single most natural one.`;
+export const PROMPT_B_INSTRUCTIONS = `Use the supplied speaker, referent, and (if present) addressee gender for any grammatical agreement (verb conjugation, adjective inflection, pronoun choice, gendered noun forms) the target language requires. The referent_gender drives third-party noun forms like German Übersetzer/-in, French traducteur/-rice, Spanish profesor/-a. It applies ONLY where the source leaves the third party's gender open (a unisex noun such as "the doctor", "my friend", "a teacher"): when the source itself fixes that person's gender — a pronoun ("he", "she", "him", "her"), a gendered kinship or role noun, an unambiguous name — the SOURCE wins and referent_gender is ignored. Never translate "he" as "she" or vice versa because referent_gender says otherwise. If the target language does not grammatically encode a given feature, translate naturally and ignore it. Do not output any field as a literal word. Only return one translation. Do not return multiple alternative translations or explanations — when several renderings are possible, silently pick the single most natural one.`;
 
 export type TranslationPromptArgs = {
   text: string;
@@ -145,9 +152,9 @@ export type TranslationPromptArgs = {
   targetLangNativeName: string;
   targetRegion: string; // region label for the prompt, e.g. 'Germany'
   addressesSomeone: boolean;
-  speakerGender?: 'male' | 'female' | 'neutral';
+  /** The key's voice: the speaker every first-person form agrees with. */
+  speakerGender?: 'male' | 'female';
   addresseeGender?: 'male' | 'female';
-  formality?: 'formal' | 'informal' | 'neutral';
   referentGender: 'male' | 'female';
   /**
    * OGTE arc sliding-window context: up to 5 sentences immediately preceding
@@ -188,72 +195,79 @@ export type TranslationPromptArgs = {
    */
   accentRewrite?: AccentRewriteConfig;
   /**
-   * Sentence-form settings (lib/preferenceResolution.ts). Set on rendering
-   * VARIANT jobs and on canonical jobs of a predicate-marking language
-   * whose text has no register metadata. `requestedGender` replaces the
-   * text's speaker gender in `<speaker_gender>`; `requestedForm` is one of
-   * the language's politeness forms (lib/languageForms.ts) and is emitted
-   * as `<register>` whether or not the sentence addresses someone, with the
-   * form's own instruction (`requestedFormInstruction`). Absent on every
-   * job from before the feature, so the prompt is unchanged for them.
+   * The politeness form of the rendering key (lib/languageForms.ts): one of
+   * the language's forms, emitted as `<politeness_form>` whether or not the
+   * sentence addresses someone, with the form's own instruction and the
+   * language's intro in the language block. Absent when the key's form is
+   * `none`: an unmarked language, or a T-V sentence with no "you".
    */
-  requestedGender?: 'male' | 'female';
-  requestedForm?: { id: string; label: string; prompt: string };
+  requestedForm?: {
+    id: string;
+    label: string;
+    prompt: string;
+    /** `POLITENESS_CONFIG[code].intro`: how this language grades politeness. */
+    intro?: string;
+  };
   /**
-   * Which phrasing the requested-form instruction uses: the app's own words
-   * or the terms of the linguistics literature (speech level, T-V
-   * distinction, speaker gender agreement). scripts/eval-adherence.ts
-   * compares the two; production leaves it unset (= 'product').
-   */
-  promptWording?: 'product' | 'literature';
-  /**
-   * The canonical wording this job REWRITES for the requested form and
-   * gender (`buildRenderingRewritePrompt`). Set on rendering variant jobs;
-   * `buildPrompt` then returns the rewrite prompt and ignores the arc and
-   * flag context, which describe a translation from the source.
+   * The primary wording this job VERSIONS for the requested form and voice
+   * (`buildVersioningPrompt`). `buildPrompt` then returns the versioning
+   * prompt and ignores the arc and flag context, which describe a
+   * translation from the source.
    */
   rewriteOf?: string;
+  /**
+   * Versioning only: the key's voice differs from the primary's, so every
+   * first-person form is to change. Without it the voice is context for
+   * the form's carriers and the wording's own first-person forms stay.
+   */
+  rewriteChangesGender?: boolean;
+  /**
+   * A wording the rendering classifier judged not to carry the requested
+   * voice or form (`verifyRendering`). Emitted as a `<previous_attempt>`
+   * block on the one retry, so the model does not return it again.
+   */
+  previousAttempt?: string;
 };
 
 /**
- * The prompt for a rendering VARIANT: rewrite the canonical wording of a
- * sentence for a requested speaker gender and/or politeness form, changing
- * only what the form requires. A fresh translation per variant drifted in
- * unrelated wording on a third of sentences (scripts/eval-gender-relevance.ts,
- * 2026-09-06: "Je me suis perdu en ville" became "perdue dans la ville"),
- * which would make every such variant a separate audio clip. A rewrite of
- * the stored text keeps the sentence identical wherever the form does not
- * bite, so `sameAsCanonical` is a real signal and unmarked sentences cost
- * nothing. Same shape as `buildAccentRewritePrompt`: identity is the
- * expected answer for most inputs and is asked for by name.
+ * The VERSIONING prompt: rewrite the primary wording of a sentence for a
+ * requested politeness form and voice, changing only what the form
+ * requires. A fresh translation per rendering drifted in unrelated wording
+ * on a third of sentences (scripts/eval-gender-relevance.ts, 2026-09-06:
+ * "Je me suis perdu en ville" became "perdue dans la ville"), which would
+ * make every such rendering a separate audio clip. A rewrite of the stored
+ * text keeps the sentence identical wherever the form does not bite. Same
+ * shape as `buildAccentRewritePrompt`: identity is the expected answer for
+ * most inputs and is asked for by name. This is the 2026-09-06 wording that
+ * won the 2026-09-07 A/B on the rewrite path; change it only with
+ * `pnpm eval:adherence` in hand.
  */
-export function buildRenderingRewritePrompt(args: {
+export function buildVersioningPrompt(args: {
   targetLang: string;
   targetLangName: string;
   sourceText: string;
-  canonicalText: string;
-  requestedGender?: 'male' | 'female';
-  /**
-   * Who is speaking, when no gender was REQUESTED. Context, not an
-   * instruction to re-gender the sentence: a politeness form whose carrier
-   * agrees with the speaker (Thai ครับ/ค่ะ, a self-reference term) has to be
-   * introduced in the right one, and the canonical wording may not contain it
-   * yet. Without this the model falls back to the form prompt's own default
-   * for an unstated speaker (ค่ะ on Thai), so a male-voiced card asking for
-   * the polite level got the female particle read in a male voice.
-   */
-  speakerGender?: 'male' | 'female' | 'neutral';
+  primaryText: string;
+  /** The key's voice. */
+  speakerGender?: 'male' | 'female';
+  /** Whether the voice differs from the primary wording's. */
+  changesGender?: boolean;
   requestedForm?: { id: string; label: string; prompt: string };
-  promptWording?: 'product' | 'literature';
+  previousAttempt?: string;
 }): string {
-  const requirements = requestedFormInstruction(args);
-  // Only when no gender was requested: `requestedFormInstruction` already
-  // emits a stronger line for that case, and stacking the two would read as a
-  // request to change every first-person form.
-  if (
-    args.requestedGender === undefined &&
-    (args.speakerGender === 'male' || args.speakerGender === 'female')
-  ) {
+  const requirements = requestedFormInstruction({
+    requestedForm: args.requestedForm,
+    speakerGender: args.changesGender ? args.speakerGender : undefined,
+  });
+  // Only when the voice stays: `requestedFormInstruction` already emits a
+  // stronger line for a changed voice, and stacking the two would read as a
+  // request to change every first-person form. A politeness form whose
+  // carrier agrees with the speaker (Thai ครับ/ค่ะ, a self-reference term)
+  // still has to be introduced in the right one, and the primary wording
+  // may not contain it yet; without this the model fell back to the form
+  // prompt's own default for an unstated speaker (ค่ะ on Thai), so a
+  // male-voiced card asking for the polite level got the female particle
+  // read in a male voice.
+  if (!args.changesGender && args.speakerGender) {
     const who = args.speakerGender === 'male' ? 'a man' : 'a woman';
     requirements.push(
       `The speaker is ${who}. Where the required form introduces a word that agrees with the speaker (a politeness particle, a first-person pronoun or a self-reference term), use the form for ${who}. Do not change any other first-person form, and do not re-gender wording the sentence already has.`,
@@ -265,45 +279,49 @@ export function buildRenderingRewritePrompt(args: {
     `<requirement>`,
     ...requirements.map((line) => `  ${line}`),
     `</requirement>`,
+    ...previousAttemptBlock(args.previousAttempt),
     ``,
     `<source>${args.sourceText}</source>`,
-    `<translation>${args.canonicalText}</translation>`,
+    `<translation>${args.primaryText}</translation>`,
     ``,
     `Output only the rewritten ${args.targetLangName} sentence. No commentary, no tags, no quotation marks, no alternatives.`,
   ].join('\n');
 }
 
 /**
+ * The block for the one retry after the rendering classifier judged a
+ * wording not to carry the requested voice or form.
+ */
+function previousAttemptBlock(previousAttempt: string | undefined): string[] {
+  if (!previousAttempt) return [];
+  return [
+    ``,
+    `<previous_attempt>`,
+    `  A previous attempt, <prior>${previousAttempt}</prior>, did not carry the required speaker gender or politeness form. Produce a rendering that does, at every place the language marks it.`,
+    `</previous_attempt>`,
+  ];
+}
+
+/**
  * The instruction lines for a requested politeness form and/or speaker
- * gender, shared by the translation prompt and the best-of-N judge so the
+ * gender, shared by the versioning prompt and the best-of-N judge so the
  * judge scores against exactly what was asked. Empty when nothing was
  * requested.
  */
 export function requestedFormInstruction(
-  args: Pick<
-    TranslationPromptArgs,
-    'requestedForm' | 'requestedGender' | 'promptWording'
-  >,
+  args: Pick<TranslationPromptArgs, 'requestedForm' | 'speakerGender'>,
 ): string[] {
-  const literature = args.promptWording === 'literature';
   const lines: string[] = [];
   if (args.requestedForm) {
-    const form = args.requestedForm;
-    const lead = literature
-      ? `Required speech level / address form (T-V distinction, honorific register): ${form.label}.`
-      : `Required politeness form: ${form.label}.`;
     lines.push(
-      `${lead} ${form.prompt} This overrides the register rule above. Apply it to every sentence, including sentences that address nobody, wherever the language marks it. Only when the source is inherently register-locked (a direct quotation, slang, a fixed formal expression) stay faithful to the source instead.`,
+      politenessInstruction({
+        promptLabel: args.requestedForm.label,
+        prompt: args.requestedForm.prompt,
+      }),
     );
   }
-  if (args.requestedGender) {
-    const who = args.requestedGender === 'male' ? 'a man' : 'a woman';
-    const forms = args.requestedGender === 'male' ? 'masculine' : 'feminine';
-    lines.push(
-      literature
-        ? `Speaker gender agreement: every first-person form (verb, adjective, participle, pronoun, self-reference term) agrees with ${who} speaking. Use ${forms} first-person forms.`
-        : `The speaker is ${who}: use ${forms} first-person forms wherever the language marks them, and leave everything else unchanged.`,
-    );
+  if (args.speakerGender) {
+    lines.push(speakerInstruction(args.speakerGender));
   }
   return lines;
 }
@@ -389,7 +407,7 @@ function sanitizeUntrustedForPrompt(raw: string): string {
  * candidates were generated under.
  */
 export function buildContextLines(args: TranslationPromptArgs): string[] {
-  const speakerLine = `  <speaker_gender>${args.requestedGender ?? args.speakerGender ?? 'unspecified'}</speaker_gender>`;
+  const speakerLine = `  <speaker_gender>${args.speakerGender ?? 'unspecified'}</speaker_gender>`;
   const referentLine = `  <referent_gender>${args.referentGender}</referent_gender>`;
   const contextLines: string[] = [speakerLine, referentLine];
   if (args.addressesSomeone) {
@@ -398,14 +416,31 @@ export function buildContextLines(args: TranslationPromptArgs): string[] {
     );
   }
   // A requested form is a constraint on every sentence, so its tag is
-  // emitted whether or not the sentence addresses someone; the metadata
-  // register keeps the addressee gate it always had.
+  // emitted whether or not the sentence addresses someone. No form, no tag:
+  // the language block says nothing about register either.
   if (args.requestedForm) {
-    contextLines.push(`  <register>${args.requestedForm.id}</register>`);
-  } else if (args.addressesSomeone) {
-    contextLines.push(`  <register>${args.formality ?? 'neutral'}</register>`);
+    contextLines.push(
+      `  <politeness_form>${args.requestedForm.id}</politeness_form>`,
+    );
   }
   return contextLines;
+}
+
+/**
+ * The language-specific half of the instructions: this language's
+ * politeness intro and the requested form, then the speaker line. Shared
+ * by the translation prompt and the judge.
+ */
+function renderingInstructionLines(args: TranslationPromptArgs): string[] {
+  return [
+    ...languagePolitenessBlock({
+      intro: args.requestedForm?.intro,
+      form: args.requestedForm
+        ? { promptLabel: args.requestedForm.label, prompt: args.requestedForm.prompt }
+        : null,
+    }),
+    ...(args.speakerGender ? [speakerInstruction(args.speakerGender)] : []),
+  ];
 }
 
 /**
@@ -423,15 +458,15 @@ function fullLanguageName(args: TranslationPromptArgs): string {
 /** Build the user-message string for one translation call. */
 export function buildPrompt(args: TranslationPromptArgs): string {
   if (args.rewriteOf !== undefined) {
-    return buildRenderingRewritePrompt({
+    return buildVersioningPrompt({
       targetLang: args.targetLang,
       targetLangName: fullLanguageName(args),
       sourceText: args.text,
-      canonicalText: args.rewriteOf,
-      requestedGender: args.requestedGender,
+      primaryText: args.rewriteOf,
       speakerGender: args.speakerGender,
+      changesGender: args.rewriteChangesGender,
       requestedForm: args.requestedForm,
-      promptWording: args.promptWording,
+      previousAttempt: args.previousAttempt,
     });
   }
   if (args.accentRewrite) {
@@ -502,10 +537,11 @@ export function buildPrompt(args: TranslationPromptArgs): string {
     ...arcBlock,
     ...prevBlock,
     ...suggestionBlock,
+    ...previousAttemptBlock(args.previousAttempt),
     ``,
     `<instructions>`,
     PROMPT_B_INSTRUCTIONS,
-    ...requestedFormInstruction(args),
+    ...renderingInstructionLines(args),
     `</instructions>`,
     ``,
     `<source>${args.text}</source>`,
@@ -535,8 +571,8 @@ export function buildJudgePrompt(
     `</context>`,
     ``,
     `<instructions>`,
-    `Judge each candidate on: (1) accuracy and completeness of meaning, (2) natural, idiomatic ${plainName} as used in ${args.targetRegion} today, and (3) strict adherence to the context constraints — grammatical agreement with the given speaker/referent/addressee genders, and the requested register ('informal' and 'neutral' both mean the casual T-form; 'formal' means the polite level, and a required politeness form stated below overrides that rule). A candidate that violates the gender or register constraints, or uses archaic or unnatural phrasing, loses to one that satisfies them.`,
-    ...requestedFormInstruction(args),
+    `Judge each candidate on: (1) accuracy and completeness of meaning, (2) natural, idiomatic ${plainName} as used in ${args.targetRegion} today, and (3) strict adherence to the context constraints — grammatical agreement with the given speaker/referent/addressee genders, and the required politeness form stated below, if any. A candidate that violates the gender or politeness constraints, or uses archaic or unnatural phrasing, loses to one that satisfies them.`,
+    ...renderingInstructionLines(args),
     `</instructions>`,
     ``,
     `<source>${args.text}</source>`,

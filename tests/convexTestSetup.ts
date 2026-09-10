@@ -12,7 +12,7 @@ process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
  * which convex-test can only provide via `t.registerComponent` (flagged
  * fragile in this project, same reasoning as the rateLimiter module mock in
  * individual test files). Any mutation that enqueues content generation
- * (`enqueueTtsJob`, `enqueueLlmTranslation`, `scheduleMissingContent` callers)
+ * (`enqueueTtsJob`, `enqueueLlmTranslation`, `ensureTextContent` callers)
  * would otherwise crash on the missing component.
  *
  * Each enqueue resolves to a unique fake workId so tests can assert the
@@ -187,10 +187,10 @@ vi.mock('lindera-wasm-nodejs-ipadic', () => {
  * The setup above fakes `OPENROUTER_API_KEY` on the assumption, true until
  * 2026-09, that every suite reaching an LLM declares its own mock. Two
  * scheduled actions broke it:
- * `renderingClassification.classifyAndStampTranslations` and
- * `sentenceMetadata.fetchSentenceMetadata` are scheduled by
- * `scheduleMissingContent` and by the translation write choke point, so any
- * suite that lands a translation now fires them. Unmocked they made a real
+ * `sentenceMetadata.classifyCurriculumText` (the sweep's metadata gate)
+ * and `sentenceMetadata.fetchSentenceMetadata` (the custom-card paths) are
+ * scheduled by `ensureTextContent` and by the translation write choke
+ * point, so any suite that lands a translation now fires them. Unmocked they made a real
  * HTTP call, which outlives `drainSchedulerAfterEach`'s macrotask drain and
  * resumes inside the NEXT test, where convex-test's scheduled-function
  * continuation pops a write frame off that test's transaction. Symptom: a

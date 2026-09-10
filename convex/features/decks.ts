@@ -38,8 +38,6 @@ import {
 } from './deckContent';
 import {
   getTranslationForTextLanguageHandler,
-  processTranslationForCardArgs,
-  processTranslationForCardHandler,
   storeTranslationAndScheduleTtsArgs,
   storeTranslationAndScheduleTTSHandler,
 } from './translationPipeline';
@@ -79,9 +77,9 @@ import {
 // tests). Their implementations moved; the import surface stays stable.
 export {
   ProbeNeedsWork,
-  scheduleTranslationForLanguage,
+  enqueueRenderingJob,
   scheduleAudioForLanguage,
-  scheduleMissingContent,
+  ensureTextContent,
 } from '../lib/contentScheduling';
 export {
   createCardsFromTexts,
@@ -403,38 +401,33 @@ export const prepareCardContent = internalMutation({
     // See prepareCardContentHandler.
     renderingSettings: v.optional(renderingSettingsValidator),
     renderingCard: v.optional(renderingCardValidator),
+    skipTts: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: prepareCardContentHandler,
 });
 
 /**
- * Internal query: translation row for idempotency before calling Google Translate.
+ * Internal query: the live row at one rendering key (undefined = the
+ * legacy row), as the LLM worker reads it.
  */
 export const getTranslationForTextLanguage = internalQuery({
   args: {
     textId: v.id('texts'),
     targetLanguage: v.string(),
+    variantKey: v.optional(v.string()),
   },
   returns: v.union(
     v.null(),
     v.object({
       translatedText: v.string(),
       romanizedText: v.optional(v.string()),
+      romanizationSource: v.optional(v.string()),
       regionVariant: v.optional(v.string()),
+      translationSource: v.optional(v.string()),
     }),
   ),
   handler: getTranslationForTextLanguageHandler,
-});
-
-/**
- * Internal action to process translation for a card (the legacy Google
- * Translate path; see the arg docs in translationPipeline.ts).
- */
-export const processTranslationForCard = internalAction({
-  args: processTranslationForCardArgs,
-  returns: v.null(),
-  handler: processTranslationForCardHandler,
 });
 
 /**

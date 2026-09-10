@@ -2,7 +2,11 @@ import { convexTest, type TestConvex } from 'convex-test';
 import { describe, it, expect } from 'vitest';
 import schema from '../../schema';
 import { api, internal } from '../../_generated/api';
-import { pickPolitenessForm } from '../../../lib/preferenceResolution';
+import {
+  renderingForView,
+  renderingTextOf,
+  viewOfCard,
+} from '../../db/translationReads';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -282,7 +286,6 @@ describe('features/writingAlternatives edit-dialog CRUD', () => {
     // not the card's own sentence; the served wording is (2026-09-09 review).
     const t = convexTest(schema, modules);
     const a = await seedAlternative(t, 'A');
-    const formId = pickPolitenessForm('es', ['formal'], a.textId)!.id;
     await t.run(async (ctx) => {
       const card = (await ctx.db.get(a.cardId))!;
       const deck = (await ctx.db.get(card.deckId))!;
@@ -292,11 +295,18 @@ describe('features/writingAlternatives edit-dialog CRUD', () => {
         politenessLevels: ['formal'],
       });
       await ctx.db.patch(a.cardId, { followsCoursePreferences: true });
+      const text = (await ctx.db.get(a.textId))!;
+      const following = (await ctx.db.get(a.cardId))!;
       await ctx.db.insert('translations', {
         textId: a.textId,
         targetLanguage: 'es',
         translatedText: 'Querría un café, por favor.',
-        variantKey: `auto|${formId}`,
+        variantKey: renderingForView(
+          viewOfCard(following, { politenessLevels: ['formal'] }),
+          renderingTextOf(text),
+          a.textId,
+          'es',
+        ).key,
       });
     });
     const asUser = t.withIdentity({ subject: 'user_A' });

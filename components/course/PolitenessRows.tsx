@@ -5,9 +5,9 @@ import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   POLITENESS_CONFIG,
-  allPolitenessLevels,
   formCopyCode,
   levelsFromTickedRows,
+  recommendedPolitenessLevels,
   type PolitenessLevel,
   type PolitenessRow,
 } from '@/lib/languageForms';
@@ -45,9 +45,10 @@ function joinLevelWords(words: string[], conjunction: string): string {
 
 /**
  * The checkbox rows plus the summary line. Shared by the wizard step, the
- * create-course dialog and the course-languages sheet. `recommendAll` puts
- * an "All levels" card with a Recommended badge above the rows; pressing it
- * ticks every row, and the rows below stay for narrowing the set.
+ * create-course dialog and the course-languages sheet. `recommendDefault`
+ * puts a "Use the default we recommend" card with a Recommended badge above
+ * the rows; pressing it ticks the recommended set
+ * (`recommendedPolitenessLevels`), and the rows below stay for changing it.
  */
 export function PolitenessRows({
   rows,
@@ -55,14 +56,14 @@ export function PolitenessRows({
   onChange,
   showExamples,
   compact,
-  recommendAll,
+  recommendDefault,
 }: {
   rows: PolitenessRow[];
   selected: PolitenessLevel[];
   onChange: (levels: PolitenessLevel[]) => void;
   showExamples?: boolean;
   compact?: boolean;
-  recommendAll?: boolean;
+  recommendDefault?: boolean;
 }) {
   const t = useTranslations('Onboarding.politeness');
   const { title, subline, levelWord } = usePolitenessRowCopy();
@@ -76,44 +77,49 @@ export function PolitenessRows({
     onChange(levelsFromTickedRows(rows, next));
   };
   const multi = rows.some((row) => row.perLanguage.length > 1);
-  const allTicked = rows.length > 0 && ticked.length === rows.length;
-  const tickAll = () => onChange(allPolitenessLevels(rows));
+  const recommended = recommendedPolitenessLevels(rows);
+  const recommendedTicked =
+    recommended.length > 0 &&
+    recommended.length === selected.length &&
+    recommended.every((level) => selected.includes(level));
+  const tickRecommended = () => onChange(recommended);
   return (
     <div className="max-w-md mx-auto w-full text-left">
-      {recommendAll ? (
+      {recommendDefault ? (
         <>
           <button
             type="button"
-            aria-pressed={allTicked}
-            data-testid="politeness-all"
-            onClick={tickAll}
+            aria-pressed={recommendedTicked}
+            data-testid="politeness-recommended"
+            onClick={tickRecommended}
             className={cn(
               'w-full rounded-xl border text-left transition-all flex items-start gap-3',
               compact ? 'p-2.5 md:p-3' : 'p-3 md:p-4',
               'hover:bg-accent',
-              allTicked && 'border-primary bg-primary/5 ring-2 ring-primary/20',
+              recommendedTicked &&
+                'border-primary bg-primary/5 ring-2 ring-primary/20',
             )}
           >
             <span
               className={cn(
                 'mt-0.5 h-4 w-4 shrink-0 rounded border-2 flex items-center justify-center',
-                allTicked
+                recommendedTicked
                   ? 'border-primary bg-primary text-primary-foreground'
                   : 'border-muted-foreground/40',
               )}
               aria-hidden
             >
-              {allTicked ? <Check className="h-3 w-3" /> : null}
+              {recommendedTicked ? <Check className="h-3 w-3" /> : null}
             </span>
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold">{t('all.title')}</span>
+                <span className="font-semibold">{t('recommended.title')}</span>
                 <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
-                  {t('all.badge')}
+                  {t('recommended.badge')}
                 </span>
               </div>
               <div className="text-sm text-muted-foreground mt-0.5">
-                {t('all.description')}
+                {t('recommended.description')}
               </div>
             </div>
           </button>

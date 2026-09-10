@@ -58,15 +58,15 @@ describe('autofill settings block', () => {
     expect(block).toContain('Formal · keigo');
     // The drawn speaker replaces rule 3's default even without settings.
     const spoken = buildAutofillSettingsBlock(undefined, ['th'], 'seed', 'female');
-    expect(spoken).toContain('the speaker is a woman');
-    expect(spoken).toContain('report speakerGender as "female"');
+    expect(spoken).toContain('agrees with a woman speaking');
+    expect(spoken).toContain('Report speakerGender as "female"');
     expect(
       buildAutofillUserPrompt({
         texts: [{ language: 'de', text: 'Ich bin müde.' }],
         resolvedTargets: ['th'],
         speakerGender: 'male',
       }),
-    ).toContain('the speaker is a man');
+    ).toContain('agrees with a man speaking');
     expect(block).toContain('Polite · Sie');
     expect(block).not.toContain('Swedish');
     const prompt = buildAutofillUserPrompt({
@@ -114,13 +114,13 @@ describe('buildFormChips', () => {
           language: 'ja',
           isTargetLanguage: true,
           voiceGender: 'female',
-          renderedPoliteness: 'polite',
+          politenessLevel: 'polite',
         },
         {
           language: 'de',
           isTargetLanguage: true,
           voiceGender: 'female',
-          renderedPoliteness: 'formal',
+          politenessLevel: 'formal',
         },
       ],
       t,
@@ -137,7 +137,7 @@ describe('buildFormChips', () => {
   it('a two-form language reads casual or formal by the form the level maps to', () => {
     const label = (language: string, level: 'casual' | 'polite' | 'formal') =>
       buildFormChips(
-        [{ language, isTargetLanguage: true, renderedPoliteness: level }],
+        [{ language, isTargetLanguage: true, politenessLevel: level }],
         t,
       )[0].label;
     // Spain Spanish: tú covers casual and polite, usted is formal.
@@ -149,25 +149,17 @@ describe('buildFormChips', () => {
     expect(label('ko', 'casual')).toBe('반말');
   });
 
-  it('the voice outranks a gender stamp, which is only the fallback', () => {
+  it('the gender chip is the card voice, and nothing without one', () => {
     const chips = buildFormChips(
-      [
-        {
-          language: 'ru',
-          isTargetLanguage: true,
-          voiceGender: 'male',
-          renderedGender: 'feminine',
-        },
-      ],
+      [{ language: 'ru', isTargetLanguage: true, voiceGender: 'male' }],
       t,
     );
     expect(chips.map((c) => c.label)).toEqual(['MASCULINE']);
     expect(
-      buildFormChips(
-        [{ language: 'ru', isTargetLanguage: true, renderedGender: 'feminine' }],
-        t,
-      ).map((c) => c.label),
-    ).toEqual(['FEMININE']);
+      buildFormChips([{ language: 'ru', isTargetLanguage: true }], t).map(
+        (c) => c.label,
+      ),
+    ).toEqual([]);
   });
 
   it('drops the language prefix when the targets agree and hides unmarked rows', () => {
@@ -176,12 +168,12 @@ describe('buildFormChips', () => {
         {
           language: 'de',
           isTargetLanguage: true,
-          renderedPoliteness: 'formal',
+          politenessLevel: 'formal',
         },
         {
           language: 'fr',
           isTargetLanguage: true,
-          renderedPoliteness: 'polite',
+          politenessLevel: 'polite',
         },
         { language: 'sv', isTargetLanguage: true },
       ],

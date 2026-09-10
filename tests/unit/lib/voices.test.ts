@@ -205,12 +205,11 @@ describe('resolveCardSpeakerGenders', () => {
       'seed-custom',
     );
     expect(['male', 'female']).toContain(r.audioSpeakerGender);
-    // Never patches speakerGender for custom (LLM owns it); only audio.
-    expect(r.genderPatch.speakerGender).toBeUndefined();
-    expect(r.genderPatch.audioSpeakerGender).toBe(r.audioSpeakerGender);
+    // Never patches speakerGender (the classifier owns it); only the voice.
+    expect(r.genderPatch).toEqual({ audioSpeakerGender: r.audioSpeakerGender });
   });
 
-  it('premade + undefined coin-flips BOTH fields to the same value', () => {
+  it('premade + undefined flips the voice only, never speakerGender', () => {
     const r = resolveCardSpeakerGenders(
       {
         speakerGender: undefined,
@@ -219,8 +218,8 @@ describe('resolveCardSpeakerGenders', () => {
       },
       'seed-premade',
     );
-    expect(r.genderPatch.speakerGender).toBe(r.audioSpeakerGender);
-    expect(r.genderPatch.audioSpeakerGender).toBe(r.audioSpeakerGender);
+    expect(r.genderPatch).toEqual({ audioSpeakerGender: r.audioSpeakerGender });
+    expect('speakerGender' in r.genderPatch).toBe(false);
   });
 
   it('is deterministic per seed (retry-stable, no re-roll)', () => {
@@ -268,11 +267,10 @@ describe('resolveCardSpeakerGenders on a classified curriculum text', () => {
       'seed-classified',
     );
     expect(['male', 'female']).toContain(r.audioSpeakerGender);
-    expect(r.genderPatch.speakerGender).toBeUndefined();
-    expect(r.genderPatch.audioSpeakerGender).toBe(r.audioSpeakerGender);
+    expect(r.genderPatch).toEqual({ audioSpeakerGender: r.audioSpeakerGender });
   });
 
-  it('still coin-flips both fields on an unclassified premade text', () => {
+  it('flips only the voice on an unclassified premade text too', () => {
     const r = resolveCardSpeakerGenders(
       {
         speakerGender: 'neutral',
@@ -281,6 +279,6 @@ describe('resolveCardSpeakerGenders on a classified curriculum text', () => {
       },
       'seed-legacy',
     );
-    expect(r.genderPatch.speakerGender).toBe(r.audioSpeakerGender);
+    expect(r.genderPatch).toEqual({ audioSpeakerGender: r.audioSpeakerGender });
   });
 });

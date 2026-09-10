@@ -31,6 +31,7 @@ import {
 } from '../lib/languages';
 import { getFuriganaSource, getIpaSource } from './lib/textAnnotations';
 import { buildSearchableTextPatchForCard } from './lib/cardContent';
+import { deleteAudioRow } from './lib/audio';
 import type { Id } from './_generated/dataModel';
 import { isPremadeLevelCollection } from './lib/collections';
 import { emptyByMode, type StatsReviewMode } from './types';
@@ -1176,6 +1177,116 @@ export const dedupeApostropheWords = migrations.define({
   migrateOne: (ctx, doc) => dedupeApostropheWordOne(ctx, doc),
 });
 
+/**
+ * The 2026-09-10 cutover to rendering keys (docs/architecture/rendering-keys.md).
+ * Dev and staging ran the pre-cutover build, which wrote rows the key model
+ * does not know: translation rows and audio pointers keyed in the OLD
+ * vocabulary (`auto` on either axis: `auto|v`, `female|auto`), keyed claims
+ * in both claim tables, the rendering stamps on translations, the
+ * gender-correction counter on texts and the withdrawn `firstPersonForms`
+ * on course settings and onboarding progress. Prod never had any of them.
+ * These sweeps delete every old-vocabulary row, pointer and claim (a legacy
+ * row is what every card of that time reads; audio assets stay in the
+ * content-addressed cache) and unset the dropped columns, which the schema
+ * keeps as transitional `v.optional(v.any())` fields until the sweeps have
+ * run on every deployment (kanban: drop-rendering-cutover-columns).
+ * Rows keyed in the new vocabulary are never touched, so the sweeps are
+ * safe to run at any time. Idempotent.
+ */
+export function isOldVocabularyKey(key: string): boolean {
+  return key.split('|').includes('auto');
+}
+
+function unsetPatch<T extends Record<string, unknown>>(
+  doc: T,
+  columns: readonly (keyof T & string)[],
+): Partial<T> | undefined {
+  const stale = columns.filter((column) => doc[column] !== undefined);
+  if (stale.length === 0) return undefined;
+  return Object.fromEntries(stale.map((column) => [column, undefined])) as Partial<T>;
+}
+
+export async function dropRenderingCutoverTranslationOne(
+  ctx: MutationCtx,
+  doc: Doc<'translations'>,
+): Promise<Partial<Doc<'translations'>> | undefined> {
+  if (doc.variantKey !== undefined && isOldVocabularyKey(doc.variantKey)) {
+    await ctx.db.delete(doc._id);
+    return undefined;
+  }
+  return unsetPatch(doc, [
+    'renderedGender',
+    'renderedPoliteness',
+    'renderingStampRequestedAt',
+    'renderingStampAttempts',
+    'sameAsCanonical',
+  ]);
+}
+
+export async function dropRenderingCutoverAudioPointerOne(
+  ctx: MutationCtx,
+  doc: Doc<'audioRecordings'>,
+): Promise<undefined> {
+  if (doc.variantKey === undefined || !isOldVocabularyKey(doc.variantKey)) {
+    return undefined;
+  }
+  await deleteAudioRow(ctx, doc, { keepAsset: true });
+  return undefined;
+}
+
+async function dropRenderingCutoverClaimOne(
+  ctx: MutationCtx,
+  doc: Doc<'llmTranslationClaims'> | Doc<'ttsGenerationClaims'>,
+): Promise<undefined> {
+  if (doc.variantKey !== undefined && isOldVocabularyKey(doc.variantKey)) {
+    await ctx.db.delete(doc._id);
+  }
+  return undefined;
+}
+
+/** Old-vocabulary rows deleted, the rendering stamps unset on the rest. */
+export const dropOldVocabularyTranslations = migrations.define({
+  table: 'translations',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (ctx, doc) => dropRenderingCutoverTranslationOne(ctx, doc),
+});
+
+export const dropOldVocabularyAudioPointers = migrations.define({
+  table: 'audioRecordings',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (ctx, doc) => dropRenderingCutoverAudioPointerOne(ctx, doc),
+});
+
+export const dropOldVocabularyLlmClaims = migrations.define({
+  table: 'llmTranslationClaims',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (ctx, doc) => dropRenderingCutoverClaimOne(ctx, doc),
+});
+
+export const dropOldVocabularyTtsClaims = migrations.define({
+  table: 'ttsGenerationClaims',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (ctx, doc) => dropRenderingCutoverClaimOne(ctx, doc),
+});
+
+export const dropGenderCorrectionAttempts = migrations.define({
+  table: 'texts',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => unsetPatch(doc, ['genderCorrectionAttempts']),
+});
+
+export const dropFirstPersonForms = migrations.define({
+  table: 'courseSettings',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => unsetPatch(doc, ['firstPersonForms']),
+});
+
+export const dropOnboardingFirstPersonForms = migrations.define({
+  table: 'onboardingProgress',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => unsetPatch(doc, ['firstPersonForms']),
+});
+
 export const runAll = migrations.runner([
   internal.migrations.perModeSettingsBackfill,
   internal.migrations.stripTrailingUnderscores,
@@ -1205,4 +1316,11 @@ export const runAll = migrations.runner([
   internal.migrations.courseStatsTimeByModeBackfill,
   internal.migrations.backfillAudioAssetAccent,
   internal.migrations.dedupeApostropheWords,
+  internal.migrations.dropOldVocabularyTranslations,
+  internal.migrations.dropOldVocabularyAudioPointers,
+  internal.migrations.dropOldVocabularyLlmClaims,
+  internal.migrations.dropOldVocabularyTtsClaims,
+  internal.migrations.dropGenderCorrectionAttempts,
+  internal.migrations.dropFirstPersonForms,
+  internal.migrations.dropOnboardingFirstPersonForms,
 ]);

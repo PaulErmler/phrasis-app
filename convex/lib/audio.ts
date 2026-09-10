@@ -5,8 +5,6 @@ import {
   audioPointer,
   audioPointersForTextLanguage,
 } from '../db/translationReads';
-import { AUTO, parseVariantKey } from '../../lib/preferenceResolution';
-import { languageMarksFirstPerson } from '../../lib/languageForms';
 
 /**
  * Delete an `audioRecordings` pointer row; when it was the LAST pointer at
@@ -31,7 +29,7 @@ import { languageMarksFirstPerson } from '../../lib/languageForms';
  *
  * `opts.blobAlreadyGone` skips the storage delete when the blob is already
  * known to be missing (`storage.getUrl` returned null), as in
- * `scheduleMissingContent`'s stale-file cleanup. Row/asset bookkeeping still
+ * `ensureTextContent`'s stale-file cleanup. Row/asset bookkeeping still
  * runs, but there is no blob left to delete.
  */
 export async function deleteAudioRow(
@@ -53,30 +51,36 @@ export async function deleteAudioRow(
 }
 
 /**
- * Delete every `audioRecordings` row for one (text, language) via the
- * reference-aware `deleteAudioRow`. The `take(10)` cap bounds the read; a
- * language has at most a couple of rows (one per voice) in practice.
+ * Delete the `audioRecordings` pointers of one (text, language) that speak
+ * the wording of one rendering, via the reference-aware `deleteAudioRow`.
+ * `variantKey` undefined is the legacy pointer; a key names that key's
+ * pointer. Every OTHER key keeps its clip: each keyed row is its own
+ * wording, and a wording change on one rendering says nothing about the
+ * others (docs/architecture/rendering-keys.md).
  */
 export async function deleteAudioRowsForTextLanguage(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   language: string,
+  opts?: { keepAsset?: boolean; variantKey?: string },
+): Promise<void> {
+  const row = await audioPointer(ctx, textId, language, opts?.variantKey);
+  if (row) await deleteAudioRow(ctx, row, opts);
+}
+
+/**
+ * Delete EVERY pointer of (text, language), legacy and keyed alike. For the
+ * manual regenerate button and the cascades that drop a text's audio
+ * wholesale.
+ */
+export async function deleteAllAudioRowsForTextLanguage(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  language: string,
   opts?: { keepAsset?: boolean },
 ): Promise<void> {
-  // The canonical pointer and every AUDIO-ONLY variant: all of them speak
-  // the wording that just changed. A variant with its own wording keeps its
-  // clip: any politeness form, and on a language whose wording marks the
-  // speaker's gender also the `<gender>|auto` key, which there voices a
-  // rewritten sentence rather than the canonical one
-  // (docs/architecture/translation-variants.md, Keys).
   const rows = await audioPointersForTextLanguage(ctx, textId, language);
-  const genderRewrites = languageMarksFirstPerson(language);
   for (const row of rows) {
-    if (row.variantKey !== undefined) {
-      const { gender, formId } = parseVariantKey(row.variantKey);
-      if (formId !== AUTO) continue;
-      if (gender !== AUTO && genderRewrites) continue;
-    }
     await deleteAudioRow(ctx, row, opts);
   }
 }

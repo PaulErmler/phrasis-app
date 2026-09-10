@@ -52,6 +52,8 @@ import {
   canonicalizeApostrophes,
   resolveAudioSpeakerGender,
 } from '../../lib/languages';
+import { renderingKey } from '../../lib/preferenceResolution';
+import { NO_FORM } from '../../lib/languageForms';
 
 export const consumeAutoFillQuota = internalMutation({
   args: { userId: v.string() },
@@ -458,6 +460,18 @@ export const createCustomText = mutation({
     const mainEntry = args.translations[0];
     const nextRank = collection.textCount + 1;
 
+    // The voice, decided at creation: the autofill's verdict when the
+    // wording marks a gender, else a flip. A user's own sentence has one
+    // rendering per language, keyed by this voice
+    // (docs/architecture/rendering-keys.md); `applyTextMetadata` re-keys
+    // the rows if the classifier later moves the voice.
+    const audioSpeakerGender = resolveAudioSpeakerGender(
+      args.metadata?.speakerGender === 'male' ||
+        args.metadata?.speakerGender === 'female'
+        ? args.metadata.speakerGender
+        : undefined,
+      `${mainEntry.text}|${userId}|${Date.now()}`,
+    );
     const textId = await ctx.db.insert('texts', {
       text: mainEntry.text,
       language: mainEntry.language,
@@ -465,6 +479,7 @@ export const createCustomText = mutation({
       userId,
       collectionId: collection._id,
       collectionRank: nextRank,
+      audioSpeakerGender,
       ...(args.metadata
         ? {
             register: args.metadata.register,
@@ -476,15 +491,6 @@ export const createCustomText = mutation({
             // across all target-language translations of this row. Mirrors the
             // logic in applyMetadataAndPrepareCard for the non-auto-fill path.
             referentGender: Math.random() < 0.5 ? 'male' : 'female',
-            // The classifier's verdict when the wording marks a gender,
-            // else the coin flip: a user's own sentence has no rendering
-            // variants, so it is voiced (and stamped) once, at creation.
-            audioSpeakerGender: resolveAudioSpeakerGender(
-              args.metadata.speakerGender === 'male' ||
-                args.metadata.speakerGender === 'female'
-                ? args.metadata.speakerGender
-                : undefined,
-            ),
           }
         : {}),
     });
@@ -495,6 +501,8 @@ export const createCustomText = mutation({
         textId,
         targetLanguage: entry.language,
         translatedText: canonicalizeApostrophes(entry.language, entry.text),
+        variantKey: renderingKey(audioSpeakerGender, NO_FORM),
+        speakerGender: audioSpeakerGender,
         ...(entry.regionVariant ? { regionVariant: entry.regionVariant } : {}),
         // The client tags autofilled entries with the model slug and
         // everything else as user-provided (EnterTextsView). Default here
@@ -661,6 +669,11 @@ export const createCustomTextsBatch = mutation({
       const mainEntry = translations[0];
       const rank = baseRank + i + 1;
 
+      // The voice, decided at creation (see `createCustomText`).
+      const audioSpeakerGender = resolveAudioSpeakerGender(
+        undefined,
+        `${mainEntry.text}|${userId}|${rank}|${baseRank}`,
+      );
       const textId = await ctx.db.insert('texts', {
         text: mainEntry.text,
         language: mainEntry.language,
@@ -668,6 +681,7 @@ export const createCustomTextsBatch = mutation({
         userId,
         collectionId: collection._id,
         collectionRank: rank,
+        audioSpeakerGender,
       });
 
       for (let j = 1; j < translations.length; j++) {
@@ -676,6 +690,8 @@ export const createCustomTextsBatch = mutation({
           textId,
           targetLanguage: entry.language,
           translatedText: canonicalizeApostrophes(entry.language, entry.text),
+          variantKey: renderingKey(audioSpeakerGender, NO_FORM),
+          speakerGender: audioSpeakerGender,
           // Bulk-import is exclusively manual, no autofill path here, so
           // every inserted translation is user-typed. Tag it explicitly so
           // a future strategy swap doesn't regenerate text the user wrote.

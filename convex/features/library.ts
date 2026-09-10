@@ -24,12 +24,7 @@ import {
   schedulingPhaseValidator,
 } from '../types';
 import { getCourseSettings } from '../db/courseSettings';
-import {
-  flushRenderingStamps,
-  newRenderingStampCollector,
-  scheduleMissingRenderings,
-} from '../lib/contentScheduling';
-import { hasRenderingOverride } from '../../lib/preferenceResolution';
+import { ensureTextContent } from '../lib/contentScheduling';
 
 // ============================================================================
 // QUERY
@@ -448,44 +443,28 @@ export const requestLibraryRenderings = mutation({
     const renderingSettings = renderingSettingsOf(
       await getCourseSettings(ctx, course._id),
     );
-    // One collector for the page, so the classifier is asked once per
-    // language per 25 rows rather than once per card.
-    const stamps = newRenderingStampCollector();
     let translationsScheduled = 0;
     for (const cardId of args.cardIds.slice(0, MAX_LIBRARY_RENDERING_CARDS)) {
       const card = await ctx.db.get(cardId);
       // Ownership: the card must belong to this user's active deck.
       if (!card || card.deckId !== deck._id) continue;
-      const renderingCard = renderingCardOf(card);
-      // `followsCoursePreferences` only means anything when the course HAS
-      // settings; without them `scheduleMissingRenderings` returns after
-      // zero reads, so testing it first would spend a text read per card to
-      // reach a guaranteed no-op. A Flag-dialog override still needs the
-      // sweep either way, which is why it is not simply an early return
-      // above: a learner can correct a card on a course that set no level.
-      const wantsRendering = renderingSettings
-        ? card.followsCoursePreferences || hasRenderingOverride(renderingCard)
-        : hasRenderingOverride(renderingCard);
-      if (!wantsRendering) continue;
       const text = await ctx.db.get(card.textId);
       if (!text) continue;
-      const scheduled = await scheduleMissingRenderings(
+      const scheduled = await ensureTextContent(
         ctx,
         card.textId,
         text,
         course.baseLanguages,
         course.targetLanguages,
-        renderingSettings,
         {
           skipTts: true,
-          stamps,
-          card: renderingCard,
+          card: renderingCardOf(card),
+          settings: renderingSettings,
           requestedByUserId: userId,
         },
       );
       translationsScheduled += scheduled.translationsScheduled;
     }
-    await flushRenderingStamps(ctx, stamps, userId);
     return { translationsScheduled };
   },
 });

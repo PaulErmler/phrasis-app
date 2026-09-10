@@ -6,7 +6,7 @@ the config, how to research it so the copy is right, and how to check the
 result. The Egyptian Arabic addition from that feature is the worked
 example at the end.
 
-Read `docs/architecture/translation-variants.md` first for the model the
+Read `docs/architecture/rendering-keys.md` first for the model the
 fields feed.
 
 ## The fields
@@ -38,15 +38,17 @@ Two files, one language.
 
 - `POLITENESS_CONFIG[code]`: `marking` (must equal the flag), `intro` (one
   learner-facing sentence, English source), `exampleEn`, `forms` (level ->
-  form; two-form languages point two levels at one object), optional
-  `defaultLevel` (predicate and particle languages only: the form a
-  canonical job requests when the text has no register metadata; polite
-  for ja, ko, th, fil), `sources`. Each form: `id` (stable, part of every
-  `variantKey`), `name` (the shortest marker a learner sees: "du",
+  form; two-form languages point two levels at one object),
+  `defaultLevel` (required for every non-address language, predicate,
+  particle and pronoun alike: the form the primary rendering takes when
+  the text's register metadata names none; polite for ja, ko, th, fil, vi,
+  id, ms; address languages take the T or V form from the register
+  instead), `sources`. Each form: `id` (stable, the form part of every
+  rendering key), `name` (the shortest marker a learner sees: "du",
   "です・ます", "without po"), `description` (who you use it with, English
   source), `example` (the `exampleEn` rendered in that form), `prompt` (the
   instruction the translation model follows; positive carriers plus one
-  example, see docs/architecture/translation-variants.md "Prompts"). The
+  example, see docs/architecture/rendering-keys.md "Prompts"). The
   builders derive `promptLabel` ("Polite · Sie") for the model-facing
   prompts. Use the `tv(...)` builder for a T-V language and say whether
   level 2 is the familiar form (`split: 'familiar'`, like Spanish tú) or
@@ -134,9 +136,9 @@ and pick the safer level (the distance form from level 2).
   with a gold register (casual / polite / formal / neutral), including a
   quoted casual line inside a polite frame and a fossilised V-form phrase.
 - Run `pnpm eval:metadata --validate-only`, then `pnpm eval:rendering
---langs=<code>` (the classifier that stamps every row) and `pnpm
-eval:adherence --langs=<code>` (does the translation prompt render the
-  requested forms). Add a surface check for the new forms to `CHECKS` in
+--langs=<code>` (the classifier that verifies every generated row) and
+  `pnpm eval:adherence --langs=<code>` (does the translation prompt render
+  the requested forms). Add a surface check for the new forms to `CHECKS` in
   `scripts/eval-adherence.ts` when a regex can tell them apart.
 
 ## Mixed-target courses

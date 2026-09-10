@@ -11,6 +11,7 @@ import {
   concreteLanguageCodes,
   selectedPolitenessForms,
 } from '../../../lib/languageForms';
+import { studiedFormsLabel } from '../../../lib/renderingPrompts';
 
 /**
  * Quick actions: the client sends a compact action key (plus a small payload)
@@ -126,12 +127,11 @@ function studiedFormsNote(ctx: QuickActionContext): string {
   if (!levels || levels.length === 0) return '';
   const parts = ctx.targetLanguages.flatMap((code) =>
     concreteLanguageCodes(code).flatMap((concrete) => {
-      const forms = selectedPolitenessForms(concrete, levels);
-      return forms.length > 0
-        ? [
-            `${languageName(concrete)}: ${forms.map((f) => f.promptLabel).join(' / ')}`,
-          ]
-        : [];
+      const studied = studiedFormsLabel(
+        languageName(concrete),
+        selectedPolitenessForms(concrete, levels),
+      );
+      return studied ? [studied] : [];
     }),
   );
   if (parts.length === 0) return '';

@@ -8,8 +8,10 @@ import {
   liveTranslation,
   audioPointer,
   audioPointersForTextLanguage,
+  dialectForRendering,
+  primaryKeyForLanguage,
 } from './translationReads';
-import { retireVariantRenderings } from '../features/translationPipeline';
+import { resolveCardSpeakerGenders } from '../../lib/languages';
 
 const SPANISH_VOICE_PREFIXES: Record<string, string> = {
   es: 'es-ES',
@@ -30,6 +32,13 @@ function textEnPreview(text: string): string {
  * For each sentence: updates the texts row (normalized text + metadata),
  * upserts translations per language, and invalidates audio when translation
  * text changes or Spanish voices use the wrong regional prefix.
+ *
+ * A seeded wording is the sentence's PRIMARY rendering
+ * (docs/architecture/rendering-keys.md): the text's voice and primary form.
+ * It lands on the primary keyed row when one exists, else on the legacy
+ * row when one exists (a curriculum fix reaches the cards still on it),
+ * else as a new keyed primary row. Rows versioned from the primary become
+ * derivation-stale and are re-versioned by the next content sweep.
  */
 export const batchUpsertTranslations = internalMutation({
   args: {
@@ -110,6 +119,24 @@ export const batchUpsertTranslations = internalMutation({
 
       const textId = textDoc._id;
 
+      // The voice is decided once and kept (lib/voices.ts); the seed's
+      // speaker gender is a verdict when male/female.
+      const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
+        { ...textDoc, speakerGender: item.speakerGender },
+        textId,
+      );
+      const patchedText = {
+        ...textDoc,
+        text: item.textEn,
+        register: item.register,
+        addresseeNumber: item.addresseeNumber,
+        speakerGender: item.speakerGender,
+        addresseeGender: item.addresseeGender,
+        tenseAspect: item.tenseAspect,
+        sentenceType: item.sentenceType,
+        literalFigurative: item.literalFigurative,
+        ...genderPatch,
+      };
       await ctx.db.patch(textId, {
         text: item.textEn,
         register: item.register,
@@ -119,6 +146,7 @@ export const batchUpsertTranslations = internalMutation({
         tenseAspect: item.tenseAspect,
         sentenceType: item.sentenceType,
         literalFigurative: item.literalFigurative,
+        ...genderPatch,
       });
       stats.textsUpdated++;
 
@@ -137,13 +165,23 @@ export const batchUpsertTranslations = internalMutation({
       }
 
       for (const tr of item.translations) {
-        const existing = await liveTranslation(ctx, textId, tr.language);
+        const legacy = await liveTranslation(ctx, textId, tr.language);
+        const primaryKey = primaryKeyForLanguage(
+          patchedText,
+          tr.language,
+          dialectForRendering(tr.language, textId, legacy),
+        );
+        const existing =
+          (await liveTranslation(ctx, textId, tr.language, primaryKey)) ??
+          legacy;
 
         if (!existing) {
           await ctx.db.insert('translations', {
             textId,
             targetLanguage: tr.language,
             translatedText: canonicalizeApostrophes(tr.language, tr.text),
+            variantKey: primaryKey,
+            speakerGender: audioSpeakerGender,
             ...(tr.translationSource
               ? { translationSource: tr.translationSource }
               : {}),
@@ -165,24 +203,16 @@ export const batchUpsertTranslations = internalMutation({
           });
           stats.translationsUpdated++;
 
-          // A curriculum fix is a canonical WORDING change, so the rendering
-          // variants of this (text, language) are rewrites of wording that
-          // has just been declared wrong. Invariant 3 in
-          // docs/architecture/translation-variants.md names this exact
-          // trigger. Without it a learner with a politeness setting keeps
-          // being served the old wording for good, because the variant sweep
-          // sees a variant row and never re-asks, while a learner with no
-          // setting gets the fix. Retiring also drops the in-flight variant
-          // claims, so the next ensure pass rewrites from the new wording
-          // instead of waiting out the claim.
-          await retireVariantRenderings(ctx, textId, tr.language);
-
-          // Translation text changed. Delete audio so it regenerates on demand
-          for (const audio of await audioPointersForTextLanguage(
+          // Translation text changed. Delete the row's audio so it
+          // regenerates on demand; the rows versioned from this wording are
+          // derivation-stale now and the sweep re-versions them.
+          const audio = await audioPointer(
             ctx,
             textId,
             tr.language,
-          )) {
+            existing.variantKey,
+          );
+          if (audio) {
             await deleteAudioRow(ctx, audio);
             stats.audioInvalidated++;
           }
@@ -193,17 +223,19 @@ export const batchUpsertTranslations = internalMutation({
         // Spanish voice audit: delete audio using wrong regional voice prefix
         const expectedPrefix = SPANISH_VOICE_PREFIXES[tr.language];
         if (expectedPrefix) {
-          const audioForLang = await audioPointer(ctx, textId, tr.language);
-          const payloadForLang = audioForLang
-            ? await resolveAudioPayload(ctx, audioForLang)
-            : null;
-          if (
-            audioForLang &&
-            payloadForLang &&
-            !payloadForLang.voiceName.startsWith(expectedPrefix)
-          ) {
-            await deleteAudioRow(ctx, audioForLang);
-            stats.audioInvalidated++;
+          for (const audioForLang of await audioPointersForTextLanguage(
+            ctx,
+            textId,
+            tr.language,
+          )) {
+            const payloadForLang = await resolveAudioPayload(ctx, audioForLang);
+            if (
+              payloadForLang &&
+              !payloadForLang.voiceName.startsWith(expectedPrefix)
+            ) {
+              await deleteAudioRow(ctx, audioForLang);
+              stats.audioInvalidated++;
+            }
           }
         }
       }

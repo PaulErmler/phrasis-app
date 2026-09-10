@@ -6,6 +6,11 @@ import schema from '../../schema';
 import { internal } from '../../_generated/api';
 import type { Id } from '../../_generated/dataModel';
 import { buildCardSearchableText } from '../../lib/cardContent';
+import {
+  renderingForView,
+  renderingTextOf,
+  viewOfCard,
+} from '../../db/translationReads';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -329,13 +334,20 @@ describe('the search string follows the served rendering', () => {
     });
     expect((await getCard(t, cardId)).searchableText).toContain('Kommst du');
 
-    // The rewrite lands under the card's variant key.
+    // The rewrite lands under the card's rendering key.
     await t.run(async (ctx) => {
+      const text = (await ctx.db.get(textId))!;
+      const card = (await ctx.db.get(cardId))!;
       await ctx.db.insert('translations', {
         textId,
         targetLanguage: 'de',
         translatedText: 'Kommen Sie?',
-        variantKey: 'auto|v',
+        variantKey: renderingForView(
+          viewOfCard(card, { politenessLevels: ['formal'] }),
+          renderingTextOf(text),
+          textId,
+          'de',
+        ).key,
       });
     });
     await t.mutation(internal.features.decks.rebuildSearchableTextForText, {
@@ -365,11 +377,20 @@ describe('the card-add and refresh builders follow the served rendering too', ()
       translation: { lang: 'de', text: 'Kommst du?' },
     });
     await t.run(async (ctx) => {
+      const text = (await ctx.db.get(textId))!;
       await ctx.db.insert('translations', {
         textId,
         targetLanguage: 'de',
         translatedText: 'Kommen Sie?',
-        variantKey: 'auto|v',
+        variantKey: renderingForView(
+          {
+            settings: { politenessLevels: ['formal'] },
+            card: { followsCoursePreferences: true },
+          },
+          renderingTextOf(text),
+          textId,
+          'de',
+        ).key,
       });
     });
     const build = (card: { followsCoursePreferences?: true } | null) =>

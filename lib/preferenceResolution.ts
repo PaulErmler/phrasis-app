@@ -6,26 +6,29 @@
  * contentScheduling.ts) all agree on one answer.
  *
  * Layers: `texts` is the identity of a meaning and carries the content
- * semantics (a definitive speaker gender, the register metadata); the
- * course settings are the preference; this module is the one resolver;
- * the `translations` / `audioRecordings` rows keyed by `variantKey` are the
- * disposable realizations. The resolver never writes anything.
+ * semantics (a definitive speaker gender, the register metadata, the
+ * voice); the course settings are the preference; this module is the one
+ * resolver; the `translations` / `audioRecordings` rows keyed by
+ * `variantKey` are the realizations. The resolver never writes anything.
  *
- * Gender is resolved ONCE per card and is the same for every language of
- * the card: the text's own voice (its classifier verdict or its coin flip)
- * sets the wording and the voice everywhere, marked or not. There is no
- * course-level gender choice: the curriculum is rendered in one gender per
- * sentence (`courseSettings.firstPersonForms` is stored but not read), and
- * the only way a card leaves that gender is the Flag dialog's per-card
- * correction. Politeness is resolved per language, because each language
- * maps the global levels onto its own forms.
+ * Every card resolves to one RENDERING KEY per language,
+ * `"<male|female>|<formId|none>"` (`renderingKey`), on the text row and on
+ * the audio pointer alike. The voice is always decided: the text's own
+ * (`texts.audioSpeakerGender`, the classifier's verdict where the sentence
+ * fixes it, else one seeded flip), or the Flag dialog's correction. The
+ * form is the card's override, else the course's pick, else the sentence's
+ * PRIMARY form (lib/languageForms.ts `primaryPolitenessForm`), and `none`
+ * when nothing in the sentence carries a form in that language. Rows with
+ * no key are legacy rows from before the cutover; a card that does not
+ * follow the settings (`acceptsLegacyRow`) is served them.
  */
 
 import { seededIndex } from './languages';
 import {
   concreteLanguageCodes,
-  getPolitenessConfig,
-  languageMarksFirstPerson,
+  formAxisApplies,
+  NO_FORM,
+  primaryPolitenessForm,
   selectedPolitenessForms,
   type PolitenessForm,
   type PolitenessLevel,
@@ -33,7 +36,9 @@ import {
 import { resolveCardSpeakerGenders } from './voices';
 import { definitiveSpeakerGender } from './sentenceMetadataSource';
 
-/** The course-settings fields this module reads. Undefined = canonical. */
+export { NO_FORM };
+
+/** The course-settings fields this module reads. Undefined = no preference. */
 export type RenderingSettings = {
   politenessLevels?: PolitenessLevel[];
 };
@@ -42,6 +47,7 @@ export type RenderingSettings = {
 export type RenderingText = {
   speakerGender?: string;
   audioSpeakerGender?: string;
+  register?: string;
   addressesSomeone?: boolean;
   addresseeNumber?: string;
   userCreated: boolean;
@@ -61,6 +67,8 @@ export type RenderingCard = {
   renderingPolitenessOverride?: PolitenessLevel;
 } | null;
 
+export type VoiceGender = 'male' | 'female';
+
 /** Whether a card carries a per-card correction the sweep must render. */
 export function hasRenderingOverride(card: RenderingCard): boolean {
   return (
@@ -69,61 +77,62 @@ export function hasRenderingOverride(card: RenderingCard): boolean {
   );
 }
 
-/** The gender axis of a variant key. 'auto' = as the canonical rendering. */
-export type GenderAxis = 'masculine' | 'feminine' | 'auto';
-
-export const AUTO = 'auto';
-
 /** The voice a gender axis is spoken in. */
-export function voiceOf(axis: 'masculine' | 'feminine'): 'male' | 'female' {
+export function voiceOf(axis: 'masculine' | 'feminine'): VoiceGender {
   return axis === 'masculine' ? 'male' : 'female';
 }
 
 /** The gender axis a voice renders. */
-export function axisOf(voice: 'male' | 'female'): 'masculine' | 'feminine' {
+export function axisOf(voice: VoiceGender): 'masculine' | 'feminine' {
   return voice === 'male' ? 'masculine' : 'feminine';
 }
 
+/** Build a rendering key. */
+export function renderingKey(voice: VoiceGender, formId: string): string {
+  return `${voice}|${formId}`;
+}
+
+/** Split a rendering key back into its parts. */
+export function parseRenderingKey(key: string): {
+  voice: VoiceGender;
+  formId: string;
+} {
+  const [voice, formId] = key.split('|');
+  return { voice: voice as VoiceGender, formId: formId ?? NO_FORM };
+}
+
 export type CardRendering = {
-  /** The gender axis shared by every language of the card. */
-  gender: GenderAxis;
-  /** The voice every language of the card is spoken in. */
-  voiceGender: 'male' | 'female';
-  /** The voice the canonical (no-preference) audio is in. */
-  canonicalVoiceGender: 'male' | 'female';
+  /** The voice every language of the card is spoken in and written for. */
+  voiceGender: VoiceGender;
+  /** The text's own voice; equals `voiceGender` unless the card is corrected. */
+  textVoiceGender: VoiceGender;
   /**
-   * True when the card must be voiced in a gender the canonical audio is
-   * not in. Unmarked languages then get an audio-only variant.
+   * Whether an unkeyed (legacy) row is THE rendering for this card: every
+   * card on a user-written text, and a card from before the feature that
+   * carries no Flag-dialog correction. Such a card keeps its legacy rows
+   * for good and reads a keyed row only for a language it has no legacy
+   * row in. A settings-following card, a corrected card and a reader with
+   * no card read the keyed row and are served a legacy row only as a
+   * placeholder while the keyed one is made.
    */
-  needsVoice: boolean;
+  acceptsLegacyRow: boolean;
 };
 
 export type LanguageRendering = {
-  /** The politeness form for this language, or null for "as canonical". */
+  /** The politeness form for this language, or null when the key's form is `none`. */
   form: PolitenessForm | null;
-  /**
-   * Key of the `translations` row this language reads:
-   * `"<male|female|auto>|<formId|auto>"`. The gender part is the card's
-   * voice only when this language's WORDING marks the speaker's gender, so
-   * a politeness variant of an unmarked language is generated once, not
-   * once per gender. Null = the canonical row.
-   */
-  textVariantKey: string | null;
-  /**
-   * Key of the `audioRecordings` row: `"<male|female>|<formId|auto>"`, the
-   * concrete voice the card is spoken in. Null = the canonical audio, which
-   * is right only when the wording is canonical AND the canonical voice
-   * already is the card's voice.
-   */
-  audioVariantKey: string | null;
+  /** The form part of the key: a form id or `none`. */
+  formId: string;
+  /** The rendering key on `translations` and `audioRecordings`. */
+  key: string;
   /** The voice this language's audio is in. */
-  voiceGender: 'male' | 'female';
+  voiceGender: VoiceGender;
 };
 
 /**
  * Whether the settings can apply to this card at all. Cards from before the
- * feature (no stamp) and every user-written sentence keep their canonical
- * rendering for good.
+ * feature (no stamp) and every user-written sentence keep their rendering
+ * for good.
  */
 export function cardFollowsPreferences(
   text: Pick<RenderingText, 'userCreated'>,
@@ -134,56 +143,52 @@ export function cardFollowsPreferences(
   return true;
 }
 
+/** See `CardRendering.acceptsLegacyRow`. */
+export function cardAcceptsLegacyRow(
+  text: Pick<RenderingText, 'userCreated'>,
+  card: RenderingCard,
+): boolean {
+  if (text.userCreated) return true;
+  if (card === null) return false;
+  return !card.followsCoursePreferences && !hasRenderingOverride(card);
+}
+
 /**
- * Resolve the card-wide gender axis and voice. The canonical rendering is
- * the answer for every card except one carrying a Flag-dialog correction:
- * the text's own voice is the gender its wording was generated in, so the
- * card shows and hears one gender without any variant.
+ * Resolve the card-wide voice. The text's own voice is the answer for every
+ * card except one carrying a Flag-dialog correction on a sentence that does
+ * not fix its own gender.
  */
 export function resolveCardRendering(args: {
   text: RenderingText;
   textId: string;
   card: RenderingCard;
 }): CardRendering {
-  const canonicalVoiceGender = resolveCardSpeakerGenders(
+  const textVoiceGender = resolveCardSpeakerGenders(
     args.text,
     args.textId,
   ).audioSpeakerGender;
+  const acceptsLegacyRow = cardAcceptsLegacyRow(args.text, args.card);
   const base: CardRendering = {
-    gender: AUTO,
-    voiceGender: canonicalVoiceGender,
-    canonicalVoiceGender,
-    needsVoice: false,
+    voiceGender: textVoiceGender,
+    textVoiceGender,
+    acceptsLegacyRow,
   };
   if (args.text.userCreated) return base;
   // Precedence: the sentence's own content, then the card's correction.
-  // `text.speakerGender` on a curriculum text is the coin flip the sweep
-  // wrote back (`resolveCardSpeakerGenders`, case 3) unless the row carries
-  // the current classifier's stamp (lib/sentenceMetadataSource.ts); only
-  // then is it evidence, and "We are brothers" is served in its own voice
-  // whatever the card says. `canonicalVoiceGender` already is that voice:
-  // case 1 mirrors it.
+  // `text.speakerGender` on a curriculum text from before the cutover may be
+  // the coin flip the old sweep wrote back; it is evidence only at the
+  // current classifier source (lib/sentenceMetadataSource.ts).
   if (definitiveSpeakerGender(args.text) !== null) return base;
-  const voiceGender = args.card?.renderingGenderOverride;
-  if (voiceGender === undefined) return base;
-  return {
-    gender: axisOf(voiceGender),
-    voiceGender,
-    canonicalVoiceGender,
-    needsVoice: voiceGender !== canonicalVoiceGender,
-  };
-}
-
-/** The legacy fallback the translation worker uses for the addressee gate. */
-function addressesSomeone(text: RenderingText): boolean {
-  return text.addressesSomeone ?? text.addresseeNumber !== 'not_applicable';
+  const override = args.card?.renderingGenderOverride;
+  if (override === undefined) return base;
+  return { ...base, voiceGender: override };
 }
 
 /**
- * Pick the politeness form for one language: the single distinct form the
- * selected levels resolve to, or one of several by a per-text hash so a
- * mixed selection alternates evenly and a text keeps its form across
- * regenerations.
+ * Pick the politeness form for one language from a level set: the single
+ * distinct form the selected levels resolve to, or one of several by a
+ * per-text hash so a mixed selection alternates evenly and a text keeps its
+ * form across regenerations.
  *
  * `seededIndex`, never `fnv1a(...) % n`: a raw FNV-1a modulo 2 is the seed's
  * character parity and nothing else, so it agrees with EVERY other `% 2` pick
@@ -203,26 +208,6 @@ export function pickPolitenessForm(
   return forms[seededIndex(`${textId}|politeness`, forms.length)];
 }
 
-/** The gender part of a variant key. */
-export type KeyGender = 'male' | 'female' | typeof AUTO;
-
-export function variantKeyFor(
-  gender: KeyGender,
-  formId: string | typeof AUTO,
-): string | null {
-  if (gender === AUTO && formId === AUTO) return null;
-  return `${gender}|${formId}`;
-}
-
-/** Split a variant key back into its parts. */
-export function parseVariantKey(variantKey: string): {
-  gender: KeyGender;
-  formId: string;
-} {
-  const [gender, formId] = variantKey.split('|');
-  return { gender: gender as KeyGender, formId };
-}
-
 /**
  * Resolve what one language of the card reads. `code` is the concrete
  * language of the row (an es_mixed text resolved to es or es_latam, an
@@ -236,77 +221,79 @@ export function resolveLanguageRendering(args: {
   settings: RenderingSettings;
   cardRow: RenderingCard;
 }): LanguageRendering {
-  const canonical: LanguageRendering = {
-    form: null,
-    textVariantKey: null,
-    audioVariantKey: null,
-    voiceGender: args.card.voiceGender,
-  };
-  if (args.text.userCreated) return canonical;
   const [concrete] = concreteLanguageCodes(args.code);
-  // The card's own correction outranks the setting and needs no stamp; the
-  // setting applies only to a card that follows it. The gender axis arrived
-  // resolved in `args.card` under the same precedence.
-  const override = args.cardRow?.renderingPolitenessOverride;
-  let form = override
-    ? pickPolitenessForm(concrete, [override], args.textId)
-    : cardFollowsPreferences(args.text, args.cardRow)
-      ? pickPolitenessForm(
-          concrete,
-          args.settings.politenessLevels,
-          args.textId,
-        )
-      : null;
-  // An address language renders a sentence without a "you" the same at
-  // every level; the canonical row already is that rendering. Never for an
-  // override: `addressesSomeone` is the classifier's verdict, and a learner
-  // ticking "the politeness level is wrong" on a sentence it marked as
-  // addressing nobody is correcting exactly that verdict. A correction on a
-  // true no-addressee sentence buys one rewrite that comes back identical
-  // and is stored `sameAsCanonical`.
-  if (
-    form &&
-    !override &&
-    !addressesSomeone(args.text) &&
-    isAddressLanguage(concrete)
-  ) {
-    form = null;
-  }
-  const formId = form ? form.id : AUTO;
-  const wordingGender: KeyGender =
-    args.card.gender !== AUTO && languageMarksFirstPerson(concrete)
-      ? args.card.voiceGender
-      : AUTO;
-  const textVariantKey = variantKeyFor(wordingGender, formId);
-  const audioVariantKey =
-    textVariantKey !== null || args.card.needsVoice
-      ? variantKeyFor(args.card.voiceGender, formId)
-      : null;
+  const voice = args.card.voiceGender;
+  const form = args.text.userCreated
+    ? null
+    : resolvePolitenessForm(concrete, args);
+  const formId = form ? form.id : NO_FORM;
   return {
     form,
-    textVariantKey,
-    audioVariantKey,
-    voiceGender: args.card.voiceGender,
+    formId,
+    key: renderingKey(voice, formId),
+    voiceGender: voice,
   };
+}
+
+function resolvePolitenessForm(
+  concrete: string,
+  args: {
+    text: RenderingText;
+    textId: string;
+    settings: RenderingSettings;
+    cardRow: RenderingCard;
+  },
+): PolitenessForm | null {
+  // The card's own correction outranks the setting and ignores the
+  // addressee gate: `addressesSomeone` is the classifier's verdict, and a
+  // learner ticking "the politeness level is wrong" on a sentence it marked
+  // as addressing nobody is correcting exactly that verdict.
+  const override = args.cardRow?.renderingPolitenessOverride;
+  if (override) return pickPolitenessForm(concrete, [override], args.textId);
+  if (cardFollowsPreferences(args.text, args.cardRow)) {
+    const picked = pickPolitenessForm(
+      concrete,
+      args.settings.politenessLevels,
+      args.textId,
+    );
+    if (picked) {
+      return formAxisApplies(concrete, args.text) ? picked : null;
+    }
+  }
+  return primaryPolitenessForm(concrete, args.text);
 }
 
 /**
  * What the text's OWN language reads. The source wording is the text and
- * is never rewritten, so no form and no text key; only the voice can
- * differ, and it does exactly when the card needs a voice the canonical
- * clip is not in. The same rule an unmarked target follows.
+ * is never rewritten, so no form; only the voice matters, and the clip is
+ * keyed like every other language of the card.
  */
 export function resolveSourceRendering(card: CardRendering): LanguageRendering {
   return {
     form: null,
-    textVariantKey: null,
-    audioVariantKey: card.needsVoice
-      ? variantKeyFor(card.voiceGender, AUTO)
-      : null,
+    formId: NO_FORM,
+    key: renderingKey(card.voiceGender, NO_FORM),
     voiceGender: card.voiceGender,
   };
 }
 
-function isAddressLanguage(code: string): boolean {
-  return getPolitenessConfig(code)?.marking === 'address';
+/**
+ * The primary key of a (text, language): the text's own voice and the
+ * sentence's primary form. What a card with no override and no setting
+ * reads, and the row every other key is versioned from.
+ */
+export function primaryRenderingKey(args: {
+  text: RenderingText;
+  textId: string;
+  code: string;
+}): string {
+  const voice = resolveCardSpeakerGenders(
+    args.text,
+    args.textId,
+  ).audioSpeakerGender;
+  const [concrete] = concreteLanguageCodes(args.code);
+  const form = args.text.userCreated
+    ? null
+    : primaryPolitenessForm(concrete, args.text);
+  return renderingKey(voice, form ? form.id : NO_FORM);
 }

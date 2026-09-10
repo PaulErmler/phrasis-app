@@ -10,8 +10,13 @@ import {
   courseAsksPoliteness,
   coursePolitenessRows,
   distinctPolitenessForms,
+  formAxisApplies,
   formCopyCode,
   languageMarksFirstPerson,
+  politenessFormById,
+  primaryPolitenessForm,
+  recommendedPolitenessLevels,
+  unmarkedIsAcceptable,
   levelsFromTickedRows,
   onboardingAsksPoliteness,
   politenessFlagMismatches,
@@ -95,12 +100,74 @@ describe('language forms config', () => {
     expect(three.sort()).toEqual(['ja', 'ko']);
   });
 
-  it('predicate languages carry a default level for canonical generation', () => {
+  it('recommends every level except the honorific third form of Japanese and Korean', () => {
+    expect(recommendedPolitenessLevels(coursePolitenessRows(['ja', 'en']))).toEqual(
+      ['casual', 'polite'],
+    );
+    expect(recommendedPolitenessLevels(coursePolitenessRows(['ko', 'en']))).toEqual(
+      ['casual', 'polite'],
+    );
+    // Two-form languages: both rows, the hidden level inheriting (Sie).
+    expect(recommendedPolitenessLevels(coursePolitenessRows(['de', 'en']))).toEqual(
+      ['casual', 'polite', 'formal'],
+    );
+    // Spanish needs its formal row for usted, so a mixed course keeps it.
+    expect(recommendedPolitenessLevels(coursePolitenessRows(['ja', 'es']))).toEqual(
+      ['casual', 'polite', 'formal'],
+    );
+    expect(recommendedPolitenessLevels(coursePolitenessRows(['sv', 'en']))).toEqual(
+      [],
+    );
+  });
+
+  it('every non-address language carries a default level for its primary rendering', () => {
     for (const [code, config] of Object.entries(POLITENESS_CONFIG)) {
-      if (config.marking === 'predicate') {
+      if (config.marking !== 'address') {
         expect(config.defaultLevel, code).toBe('polite');
+      } else {
+        expect(config.defaultLevel, code).toBeUndefined();
       }
     }
+  });
+
+  it('the primary form follows the register, the default, and the addressee gate', () => {
+    expect(primaryPolitenessForm('ja', {})?.id).toBe('desu-masu');
+    expect(primaryPolitenessForm('ja', { register: 'informal' })?.id).toBe(
+      'plain',
+    );
+    expect(primaryPolitenessForm('ja', { register: 'formal' })?.id).toBe(
+      'desu-masu',
+    );
+    expect(primaryPolitenessForm('vi', {})?.id).toBe('respectful');
+    expect(primaryPolitenessForm('de', { addressesSomeone: false })).toBeNull();
+    expect(
+      primaryPolitenessForm('de', { addressesSomeone: true, register: 'formal' })
+        ?.id,
+    ).toBe('v');
+    expect(
+      primaryPolitenessForm('es', { addressesSomeone: true, register: 'formal' })
+        ?.id,
+    ).toBe('v');
+    expect(
+      primaryPolitenessForm('es', { addressesSomeone: true, register: 'neutral' })
+        ?.id,
+    ).toBe('t');
+    expect(primaryPolitenessForm('sv', { addressesSomeone: true })).toBeNull();
+    expect(politenessFormById('ja', 'keigo')?.id).toBe('keigo');
+    expect(politenessFormById('ja', 'nope')).toBeUndefined();
+  });
+
+  it('the form axis applies to every sentence except an address language without a you', () => {
+    expect(formAxisApplies('de', { addressesSomeone: false })).toBe(false);
+    expect(formAxisApplies('de', { addresseeNumber: 'not_applicable' })).toBe(
+      false,
+    );
+    expect(formAxisApplies('de', { addressesSomeone: true })).toBe(true);
+    expect(formAxisApplies('th', { addressesSomeone: false })).toBe(true);
+    expect(formAxisApplies('sv', { addressesSomeone: true })).toBe(false);
+    expect(unmarkedIsAcceptable('vi')).toBe(true);
+    expect(unmarkedIsAcceptable('ja')).toBe(false);
+    expect(unmarkedIsAcceptable('de')).toBe(false);
   });
 
   it('Spanish is familiar-split, German and French distance-split', () => {

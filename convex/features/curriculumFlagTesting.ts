@@ -8,7 +8,7 @@ import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
 import { politenessLevelValidator, voiceGenderValidator } from '../types';
 import {
-  liveTranslation,
+  primaryOrLegacyTranslation,
   liveTranslationsForText,
 } from '../db/translationReads';
 
@@ -136,11 +136,14 @@ export const readTranslation = internalQuery({
   ),
   handler: async (ctx, args) => {
     assertTestHooksEnabled();
-    const row = await liveTranslation(ctx, args.textId, args.targetLanguage);
-    if (!row) return null;
+    const text = await ctx.db.get(args.textId);
+    const served = text
+      ? await primaryOrLegacyTranslation(ctx, text, args.targetLanguage)
+      : null;
+    if (!served) return null;
     return {
-      flagCount: row.flagCount ?? null,
-      translatedText: row.translatedText,
+      flagCount: served.live.flagCount ?? null,
+      translatedText: served.live.translatedText,
     };
   },
 });
@@ -198,9 +201,12 @@ export const restoreProbe = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     assertTestHooksEnabled();
-    const row = await liveTranslation(ctx, args.textId, args.targetLanguage);
-    if (row) {
-      await ctx.db.patch(row._id, {
+    const text = await ctx.db.get(args.textId);
+    const served = text
+      ? await primaryOrLegacyTranslation(ctx, text, args.targetLanguage)
+      : null;
+    if (served) {
+      await ctx.db.patch(served.live._id, {
         flagCount: args.originalFlagCount ?? undefined,
       });
     }

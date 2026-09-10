@@ -54,11 +54,10 @@ const vStoreAudioRecordingArgs = v.object({
   // as usual, but the (text, language) pointer is left alone (it speaks the
   // live wording) and the revision's `audioAssetId` is re-pointed instead.
   supersededTranslationId: v.optional(v.id('translations')),
-  // Rendering variant this clip belongs to (`audioVariantKey`, see
-  // docs/architecture/translation-variants.md). The pointer row written is
-  // keyed by it; absent = the canonical pointer. The asset key is unchanged:
-  // assets are shared by (language, voice, dialect, string) whatever
-  // variant asked for them.
+  // The rendering key this clip belongs to (docs/architecture/
+  // rendering-keys.md). The pointer row written is keyed by it; absent = a
+  // legacy pointer. The asset key is unchanged: assets are shared by
+  // (language, voice, dialect, string) whatever key asked for them.
   variantKey: v.optional(v.string()),
 });
 export const storeAudioRecordingArgs = vStoreAudioRecordingArgs.fields;

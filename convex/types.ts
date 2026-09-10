@@ -80,18 +80,15 @@ export const translationValidator = v.object({
   retranslating: v.optional(v.boolean()),
   // The chips (see CardTranslationContent in convex/lib/cardContent.ts).
   voiceGender: v.optional(v.union(v.literal('male'), v.literal('female'))),
-  renderedGender: v.optional(
-    v.union(v.literal('masculine'), v.literal('feminine')),
-  ),
-  renderedPoliteness: v.optional(
+  politenessLevel: v.optional(
     v.union(v.literal('casual'), v.literal('polite'), v.literal('formal')),
   ),
   /**
-   * The code whose politeness config names `renderedPoliteness`, which on a
+   * The code whose politeness config names `politenessLevel`, which on a
    * mixed code is the served row's own dialect rather than the course
    * language. `es_mixed` has no config of its own, and Spain and Latin
    * America map the levels onto different forms, so the chip needs the row's
-   * answer. Sent only alongside `renderedPoliteness`.
+   * answer. Sent only alongside `politenessLevel`.
    */
   formLanguage: v.optional(v.string()),
   /**
@@ -523,13 +520,6 @@ export const translationReasonValidator = v.union(
   // cards (see `supersededAt` in schema.ts). Carries no previous
   // translation: the point is a fresh rendering, not a reconsideration.
   v.literal('version_bump'),
-  // The sentence-metadata classifier landed a definitive speaker gender on
-  // a curriculum text and this row's rendering stamp proves it was written
-  // in the other one (`sweepStaleTranslations` in lib/contentScheduling.ts).
-  // Same keep-row, archive-the-old-wording write as 'version_bump'; a
-  // separate reason because no user flagged anything and the audit must
-  // not say one did.
-  v.literal('metadata_correction'),
 );
 export type TranslationReason = Infer<typeof translationReasonValidator>;
 
@@ -570,43 +560,15 @@ export const ADDRESSEE_NUMBER_VALUES = [
 const literalUnion = <T extends readonly string[]>(values: T) =>
   v.union(...values.map((value: T[number]) => v.literal(value)));
 
-// Sentence-form preferences (lib/languageForms.ts, lib/preferenceResolution.ts).
-// Stored on courseSettings and onboardingProgress; undefined = today's
-// canonical renderings. `politenessLevels` is a SET of global levels; the
+// The politeness preference (lib/languageForms.ts, lib/preferenceResolution.ts).
+// Stored on courseSettings and onboardingProgress; undefined = each
+// sentence's primary form. `politenessLevels` is a SET of global levels; the
 // UI never writes an empty array.
-export const FIRST_PERSON_FORMS_VALUES = [
-  'masculine',
-  'feminine',
-  'both',
-] as const;
 export const POLITENESS_LEVEL_VALUES = ['casual', 'polite', 'formal'] as const;
-export const firstPersonFormsValidator = literalUnion(
-  FIRST_PERSON_FORMS_VALUES,
-);
 export const politenessLevelValidator = literalUnion(POLITENESS_LEVEL_VALUES);
 export const politenessLevelsValidator = v.array(politenessLevelValidator);
-// What a stored rendering actually is, stamped by the rendering classifier
-// (convex/lib/renderingClassifier.ts) on generation, and lazily by the
-// content sweep (`flushRenderingStamps`) on rows from before the feature.
-// 'unmarked' = the wording carries no such form.
-export const RENDERED_GENDER_VALUES = [
-  'masculine',
-  'feminine',
-  'unmarked',
-] as const;
-export const RENDERED_POLITENESS_VALUES = [
-  'casual',
-  'polite',
-  'formal',
-  'unmarked',
-] as const;
-/**
- * The settings as readers and job args carry them. `firstPersonForms` is
- * accepted so a job scheduled before the course gender choice was withdrawn
- * (2026-09-08) still validates; the resolver ignores it.
- */
+/** The settings as readers and job args carry them. */
 export const renderingSettingsValidator = v.object({
-  firstPersonForms: v.optional(firstPersonFormsValidator),
   politenessLevels: v.optional(politenessLevelsValidator),
 });
 /**
@@ -621,11 +583,6 @@ export const renderingCardValidator = v.object({
   // the accent row's when the card reads one (`SweepCard`).
   accentLanguage: v.optional(v.string()),
 });
-export const renderedGenderValidator = literalUnion(RENDERED_GENDER_VALUES);
-export const renderedPolitenessValidator = literalUnion(
-  RENDERED_POLITENESS_VALUES,
-);
-
 export const proposedCardMetadataValidator = v.object({
   speakerGender: v.optional(literalUnion(SPEAKER_GENDER_VALUES)),
   register: v.optional(literalUnion(REGISTER_VALUES)),

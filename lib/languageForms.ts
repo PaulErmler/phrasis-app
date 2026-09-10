@@ -73,12 +73,20 @@ export type PolitenessConfig = {
   /** Level -> form. Levels sharing a form reference the same object. */
   forms: Record<PolitenessLevel, PolitenessForm>;
   /**
-   * Form used for the shared (no-preference) rendering when the text's own
-   * register metadata is empty or neutral. Only predicate and particle
-   * languages need one: for address languages a sentence without a "you"
-   * renders the same at every level.
+   * The level a sentence's PRIMARY rendering uses when its register metadata
+   * is empty or neutral (`primaryPolitenessForm`). Required for every
+   * predicate, particle and pronoun language, which mark every sentence;
+   * an address language has no default because a sentence without a "you"
+   * has no form at all there.
    */
   defaultLevel?: PolitenessLevel;
+  /**
+   * The levels the settings recommend for a new course. Absent = every
+   * level. Japanese and Korean leave the honorific third form out: it is
+   * the register a learner meets last, and mixing it into the first cards
+   * cost more than it taught (Paul, 2026-09-10).
+   */
+  recommendedLevels?: PolitenessLevel[];
   sources: string[];
 };
 
@@ -151,6 +159,7 @@ function threeForm(spec: {
   polite: FormSpec;
   formal: FormSpec;
   defaultLevel?: PolitenessLevel;
+  recommendedLevels?: PolitenessLevel[];
   sources: string[];
 }): PolitenessConfig {
   return {
@@ -163,6 +172,7 @@ function threeForm(spec: {
       formal: withPromptLabel(spec.formal, 'formal'),
     },
     defaultLevel: spec.defaultLevel,
+    recommendedLevels: spec.recommendedLevels,
     sources: spec.sources,
   };
 }
@@ -234,6 +244,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
         "Keigo on a です・ます base: 尊敬語 for the listener's or a third party's actions, 謙譲語 for the speaker's own, 丁重語 (ございます, おります, いたします) for neutral statements. Never stack honorifics (no 二重敬語).",
     },
     defaultLevel: 'polite',
+    recommendedLevels: ['casual', 'polite'],
     sources: [
       'https://en.wikipedia.org/wiki/Honorific_speech_in_Japanese',
       'https://human.libretexts.org/Bookshelves/Languages/Japanese/Japanese_Introductory_1_(Hamada)',
@@ -269,6 +280,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
         '합쇼체: -습니다/-ㅂ니다 statements, -습니까 questions, -십시오 requests; 저/저희 for the speaker; honorific -시- and honorific vocabulary whenever the subject deserves them.',
     },
     defaultLevel: 'polite',
+    recommendedLevels: ['casual', 'polite'],
     sources: [
       'https://en.wikipedia.org/wiki/Korean_speech_levels',
       'https://en.wikipedia.org/wiki/Korean_honorifics',
@@ -348,6 +360,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       prompt:
         'Kinship pronouns by relative age (anh/chị for an older listener, em for a younger one; tôi/bạn when the relationship is unknown) and sentence-final ạ (dạ for yes) toward an older or unfamiliar listener.',
     },
+    defaultLevel: 'polite',
     sources: [
       'https://en.wikibooks.org/wiki/Vietnamese/Personal_pronouns',
       'https://vietnameselab.com/blog/vietnamese-particles',
@@ -375,6 +388,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       prompt:
         'saya for I; address the listener as Bapak/Ibu (Mas/Mbak for younger adults) or Anda, never kamu or aku.',
     },
+    defaultLevel: 'polite',
     sources: [
       'https://en.wikibooks.org/wiki/Indonesian/Lessons/Formal_speech',
       'https://ielanguages.com/indonesian-address.html',
@@ -401,6 +415,7 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
       prompt:
         'saya for I; awak for a peer or the title Encik/Puan (Cik for a young woman) for a stranger or elder; never aku or kau.',
     },
+    defaultLevel: 'polite',
     sources: [
       'https://ilearnmalay.blogspot.com/2020/02/pronouns-in-malay-language.html',
     ],
@@ -1613,13 +1628,28 @@ export function levelsFromTickedRows(
   return out;
 }
 
-/** The levels every row ticked stands for: the "all levels" answer. */
-export function allPolitenessLevels(
+/**
+ * The levels the settings recommend for these rows: every row, minus the
+ * ones every marked language leaves out of its `recommendedLevels` (the
+ * honorific third form of Japanese and Korean). A language without a
+ * recommendation wants every level, so a course mixing Spanish with
+ * Japanese keeps the formal row for usted.
+ */
+export function recommendedPolitenessLevels(
   rows: readonly PolitenessRow[],
 ): PolitenessLevel[] {
+  const wanted = new Set<PolitenessLevel>();
+  for (const row of rows) {
+    for (const { code } of row.perLanguage) {
+      for (const level of POLITENESS_CONFIG[code]?.recommendedLevels ??
+        POLITENESS_LEVELS) {
+        wanted.add(level);
+      }
+    }
+  }
   return levelsFromTickedRows(
     rows,
-    rows.map((row) => row.level),
+    rows.map((row) => row.level).filter((level) => wanted.has(level)),
   );
 }
 
@@ -1669,4 +1699,82 @@ export function politenessFlagMismatches(
       out.push(`${lang.code}: first-person config present, no flag`);
   }
   return out;
+}
+
+// ------------------------------------------------ primary rendering + keys
+
+/** The form-axis value of a rendering key when no form applies. */
+export const NO_FORM = 'none';
+
+/** The `texts` fields the primary form is derived from. */
+export type FormAxisText = {
+  register?: string;
+  addressesSomeone?: boolean;
+  addresseeNumber?: string;
+};
+
+/**
+ * Whether the sentence speaks to someone. The explicit classifier boolean,
+ * with the legacy fallback rows from before it carried: `addresseeNumber`
+ * is 'not_applicable' exactly when there is no addressee.
+ */
+export function sentenceAddressesSomeone(text: FormAxisText): boolean {
+  return text.addressesSomeone ?? text.addresseeNumber !== 'not_applicable';
+}
+
+/**
+ * Whether this language has a politeness form to decide for this sentence.
+ * An address (T-V) language marks politeness only on a "you", so a sentence
+ * that addresses nobody renders the same at every level and its key carries
+ * `none`. Predicate, particle and pronoun languages mark every sentence.
+ */
+export function formAxisApplies(code: string, text: FormAxisText): boolean {
+  const config = POLITENESS_CONFIG[code];
+  if (!config) return false;
+  return config.marking !== 'address' || sentenceAddressesSomeone(text);
+}
+
+/**
+ * Whether a wording the classifier calls `unmarked` still satisfies a
+ * requested form. Only on pronoun languages (vi, id, ms): a sentence with no
+ * pronoun and no particle cannot commit to a form, and asking the model
+ * again will not add one.
+ */
+export function unmarkedIsAcceptable(code: string): boolean {
+  return POLITENESS_CONFIG[code]?.marking === 'pronoun';
+}
+
+/**
+ * The form a sentence's PRIMARY rendering is generated in, or null when the
+ * form axis does not apply (`formAxisApplies`). Address languages: the V
+ * form for a formal register, else T. Every other marking language: the
+ * level the register names ('informal' = casual, 'formal' = the safe polite
+ * level, as the metadata prompt defines it), else the config's default.
+ */
+export function primaryPolitenessForm(
+  code: string,
+  text: FormAxisText,
+): PolitenessForm | null {
+  const config = POLITENESS_CONFIG[code];
+  if (!config || !formAxisApplies(code, text)) return null;
+  if (config.marking === 'address') {
+    return config.forms[text.register === 'formal' ? 'formal' : 'casual'];
+  }
+  const level: PolitenessLevel =
+    text.register === 'informal'
+      ? 'casual'
+      : text.register === 'formal'
+        ? 'polite'
+        : (config.defaultLevel ?? 'polite');
+  return config.forms[level];
+}
+
+/** The form of a language by its id, for callers holding a key. */
+export function politenessFormById(
+  code: string,
+  formId: string,
+): PolitenessForm | undefined {
+  const config = POLITENESS_CONFIG[code];
+  if (!config) return undefined;
+  return Object.values(config.forms).find((form) => form.id === formId);
 }

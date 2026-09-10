@@ -3,21 +3,22 @@ import type { MutationCtx, QueryCtx } from '../_generated/server';
 import {
   accentRowLanguage,
   getMixedAccentTextLanguage,
+  isMixedLanguage,
+  pickMixedVariantForNewRow,
+  resolveMixedVariant,
 } from '../../lib/languages';
 import {
-  AUTO,
-  axisOf,
-  hasRenderingOverride,
-  parseVariantKey,
+  cardAcceptsLegacyRow,
+  primaryRenderingKey,
   resolveCardRendering,
   resolveLanguageRendering,
   resolveSourceRendering,
+  type CardRendering,
   type LanguageRendering,
   type RenderingCard,
   type RenderingSettings,
   type RenderingText,
 } from '../../lib/preferenceResolution';
-import { getPolitenessConfig } from '../../lib/languageForms';
 import { classificationLanguageForRow } from '../lib/renderingClassifier';
 
 type ContentCtx = QueryCtx | MutationCtx;
@@ -32,24 +33,25 @@ type ContentCtx = QueryCtx | MutationCtx;
  * A curriculum translation row is shared by every learner's card for that
  * text. Two things decide which row a card reads:
  *
- * 1. The REVISION. When a version bump regenerates the row's wording, the
+ * 1. The RENDERING KEY, `"<male|female>|<formId|none>"` on `variantKey`
+ *    (lib/preferenceResolution.ts, docs/architecture/rendering-keys.md).
+ *    Every row written since the cutover carries one: the voice and the
+ *    politeness form it was generated for. Rows with no key are LEGACY rows
+ *    from before; they are never generated again and are served only to
+ *    cards that do not follow the settings (`viewAcceptsLegacyRow`), and as
+ *    a placeholder to a settings-following card whose keyed row is still
+ *    being made.
+ * 2. The REVISION. When a version bump regenerates the row's wording, the
  *    previous wording is copied into a second row with `supersededAt` set
  *    (see schema.ts) and the live row remembers `lastArchivedAt`. A card is
  *    served the wording that was live at its PIN: `translationsAcceptedAt`
  *    when set, else `_creationTime`. So an existing learner keeps seeing
  *    (and hearing) exactly what they learned, with zero per-card writes.
- * 2. The RENDERING VARIANT. A course's politeness levels, plus the card's
- *    own Flag-dialog corrections, resolve, per language, to a
- *    `variantKey` (lib/preferenceResolution.ts); rows carrying it are a
- *    second rendering of the same text. Canonical rows have no key. See
- *    docs/architecture/translation-variants.md.
+ *    The pin applies within a key.
  *
  * Every point read pins ALL index columns: a prefix query plus `.first()`
  * returns whichever row was created first, which is the silent
- * wrong-rendering bug. Readers with no card in hand (collection preview,
- * placement test, the content pipeline itself) read the live canonical row
- * through `liveTranslation`; sweeps that must reach superseded revisions
- * read the range through `translationRevisions`.
+ * wrong-rendering bug.
  */
 
 /** The instant a card's translations are pinned to. */
@@ -67,11 +69,12 @@ export function isSupersededRow(
 }
 
 /**
- * The live row for (text, language, variant): the one without
- * `supersededAt`. Convex orders `undefined` before every other value, so it
- * is the first row of the index range anyway; the explicit `.eq(undefined)`
- * on both `variantKey` and `supersededAt` is what keeps a variant or a
- * superseded row from ever being read as the canonical live row.
+ * The live row for (text, language, key): the one without `supersededAt`.
+ * `variantKey` undefined is the LEGACY row. Convex orders `undefined` before
+ * every other value, so it is the first row of the index range anyway; the
+ * explicit `.eq(undefined)` on both `variantKey` and `supersededAt` is what
+ * keeps a keyed or a superseded row from ever being read as the legacy live
+ * row.
  */
 export async function liveTranslation(
   ctx: ContentCtx,
@@ -92,10 +95,9 @@ export async function liveTranslation(
 }
 
 /**
- * The live CANONICAL rows of a text across languages, at most `limit` of
+ * The live rows of a text across languages and keys, at most `limit` of
  * them. For readers that list a text's translations without naming a
- * language (the admin content view, the e2e flag probe). Variant rows are
- * filtered out after the index scan; a text has a handful of them at most.
+ * language (the admin content view, the e2e flag probe).
  */
 export async function liveTranslationsForText(
   ctx: ContentCtx,
@@ -107,12 +109,11 @@ export async function liveTranslationsForText(
     .withIndex('by_textId_supersededAt', (q) =>
       q.eq('textId', textId).eq('supersededAt', undefined),
     )
-    .filter((q) => q.eq(q.field('variantKey'), undefined))
     .take(limit);
 }
 
 /**
- * A (text, language, variant) range is one live row plus one superseded row
+ * A (text, language, key) range is one live row plus one superseded row
  * per version bump whose wording differed, so it is a handful at most. The
  * cap only bounds the read for the guideline's sake; a text would need 31
  * bumps to reach it.
@@ -120,7 +121,7 @@ export async function liveTranslationsForText(
 const MAX_TRANSLATION_REVISIONS = 32;
 
 /**
- * Every row of (text, language, variant): the live row first (when one
+ * Every row of (text, language, key): the live row first (when one
  * exists), then the superseded revisions, oldest-superseded first. For the
  * sweeps that treat superseded revisions as content in their own right.
  */
@@ -142,27 +143,6 @@ export async function translationRevisions(
     .take(MAX_TRANSLATION_REVISIONS);
 }
 
-/**
- * Every VARIANT row of (text, language), live and superseded, whatever the
- * key: the range past the canonical rows. For cascades and sweeps that
- * must reach variants (delete a text, retire a language).
- */
-export async function variantTranslationsForTextLanguage(
-  ctx: ContentCtx,
-  textId: Id<'texts'>,
-  targetLanguage: string,
-): Promise<Doc<'translations'>[]> {
-  return ctx.db
-    .query('translations')
-    .withIndex('by_text_language_variant_supersededAt', (q) =>
-      q
-        .eq('textId', textId)
-        .eq('targetLanguage', targetLanguage)
-        .gt('variantKey', ''),
-    )
-    .take(MAX_TRANSLATION_REVISIONS * 4);
-}
-
 /** Split a `translationRevisions` range into the live row and the rest. */
 export function splitRevisions(rows: Doc<'translations'>[]): {
   live: Doc<'translations'> | null;
@@ -178,7 +158,7 @@ export function splitRevisions(rows: Doc<'translations'>[]): {
 }
 
 export type ServedTranslation = {
-  /** The live row for (text, language, variant). */
+  /** The live row for (text, language, key). */
   live: Doc<'translations'>;
   /**
    * What the card shows: the live row, or the superseded revision that was
@@ -254,7 +234,7 @@ export async function resolveServedFromLive(
   };
 }
 
-/** `liveTranslation` + `resolveServedFromLive` in one call (canonical). */
+/** `liveTranslation` + `resolveServedFromLive` in one call, for one key. */
 export async function resolveServedTranslation(
   ctx: ContentCtx,
   args: {
@@ -274,26 +254,106 @@ export async function resolveServedTranslation(
   return resolveServedFromLive(ctx, live, args.pinAt);
 }
 
-/** The served wording alone, for readers that only need the text. */
-export async function servedTranslatedText(
+/**
+ * The dialect a mixed-code row of (text, language) resolves its form under
+ * (`classificationLanguageForRow`): the legacy row's pin when one exists
+ * (its wording was written under it, and a keyed row inherits it), the
+ * legacy coin when a legacy row predates the column, and the decorrelated
+ * pick for a text with no row at all. Mirrors `resolveMixedVariantPin` in
+ * the LLM worker, so the key a reader computes is the key the job writes.
+ * Undefined for every non-mixed language.
+ */
+export function dialectForRendering(
+  language: string,
+  textId: Id<'texts'>,
+  legacy: Pick<Doc<'translations'>, 'regionVariant'> | null,
+): string | undefined {
+  if (legacy?.regionVariant) return legacy.regionVariant;
+  if (!isMixedLanguage(language)) return undefined;
+  const pick = legacy
+    ? resolveMixedVariant(language, textId as string)
+    : pickMixedVariantForNewRow(language, textId as string);
+  return pick?.regionVariant;
+}
+
+/**
+ * The row a reader WITHOUT a card is served for one language: the primary
+ * keyed row (the text's own voice and primary form), else the legacy row.
+ * The placement test, the admin views and the e2e probes read this.
+ */
+export async function primaryOrLegacyTranslation(
   ctx: ContentCtx,
-  args: {
-    textId: Id<'texts'>;
-    targetLanguage: string;
-    pinAt: number | undefined;
-  },
-): Promise<string | null> {
-  const served = await resolveServedTranslation(ctx, args);
-  return served ? served.row.translatedText : null;
+  text: Doc<'texts'>,
+  targetLanguage: string,
+  pinAt?: number,
+): Promise<ServedTranslation | null> {
+  const legacy = await liveTranslation(ctx, text._id, targetLanguage);
+  const key = primaryRenderingKey({
+    text: renderingTextOf(text),
+    textId: text._id,
+    code: classificationLanguageForRow({
+      targetLanguage,
+      regionVariant: dialectForRendering(targetLanguage, text._id, legacy),
+    }),
+  });
+  const keyed = await liveTranslation(ctx, text._id, targetLanguage, key);
+  const live = keyed ?? legacy;
+  if (!live) return null;
+  return resolveServedFromLive(ctx, live, pinAt);
+}
+
+/** The primary key of (text, language) on the row's dialect. */
+export function primaryKeyForLanguage(
+  text: Doc<'texts'>,
+  language: string,
+  regionVariant: string | undefined,
+): string {
+  return primaryRenderingKey({
+    text: renderingTextOf(text),
+    textId: text._id,
+    code: classificationLanguageForRow({
+      targetLanguage: language,
+      regionVariant,
+    }),
+  });
+}
+
+/**
+ * The audio pointer a reader WITHOUT a card plays for one language: the
+ * pointer of the primary key when its row is served, else the legacy
+ * pointer. Pairs with `primaryOrLegacyTranslation`.
+ */
+export async function primaryOrLegacyAudio(
+  ctx: ContentCtx,
+  text: Doc<'texts'>,
+  language: string,
+): Promise<Doc<'audioRecordings'> | null> {
+  const rendering =
+    language === text.language
+      ? sourceRenderingForView(null, renderingTextOf(text), text._id)
+      : renderingForView(
+          null,
+          renderingTextOf(text),
+          text._id,
+          language,
+          dialectForRendering(
+            language,
+            text._id,
+            await liveTranslation(ctx, text._id, language),
+          ),
+        );
+  return (
+    (await audioPointer(ctx, text._id, language, rendering.key)) ??
+    (await audioPointer(ctx, text._id, language))
+  );
 }
 
 // ------------------------------------------------------------- audio rows
 
 /**
- * The audio pointer for (text, language, variant). `variantKey` undefined is
- * the canonical pointer, spoken in the text's coin-flipped voice; a key is a
- * specific voice and politeness form (`audioVariantKey` in
- * lib/preferenceResolution.ts).
+ * The audio pointer for (text, language, key). `variantKey` undefined is
+ * the legacy pointer, spoken in the text's own voice; a key is a concrete
+ * voice and politeness form (`LanguageRendering.key`).
  */
 export async function audioPointer(
   ctx: ContentCtx,
@@ -313,8 +373,8 @@ export async function audioPointer(
 }
 
 /**
- * Every audio pointer of (text, language): the canonical one and every
- * variant. For deletes and cascades; point reads use `audioPointer`.
+ * Every audio pointer of (text, language): the legacy one and every keyed
+ * one. For deletes and cascades; point reads use `audioPointer`.
  */
 export async function audioPointersForTextLanguage(
   ctx: ContentCtx,
@@ -335,17 +395,17 @@ export async function audioPointersForTextLanguage(
  * What a reader sees of a card. Three per-card choices decide a read. The
  * pin (`cardPinAt`) picks which superseded revision, the accent the card's
  * text speaks in (`cards.accentLanguage`) picks which row stands in for the
- * source text, and the course's sentence-form settings, when the card
- * follows them (`cards.followsCoursePreferences`), pick the rendering
- * variant per language. `null` is a reader with no card, such as the
- * collection preview, the placement test or the level picker. Those get the
- * live rows, the accent row a card created now would store and, when
- * `previewView` supplied the settings, the rendering a new card would get.
+ * source text, and the course's politeness setting, when the card follows
+ * it (`cards.followsCoursePreferences`), picks the rendering key per
+ * language. `null` is a reader with no card, such as the collection
+ * preview, the placement test or the level picker. Those get the live rows,
+ * the accent row a card created now would store and the rendering a new
+ * card would get.
  */
 export type SourceView = {
   pinAt?: number;
   accentLanguage?: string;
-  /** The course's sentence-form settings; absent = canonical renderings. */
+  /** The course's politeness setting; absent = no preference. */
   settings?: RenderingSettings;
   /** The card's stamp, or null for a reader with no card. */
   card?: RenderingCard;
@@ -367,10 +427,7 @@ export function viewOfCard(
   return {
     pinAt: cardPinAt(card),
     accentLanguage: card.accentLanguage,
-    // A per-card correction renders even on a course without settings; the
-    // resolver needs a settings object to read the politeness levels from,
-    // so an empty one stands in.
-    settings: settings ?? (hasRenderingOverride(card) ? {} : undefined),
+    settings: settings ?? undefined,
     card: renderingCardOf(card),
   };
 }
@@ -378,8 +435,8 @@ export function viewOfCard(
 /**
  * The `RenderingCard` of a cards row, plus the accent row its source slot
  * reads (`cards.accentLanguage`). The resolver ignores the accent; the
- * rendering sweep needs it so the source clip it voices is the one the
- * card plays (`scheduleMissingRenderings`).
+ * content sweep needs it so the source clip it voices is the one the card
+ * plays.
  */
 export type SweepCard = NonNullable<RenderingCard> & {
   accentLanguage?: string;
@@ -404,21 +461,16 @@ export function renderingCardOf(
 }
 
 /**
- * The `SourceView` of a reader with no card that still wants the rendering
- * a card created now would get (the collection preview on a course with
- * settings). Without settings it equals `null`.
+ * The `SourceView` of a reader with no card: the rendering a card created
+ * now would get (the collection preview, the warm sweeps).
  */
 export function previewView(
   settings: RenderingSettings | null | undefined,
-): SourceView | null {
-  return settings ? { settings, card: null } : null;
+): SourceView {
+  return { settings: settings ?? undefined, card: null };
 }
 
-/**
- * The settings a course settings document carries for the resolver. Only
- * the politeness levels: `firstPersonForms` is still stored (the course
- * gender choice was withdrawn on 2026-09-08) but nothing reads it.
- */
+/** The settings a course settings document carries for the resolver. */
 export function renderingSettingsOf(
   settings: Pick<Doc<'courseSettings'>, 'politenessLevels'> | null | undefined,
 ): RenderingSettings | undefined {
@@ -427,20 +479,13 @@ export function renderingSettingsOf(
   return { politenessLevels: settings.politenessLevels };
 }
 
-/** The rendering of a reader with no settings: every axis canonical. */
-export const CANONICAL_RENDERING: LanguageRendering = {
-  form: null,
-  textVariantKey: null,
-  audioVariantKey: null,
-  voiceGender: 'male',
-};
-
 /** The `RenderingText` view of a texts row. */
 export function renderingTextOf(
   text: Pick<
     Doc<'texts'>,
     | 'speakerGender'
     | 'audioSpeakerGender'
+    | 'register'
     | 'addressesSomeone'
     | 'addresseeNumber'
     | 'userCreated'
@@ -450,6 +495,7 @@ export function renderingTextOf(
   return {
     speakerGender: text.speakerGender,
     audioSpeakerGender: text.audioSpeakerGender,
+    register: text.register,
     addressesSomeone: text.addressesSomeone,
     addresseeNumber: text.addresseeNumber,
     userCreated: text.userCreated,
@@ -458,16 +504,37 @@ export function renderingTextOf(
 }
 
 /**
- * The rendering a view reads for one language of a text: the two variant
- * keys and the voice. Canonical (null keys) whenever the view carries no
- * settings, the card does not follow them, or the text is user-written.
- * `voiceGender` is only meaningful when a key is set.
+ * Whether an unkeyed (legacy) row is THE rendering for this view
+ * (`cardAcceptsLegacyRow`): a user-written text, or a card from before the
+ * feature with no Flag-dialog correction. Such a view reads its legacy row
+ * first and a keyed row only where it has none. Every other view reads the
+ * keyed row first and is served a legacy row only as a placeholder.
+ */
+export function viewAcceptsLegacyRow(
+  view: SourceView | null,
+  text: Pick<RenderingText, 'userCreated'>,
+): boolean {
+  return cardAcceptsLegacyRow(text, view?.card ?? null);
+}
+
+/** The card-wide voice of a view: the text's own or the card's correction. */
+export function cardRenderingForView(
+  view: SourceView | null,
+  text: RenderingText,
+  textId: Id<'texts'>,
+): CardRendering {
+  return resolveCardRendering({ text, textId, card: view?.card ?? null });
+}
+
+/**
+ * The rendering a view reads for one language of a text: the key and the
+ * voice. Always resolved, settings or not: a view with no settings and no
+ * card override reads the sentence's primary rendering.
  *
- * `regionVariant` is the canonical row's dialect pin when `language` is a
- * mixed code (`es_mixed`): Spain and Latin America map the levels onto
- * their forms differently, so the row's own dialect decides the form. Before
- * the canonical row exists the language's default dialect stands in, which
- * only ever affects a key nothing has been generated under yet.
+ * `regionVariant` is the row's dialect pin when `language` is a mixed code
+ * (`es_mixed`): Spain and Latin America map the levels onto their forms
+ * differently, so the row's own dialect decides the form
+ * (`dialectForRendering`).
  */
 export function renderingForView(
   view: SourceView | null,
@@ -476,147 +543,53 @@ export function renderingForView(
   language: string,
   regionVariant?: string,
 ): LanguageRendering {
-  if (!view?.settings) return CANONICAL_RENDERING;
-  const card = view.card ?? null;
-  const cardRendering = resolveCardRendering({
-    text,
-    textId,
-    card,
-  });
+  const card = view?.card ?? null;
   return resolveLanguageRendering({
-    card: cardRendering,
+    card: cardRenderingForView(view, text, textId),
     code: classificationLanguageForRow({
       targetLanguage: language,
       regionVariant,
     }),
     text,
     textId,
-    settings: view.settings,
+    settings: view?.settings ?? {},
     cardRow: card,
   });
 }
 
 /**
  * The rendering a view reads for the text's OWN language: never a wording
- * variant (the source text is the wording), only the card's voice when it
- * differs from the canonical clip's. The accent row of a Mixed English card
- * reads the same rendering, since it is a rewrite of the source, not of a
- * form.
+ * variant (the source text is the wording), only the card's voice. The
+ * accent row of a Mixed English card reads the same rendering, since it is
+ * a rewrite of the source, not of a form.
  */
 export function sourceRenderingForView(
   view: SourceView | null,
   text: RenderingText,
   textId: Id<'texts'>,
 ): LanguageRendering {
-  if (!view?.settings) return CANONICAL_RENDERING;
-  return resolveSourceRendering(
-    resolveCardRendering({
-      text,
-      textId,
-      card: view.card ?? null,
-    }),
-  );
-}
-
-/**
- * The voice every language of the card is spoken in, for the gender chip:
- * the text's own voice, or the card's Flag-dialog correction. Defined for
- * every reader, settings or not, since every card has a voice.
- */
-export function cardVoiceForView(
-  view: SourceView | null,
-  text: RenderingText,
-  textId: Id<'texts'>,
-): 'male' | 'female' {
-  return resolveCardRendering({
-    text,
-    textId,
-    card: view?.card ?? null,
-  }).voiceGender;
-}
-
-/**
- * Whether a canonical row, by its classifier stamps, already IS the
- * requested rendering on every axis the text key asks for, so no variant
- * row is needed: the reader serves canonical and the ensure path schedules
- * nothing. An unstamped row never satisfies anything (the lazy stamp,
- * `flushRenderingStamps`, has not landed yet). A gender stamp of 'unmarked'
- * always satisfies a gender request: the wording has no first-person
- * marking to rewrite, only the voice can differ, and that is the audio
- * key's business. A politeness stamp of 'unmarked' satisfies only on an
- * ADDRESS language; see the branch in the body, which is where the two
- * axes stop agreeing.
- */
-export function canonicalSatisfies(
-  canonical: Pick<
-    Doc<'translations'>,
-    'targetLanguage' | 'regionVariant' | 'renderedGender' | 'renderedPoliteness'
-  >,
-  rendering: LanguageRendering,
-): boolean {
-  if (rendering.textVariantKey === null) return true;
-  const { gender, formId } = parseVariantKey(rendering.textVariantKey);
-  if (gender !== AUTO) {
-    if (
-      canonical.renderedGender !== axisOf(gender) &&
-      canonical.renderedGender !== 'unmarked'
-    ) {
-      return false;
-    }
-  }
-  if (formId !== AUTO) {
-    const form = rendering.form;
-    if (!form || canonical.renderedPoliteness === undefined) return false;
-    // The stamp is a global level; the form it names must be the requested
-    // one (a tu sentence satisfies both "casual" and "polite" on Spain
-    // Spanish). Looked up through the row's own dialect, like the stamp.
-    const config = getPolitenessConfig(classificationLanguageForRow(canonical));
-    if (!config) return false;
-    if (canonical.renderedPoliteness === 'unmarked') {
-      // An ADDRESS language marks politeness only through the word for
-      // "you", so a wording the classifier stamped `unmarked` has nothing a
-      // rewrite could change: "Hola." is the same sentence at tú and at
-      // usted, and the canonical row already IS every form. Treating that
-      // as a gap made every such sentence sit on "updating" for good in the
-      // preview and buy one LLM rewrite per card to rediscover it
-      // (2026-09-09, the pre-A1 greetings).
-      //
-      // The other markings are a real gap: a predicate, particle or pronoun
-      // language can have its carrier ADDED by a rewrite (Thai gaining
-      // ครับ, Japanese gaining です・ます), so `unmarked` there means the
-      // form is genuinely absent and worth asking for. Same shape as the
-      // gender axis above, where `unmarked` always satisfies because no
-      // rewrite can introduce first-person marking that is not there.
-      if (config.marking !== 'address') return false;
-    } else if (config.forms[canonical.renderedPoliteness].id !== form.id) {
-      return false;
-    }
-  }
-  return true;
+  return resolveSourceRendering(cardRenderingForView(view, text, textId));
 }
 
 export type ServedRendering = {
-  /** The row the card shows, canonical or variant, pin-resolved; null = none yet. */
+  /** The row the card shows, keyed or legacy, pin-resolved; null = none yet. */
   served: ServedTranslation | null;
   rendering: LanguageRendering;
+  /** True when `served` is the row at the view's key. */
+  servedKeyed: boolean;
   /**
-   * The view wants a text variant that has not landed yet (the card shows
-   * canonical meanwhile). A stored variant marked `sameAsCanonical` is not
-   * missing: the canonical wording IS the variant.
+   * The view's keyed row has not landed and the view does not accept a
+   * legacy row: whatever `served` holds is a placeholder about to change.
    */
-  textVariantMissing: boolean;
+  textPending: boolean;
 };
 
 /**
- * The translation a view is served for one language: the variant row when
- * the view resolves to one and it has landed with its own wording, else
- * the canonical row. Both are pin-aware like any translation.
- *
- * The pin outranks the variant. A card pinned to an archived revision is
- * served that wording as it was; the variants are rewrites of the LIVE
- * wording (a bump retires them, `retireVariantRenderings`), so serving one
- * would move the card onto the new wording through the back door, and
- * asking for one would buy a rewrite the card never shows.
+ * The translation a view is served for one language. A view that accepts
+ * legacy rows reads its legacy row, and the row at its key only where it
+ * has none. Every other view reads the live row at its rendering key,
+ * pinned within that key, and is served the legacy row only as a
+ * placeholder, with `textPending` set, while the keyed row is made.
  */
 export async function resolveServedRendering(
   ctx: ContentCtx,
@@ -628,43 +601,31 @@ export async function resolveServedRendering(
   },
 ): Promise<ServedRendering> {
   const pinAt = args.view?.pinAt;
-  const canonical = await liveTranslation(
-    ctx,
-    args.textId,
-    args.targetLanguage,
-  );
+  const legacy = await liveTranslation(ctx, args.textId, args.targetLanguage);
   const rendering = renderingForView(
     args.view,
     args.text,
     args.textId,
     args.targetLanguage,
-    canonical?.regionVariant,
+    dialectForRendering(args.targetLanguage, args.textId, legacy),
   );
-  const servedCanonical = canonical
-    ? await resolveServedFromLive(ctx, canonical, pinAt)
-    : null;
-  if (rendering.textVariantKey === null || servedCanonical?.archived) {
-    return { served: servedCanonical, rendering, textVariantMissing: false };
-  }
-  const variant = await liveTranslation(
-    ctx,
-    args.textId,
-    args.targetLanguage,
-    rendering.textVariantKey,
-  );
-  if (variant && !variant.sameAsCanonical) {
-    return {
-      served: await resolveServedFromLive(ctx, variant, pinAt),
-      rendering,
-      textVariantMissing: false,
-    };
-  }
+  const acceptsLegacy = viewAcceptsLegacyRow(args.view, args.text);
+  const keyed =
+    acceptsLegacy && legacy
+      ? null
+      : await liveTranslation(
+          ctx,
+          args.textId,
+          args.targetLanguage,
+          rendering.key,
+        );
+  const live = acceptsLegacy ? (legacy ?? keyed) : (keyed ?? legacy);
+  const servedKeyed = live !== null && live === keyed;
   return {
-    served: servedCanonical,
+    served: live ? await resolveServedFromLive(ctx, live, pinAt) : null,
     rendering,
-    textVariantMissing:
-      variant === null &&
-      !(canonical !== null && canonicalSatisfies(canonical, rendering)),
+    servedKeyed,
+    textPending: !acceptsLegacy && keyed === null,
   };
 }
 
@@ -738,8 +699,9 @@ export type ServedSourceText = {
 /**
  * What a course shows for the text's OWN language. The source text, except
  * when `servedAccentRow` names an accent row. Then it is that row's served
- * revision, pin-aware like any translation, with the source text as the
- * fallback while the row has not landed. Every reader that renders,
+ * revision, at the view's source key (the card's voice, no form) or the
+ * legacy accent row, pin-aware like any translation, with the source text
+ * as the fallback while the row has not landed. Every reader that renders,
  * indexes, compares or counts the source-language side of a card goes
  * through here, so all of them agree with the card. Never a wording
  * variant: the source text is the wording. Only its voice can follow the
@@ -752,11 +714,16 @@ export async function servedSourceText(
 ): Promise<ServedSourceText> {
   const accent = servedAccentRow(text, view);
   if (accent !== undefined) {
-    const served = await resolveServedTranslation(ctx, {
-      textId: text._id,
-      targetLanguage: accent,
-      pinAt: view?.pinAt,
-    });
+    const key = sourceRenderingForView(view, renderingTextOf(text), text._id)
+      .key;
+    const legacy = await liveTranslation(ctx, text._id, accent);
+    const live =
+      viewAcceptsLegacyRow(view, text) && legacy
+        ? legacy
+        : ((await liveTranslation(ctx, text._id, accent, key)) ?? legacy);
+    const served = live
+      ? await resolveServedFromLive(ctx, live, view?.pinAt)
+      : null;
     if (served) {
       return {
         text: served.row.translatedText,

@@ -19,6 +19,8 @@ export interface AudioFixtureArgs {
   regionVariant?: string;
   /** Point the row at an existing asset instead of creating one (shared-asset scenarios). */
   assetId?: Id<'audioAssets'>;
+  /** The pointer's rendering key; absent = the legacy pointer. */
+  variantKey?: string;
 }
 
 /**
@@ -53,6 +55,7 @@ export async function insertAudioFixture(
     textId: args.textId,
     language: args.language,
     assetId,
+    ...(args.variantKey !== undefined ? { variantKey: args.variantKey } : {}),
   });
   return { assetId, rowId };
 }

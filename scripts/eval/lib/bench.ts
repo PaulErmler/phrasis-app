@@ -218,8 +218,12 @@ export function contextLines(args: TranslationPromptArgs): string[] {
   if (args.addressesSomeone) {
     ctx.push(
       `  <addressee_gender>${args.addresseeGender ?? 'unspecified'}</addressee_gender>`,
-      `  <register>${args.formality ?? 'neutral'}</register>`,
     );
+  }
+  // The rendering key's form, as the production prompt states it since
+  // the rendering keys (2026-09-10); no register line otherwise.
+  if (args.requestedForm) {
+    ctx.push(`  <politeness_form>${args.requestedForm.id}</politeness_form>`);
   }
   return ctx;
 }

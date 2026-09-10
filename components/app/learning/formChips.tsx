@@ -23,8 +23,7 @@ export type ChipTranslation = {
   language: string;
   isTargetLanguage: boolean;
   voiceGender?: 'male' | 'female';
-  renderedGender?: 'masculine' | 'feminine';
-  renderedPoliteness?: PolitenessLevel;
+  politenessLevel?: PolitenessLevel;
   /** The code whose politeness config names the level; see the card type. */
   formLanguage?: string;
   /** The rendering the settings ask for has not landed; see `formPending`. */
@@ -94,13 +93,11 @@ function politenessChipLabel(
 }
 
 /**
- * The sentence-form chips for a card (docs/architecture/translation-
- * variants.md): the gender once, since it is one per card (the voice every
- * language is spoken in, which the wording follows), and the politeness
- * form per target language, prefixed with the language when two targets
- * disagree. A pre-feature card shows what its row IS (from the lazy
- * classifier stamps), not the course setting; an unmarked or unstamped
- * politeness row shows nothing.
+ * The sentence-form chips for a card (docs/architecture/rendering-keys.md):
+ * the voice once, since it is one per card (the voice every language is
+ * spoken in, which the wording follows), and the politeness form per target
+ * language from its rendering key, prefixed with the language when two
+ * targets disagree. A card on a legacy row shows its voice only.
  */
 export function buildFormChips(
   translations: ChipTranslation[],
@@ -108,18 +105,12 @@ export function buildFormChips(
 ): FormChip[] {
   const targets = translations.filter((tr) => tr.isTargetLanguage);
   const chips: FormChip[] = [];
-  // The VOICE the card is spoken in, preferred over any row's
-  // `renderedGender` stamp. Those are two different facts: the voice comes
-  // from the text (its classifier verdict or its coin flip) and is known for
-  // every card including the legacy ones with no stamp, while the stamp
-  // describes one wording's grammar. The chip therefore reads "male
-  // speaker" / "female speaker" rather than "masculine" / "feminine", so it
-  // never claims to describe grammar it is not reading.
+  // The VOICE the card is spoken in, known for every card. The chip reads
+  // "male speaker" / "female speaker" rather than "masculine" / "feminine",
+  // so it never claims to describe grammar it is not reading.
   const voice = translations.find((tr) => tr.voiceGender)?.voiceGender;
-  const gender = voice
-    ? axisOf(voice)
-    : targets.find((tr) => tr.renderedGender)?.renderedGender;
-  if (gender) {
+  if (voice) {
+    const gender = axisOf(voice);
     chips.push({ label: t(gender), testId: `form-chip-${gender}` });
   }
   // The settings ask for a wording this card does not have yet. Said once
@@ -130,7 +121,7 @@ export function buildFormChips(
   if (translations.some((tr) => tr.formPending)) {
     chips.push({ label: t('pending'), testId: 'form-chip-pending' });
   }
-  const polite = targets.filter((tr) => tr.renderedPoliteness);
+  const polite = targets.filter((tr) => tr.politenessLevel);
   // The config language, which on a mixed code is the served row's dialect.
   // The PREFIX and the tooltip still name the course language, since that is
   // what the learner picked; only the form lookup follows the row.
@@ -138,11 +129,11 @@ export function buildFormChips(
   const disagree =
     new Set(
       polite.map((tr) =>
-        politenessChipLabel(formCodeOf(tr), tr.renderedPoliteness!, t),
+        politenessChipLabel(formCodeOf(tr), tr.politenessLevel!, t),
       ),
     ).size > 1;
   for (const tr of polite) {
-    const level = tr.renderedPoliteness!;
+    const level = tr.politenessLevel!;
     const formCode = formCodeOf(tr);
     const form = politenessFormForLevel(formCode, level);
     const base = politenessChipLabel(formCode, level, t);

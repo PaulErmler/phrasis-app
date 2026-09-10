@@ -15,6 +15,10 @@ import {
   pickPolitenessForm,
   type RenderingSettings,
 } from '../../lib/preferenceResolution';
+import {
+  politenessInstruction,
+  speakerInstruction,
+} from '../../lib/renderingPrompts';
 
 /**
  * Everything the translation auto-fill needs to build a request and read a
@@ -218,10 +222,8 @@ export function buildAutofillSettingsBlock(
 ): string {
   const lines: string[] = [];
   if (speakerGender) {
-    const who = speakerGender === 'male' ? 'a man' : 'a woman';
-    const forms = speakerGender === 'male' ? 'masculine' : 'feminine';
     lines.push(
-      `- Speaker: unless a source rendering marks the speaker's gender, the speaker is ${who}: use ${forms} first-person forms, pronouns and particles wherever a target marks them, and report speakerGender as "${speakerGender}" (the metadata describes the sentence as written, so the voice and the grader agree with it).`,
+      `- Speaker: unless a source rendering marks the speaker's gender, ${speakerInstruction(speakerGender)} Report speakerGender as "${speakerGender}" (the metadata describes the sentence as written, so the voice and the grader agree with it).`,
     );
   }
   if (settings?.politenessLevels && settings.politenessLevels.length > 0) {
@@ -229,7 +231,7 @@ export function buildAutofillSettingsBlock(
       const form = pickPolitenessForm(code, settings.politenessLevels, seed);
       if (!form) continue;
       lines.push(
-        `- ${formatLangLabel(code)} politeness: unless a source rendering marks register explicitly, use the ${form.promptLabel}. ${form.prompt} Report register as the level you applied ("informal" for a casual form, "formal" for a polite or formal one), so the metadata describes the sentence as written.`,
+        `- ${formatLangLabel(code)}: unless a source rendering marks register explicitly, ${politenessInstruction(form)} Report register as the level you applied ("informal" for a casual form, "formal" for a polite or formal one), so the metadata describes the sentence as written.`,
       );
     }
   }

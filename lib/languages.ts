@@ -41,7 +41,6 @@ export const TTS_PROVIDERS = [
 export type TtsProvider = (typeof TTS_PROVIDERS)[number];
 
 /** Identifier for which translation backend a target language currently uses. */
-export type TranslationProvider = 'google' | 'openrouter';
 
 /**
  * Which speech-to-text backend transcribes a language (convex/lib/stt).
@@ -188,14 +187,6 @@ export interface Language {
    * timings (`languageSupportsWordTimings`).
    */
   sttBackend?: SttBackend;
-  /**
-   * Which backend translates English → this language. Omit to take the
-   * default: 'openrouter' for every non-English language, 'google' for English
-   * (which is source-only and never translated by the system).
-   * Set to 'google' explicitly to keep a language on the legacy Google
-   * Translate path (e.g. if a particular language regresses on LLM translation).
-   */
-  translationProvider?: TranslationProvider;
   /**
    * Named pipeline that decides which OpenRouter model(s) + reasoning levels
    * the translation worker uses for this language, with optional fallbacks
@@ -2131,7 +2122,7 @@ export function getTtsProviderForLanguage(code: string): TtsProvider {
 //
 // Each version defaults to 1. Bumping a language's `translationVersion` (a new
 // model/prompt) or `ttsVersion` (a new voice pool / Gemini prompt / provider)
-// in SUPPORTED_LANGUAGES makes `scheduleMissingContent` treat already-stored
+// in SUPPORTED_LANGUAGES makes `ensureTextContent` treat already-stored
 // rows whose stamped version is strictly LOWER than the current value as stale
 // and regenerate them lazily on next view. The stamp is "undefined === current"
 // at the comparison sites (only a number strictly < current is stale), so rows
@@ -2835,7 +2826,6 @@ export const ACCENT_REWRITE_STAGES: ModelStage[] = [
  * source-text length and may include a fallback chain.
  */
 export type ResolvedTranslationConfig = {
-  provider: TranslationProvider;
   targetRegion: string; // for the LLM prompt's <context>
   targetLangName: string; // English language name
   /**
@@ -2851,21 +2841,16 @@ export function getTranslationConfigForLanguage(
   code: string,
 ): ResolvedTranslationConfig {
   const lang = getLanguageByCode(code);
-  // Unknown / English → Google. English is source-only and never translated by
-  // the system, but defaulting unknowns to Google is also the safe behavior.
+  // Unknown / English: English is source-only and never translated by the
+  // system; an unknown code keeps its own name so a prompt never lies.
   if (!lang || lang.code === 'en') {
     return {
-      provider: lang?.translationProvider ?? 'google',
       targetRegion: lang ? regionLabelFromDisplayCode(lang.displayCode) : code,
       targetLangName: lang?.name ?? code,
       targetLangNativeName: lang?.nativeName ?? lang?.name ?? code,
     };
   }
-  // Non-English: default to openrouter unless the language explicitly opts back to google.
-  const provider: TranslationProvider =
-    lang.translationProvider ?? 'openrouter';
   return {
-    provider,
     targetRegion: regionLabelFromDisplayCode(lang.displayCode),
     targetLangName: lang.translationName ?? lang.name,
     targetLangNativeName: lang.nativeName,

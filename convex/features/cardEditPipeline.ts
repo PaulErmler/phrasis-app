@@ -3,13 +3,17 @@ import { getCourseSettings } from '../db/courseSettings';
 import { MutationCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
 import { asVoiceGender } from '../types';
-import type { LanguageRendering } from '../../lib/preferenceResolution';
+import {
+  renderingKey,
+  type LanguageRendering,
+} from '../../lib/preferenceResolution';
+import { NO_FORM } from '../../lib/languageForms';
 import {
   carriedAnnotationFields,
   clearedAnnotationFields,
 } from '../lib/textAnnotations';
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../lib/translationProvenance';
-import { deleteAudioRowsForTextLanguage } from '../lib/audio';
+import { deleteAllAudioRowsForTextLanguage } from '../lib/audio';
 import { soundsSame } from '../lib/textComparison';
 import { canonicalizeApostrophes } from '../../lib/languages';
 import { MAX_CARD_TEXT_LENGTH } from '../../lib/constants/learning';
@@ -34,7 +38,7 @@ import {
 import { patchCard } from '../db/stats/cardAggregates';
 import { randomOrderKey } from '../lib/freePlay';
 import { updateWordTextsForEdit } from '../db/stats/wordTracking';
-import { scheduleMissingContent } from '../lib/contentScheduling';
+import { ensureTextContent } from '../lib/contentScheduling';
 
 /**
  * Implementation phases of `applyCardEdit` (which stays in
@@ -386,29 +390,37 @@ export async function applyInPlaceTextEdit(
         ...clearedAnnotationFields(),
         translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
         // Stamp with the card's current gender so the mismatch sweep in
-        // `scheduleMissingContent` sees agreement (the user-provided
+        // `ensureTextContent` sees agreement (the user-provided
         // branch is already skipped by the sweep, but keeping this in
         // sync avoids relying on that skip).
         ...(audioGenderStamp ? { speakerGender: audioGenderStamp } : {}),
       });
     } else {
+      // A user-written text has one rendering per language, keyed by its
+      // voice (docs/architecture/rendering-keys.md).
       await ctx.db.insert('translations', {
         textId: card.textId,
         targetLanguage: lang,
         translatedText: canonicalizeApostrophes(lang, submittedMap.get(lang)!),
         translationSource: USER_PROVIDED_TRANSLATION_SOURCE,
-        ...(audioGenderStamp ? { speakerGender: audioGenderStamp } : {}),
+        ...(audioGenderStamp
+          ? {
+              speakerGender: audioGenderStamp,
+              variantKey: renderingKey(audioGenderStamp, NO_FORM),
+            }
+          : {}),
       });
     }
   }
 
-  // Detach audio pointers for audibly-changed languages only.
+  // Detach the audio pointers of audibly-changed languages only, whatever
+  // key they carry: a user text has one rendering per language.
   // Punctuation-only edits keep their audio. keepAsset: the old audio is
   // still correct for the old sentence, so it stays in the audioAssets
   // cache (only the regenerate button and TTS-system migrations fully
   // delete audio).
   for (const lang of audioChangedLanguages) {
-    await deleteAudioRowsForTextLanguage(ctx, card.textId, lang, {
+    await deleteAllAudioRowsForTextLanguage(ctx, card.textId, lang, {
       keepAsset: true,
     });
   }
@@ -466,7 +478,7 @@ export async function forkSharedTextForEdit(
     // This row is a logical copy of `text`. The user only edited
     // translations, not the source, so preserve all pipeline-derived
     // metadata rather than regenerating it. speakerGender specifically
-    // also prevents the downstream `scheduleMissingContent` sweep from
+    // also prevents the downstream `ensureTextContent` sweep from
     // coin-flipping a new gender that disagrees with the copied audio
     // rows and deletes them.
     speakerGender: text.speakerGender,
@@ -506,6 +518,11 @@ export async function forkSharedTextForEdit(
       textId: newTextId,
       targetLanguage: lang,
       translatedText,
+      // The copy is a user-written text: one rendering per language, keyed
+      // by the copy's voice.
+      ...(audioGenderStamp
+        ? { variantKey: renderingKey(audioGenderStamp, NO_FORM) }
+        : {}),
       ...(changed
         ? { translationSource: USER_PROVIDED_TRANSLATION_SOURCE }
         : existing?.translationSource
@@ -551,6 +568,9 @@ export async function forkSharedTextForEdit(
           textId: newTextId,
           language: lang,
           assetId: served.audioAssetId,
+          ...(audioGenderStamp
+            ? { variantKey: renderingKey(audioGenderStamp, NO_FORM) }
+            : {}),
         });
       }
       continue;
@@ -573,28 +593,26 @@ export async function forkSharedTextForEdit(
     const rendering =
       plan.renderingMap.get(lang) ??
       sourceRenderingForView(plan.view, renderingTextOf(text), card.textId);
-    const keyed = rendering.audioVariantKey
-      ? await audioPointer(ctx, card.textId, rowLang, rendering.audioVariantKey)
-      : null;
-    // Fall back to the canonical pointer only when the canonical wording is
-    // what the card shows. When a variant row with its own wording is served,
-    // the canonical clip speaks a different sentence, so copying it would
-    // pair this wording with that audio for good. Copy nothing and let the
-    // fork's own ensure sweep voice the carried wording.
-    const servesOwnVariantWording =
+    // The clip of the row the card shows: the keyed pointer when the card
+    // reads a keyed row, else the legacy pointer. Copying the other one
+    // would pair this wording with a clip of another sentence for good.
+    const servesKeyedRow =
       served !== undefined && served.row.variantKey !== undefined;
-    const row =
-      keyed ??
-      (servesOwnVariantWording
-        ? null
-        : await audioPointer(ctx, card.textId, rowLang));
+    const row = servesKeyedRow
+      ? await audioPointer(ctx, card.textId, rowLang, rendering.key)
+      : ((await audioPointer(ctx, card.textId, rowLang, rendering.key)) ??
+        (await audioPointer(ctx, card.textId, rowLang)));
     if (row) {
-      // The copy shares the same asset. Staleness (the asset's
-      // ttsVersion stamp) travels with the asset itself.
+      // The copy shares the same asset, under the copy's own key (its
+      // voice, no form). Staleness (the asset's ttsVersion stamp) travels
+      // with the asset itself.
       await ctx.db.insert('audioRecordings', {
         textId: newTextId,
         language: lang,
         assetId: row.assetId,
+        ...(audioGenderStamp
+          ? { variantKey: renderingKey(audioGenderStamp, NO_FORM) }
+          : {}),
       });
     }
   }
@@ -618,7 +636,7 @@ export async function forkSharedTextForEdit(
  * reviewHistory, the audit log, the undo stack) stays valid by construction.
  *
  * Returns the resolved text row (fetched after any metadata patch, so the
- * downstream `scheduleMissingContent` sees the final row).
+ * downstream `ensureTextContent` sees the final row).
  */
 export async function repointCardAtEditedText(
   ctx: MutationCtx,
@@ -712,7 +730,7 @@ export async function propagateEditToDerivedContent(
   }
 
   // Trigger TTS + romanization for changed languages, billed to the editor.
-  await scheduleMissingContent(
+  await ensureTextContent(
     ctx,
     resolvedTextId,
     resolvedText,

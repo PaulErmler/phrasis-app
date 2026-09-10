@@ -1,12 +1,12 @@
 /**
- * Shared translation helpers. Used by features/decks.ts and
- * features/llmTranslationQueue.ts; `toGoogleTranslateCode` is also exercised
- * by tests/integration/google-translate-fallback.test.ts and
- * convex/tests/features/translationCodes.test.ts.
- * No Convex function exports; just plain async helpers.
+ * Shared romanization helpers. Used by features/llmTranslationQueue.ts and
+ * the annotation actions; `toGoogleTranslateCode` maps internal codes onto
+ * the Google API codes the v3 romanizer wants (exercised by
+ * convex/tests/features/translationCodes.test.ts). No Convex function
+ * exports; just plain async helpers. There is no Google TRANSLATE path any
+ * more (2026-09-10): the LLM chain is the only producer of translations.
  *
- * Uses Google Cloud Translation API v2 (API key) for translations,
- * v3 (service account OAuth2) for romanization of ru/hi/ja/bn/ta/uk/sr,
+ * Uses Google Cloud Translation v3 (service account OAuth2) for romanization of ru/hi/ja/bn/ta/uk/sr,
  * chinese-to-pinyin for Chinese romanization,
  * es-hangul for Korean (Revised Romanization),
  * and greek-utils for Greek phonetic Latin.
@@ -27,11 +27,11 @@ import { SignJWT, importPKCS8 } from 'jose';
 import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 
 /**
- * Map internal language codes to Google Translate / romanization API codes.
+ * Map internal language codes to Google romanization API codes.
  * Derived from each Language's `googleTranslateCode` field (single source of
  * truth in lib/languages.ts); codes without one pass through unchanged. Most
- * ISO 639-1 codes work unmapped against both the v2 translate and v3
- * romanizeText endpoints, only regional variants and internal dialect codes
+ * ISO 639-1 codes work unmapped against the v3 romanizeText endpoint, only
+ * regional variants and internal dialect codes
  * set an override (e.g. Spanish/English variants collapse to the bare lang,
  * Arabic dialects collapse to `ar`, Chinese Traditional / European Portuguese
  * keep their locale-tagged form which v2 accepts).
@@ -45,15 +45,6 @@ const GOOGLE_TRANSLATE_CODE_MAP: Record<string, string> = Object.fromEntries(
 
 export function toGoogleTranslateCode(code: string): string {
   return GOOGLE_TRANSLATE_CODE_MAP[code] ?? code;
-}
-
-/** Google Translation API v2 response type */
-interface GoogleTranslateResponse {
-  data: {
-    translations: Array<{
-      translatedText: string;
-    }>;
-  };
 }
 
 /** Google Translation API v3 romanization response type */
@@ -121,56 +112,6 @@ async function getGoogleAccessToken(): Promise<{
   };
 
   return { token: data.access_token, projectId: creds.project_id };
-}
-
-/**
- * Call the Google Cloud Translation v2 REST API.
- * Returns the translated text. Throws on any error.
- */
-export async function translateText(
-  text: string,
-  sourceLang: string,
-  targetLang: string,
-): Promise<string> {
-  const apiKey = requireEnv('GOOGLE_TRANSLATE_API_KEY');
-
-  const googleSource = toGoogleTranslateCode(sourceLang);
-  const googleTarget = toGoogleTranslateCode(targetLang);
-  const startedAt = Date.now();
-
-  const response = await fetch(
-    `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        q: text,
-        source: googleSource,
-        target: googleTarget,
-        format: 'text',
-      }),
-    },
-  );
-
-  const elapsedMs = Date.now() - startedAt;
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('[translation] Google Translate v2 error', {
-      status: response.status,
-      elapsedMs,
-      sourceLang,
-      targetLang,
-      bodyPreview: errorText.slice(0, 500),
-    });
-    throw new Error(`Google API error: ${response.status} - ${errorText}`);
-  }
-
-  const data = (await response.json()) as GoogleTranslateResponse;
-  const translation = data.data?.translations?.[0]?.translatedText;
-  if (!translation) throw new Error('No translation returned from Google API');
-
-  return translation;
 }
 
 /**

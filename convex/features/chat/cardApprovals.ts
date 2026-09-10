@@ -19,6 +19,8 @@ import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
 import { applyCardEdit } from '../scheduling';
 import { applyTextMetadata } from '../sentenceMetadata';
+import { renderingKey } from '../../../lib/preferenceResolution';
+import { NO_FORM } from '../../../lib/languageForms';
 import { storeWritingAlternative } from '../writingAlternatives';
 import { resolveCardContext } from './cardContext';
 import { MAX_CARD_TEXT_LENGTH } from '../../../lib/constants/learning';
@@ -27,6 +29,7 @@ import {
   getTranslationSource,
   postProcessTranslation,
   canonicalizeApostrophes,
+  resolveAudioSpeakerGender,
 } from '../../../lib/languages';
 import {
   ANNOTATION_KINDS,
@@ -103,6 +106,12 @@ async function processApproval(
   // classifier below only replaces it with a gender the wording proves
   // (`applyTextMetadata` keeps a stored voice on a neutral verdict).
   const tutorSpeaker = approval.proposedMetadata?.speakerGender;
+  const audioSpeakerGender = resolveAudioSpeakerGender(
+    tutorSpeaker === 'male' || tutorSpeaker === 'female'
+      ? tutorSpeaker
+      : undefined,
+    `${approval._id}|voice`,
+  );
   const textId: Id<'texts'> = await ctx.db.insert('texts', {
     text: mainText,
     language: mainEntry.language,
@@ -110,9 +119,7 @@ async function processApproval(
     userId,
     collectionId: chatCollection._id,
     collectionRank: nextRank,
-    ...(tutorSpeaker === 'male' || tutorSpeaker === 'female'
-      ? { audioSpeakerGender: tutorSpeaker }
-      : {}),
+    audioSpeakerGender,
   });
 
   // The approval's translations were produced by the language-teacher chat
@@ -134,9 +141,13 @@ async function processApproval(
     // and get the language's post-processing step (default: strip
     // trailing '_' runs).
     const userEdited = userEditedLanguages.has(entry.language);
+    // One rendering per language, keyed by the text's voice
+    // (docs/architecture/rendering-keys.md).
     await ctx.db.insert('translations', {
       textId,
       targetLanguage: entry.language,
+      variantKey: renderingKey(audioSpeakerGender, NO_FORM),
+      speakerGender: audioSpeakerGender,
       translatedText: userEdited
         ? canonicalizeApostrophes(entry.language, entry.text)
         : postProcessTranslation(entry.language, entry.text),

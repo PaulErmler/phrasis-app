@@ -1418,10 +1418,10 @@
         "single": "Every sentence is {level}.",
         "mixed": "Sentences alternate between {levels} where applicable."
       },
-      "all": {
-        "title": "All levels",
+      "recommended": {
+        "title": "Use the default we recommend",
         "badge": "Recommended",
-        "description": "Sentences alternate between the levels, so you learn to understand and use each one."
+        "description": "Sentences alternate between the levels we recommend for your languages, so you learn to understand and use each one."
       },
       "orPick": "Or pick the levels yourself"
     }

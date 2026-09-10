@@ -162,15 +162,22 @@ export function CardShell({
       className="card-surface overflow-hidden"
       data-tutorial={TUTORIAL_ANCHORS.cardFlashcard}
     >
-      {/* Card top bar: metadata left, actions right */}
+      {/* Card top bar: tags left, actions right, on one line whenever they
+          fit. When they do not, the buttons wrap onto a line of their own
+          ABOVE the tags: `flex-wrap-reverse` lays the first line at the
+          bottom, so the overflowing last item (the buttons) lands on top,
+          still pushed right by `ml-auto`. The tag group never shrinks
+          (`shrink-0`), so the buttons wrap before the tags do; only when
+          the tags alone are wider than the card do they wrap among
+          themselves (`max-w-full`). No breakpoint: it follows the card. */}
       <div
         className={
           compact
-            ? 'flex items-center justify-between px-3 pt-3 pb-1.5'
-            : 'flex items-center justify-between px-4 pt-4 pb-2'
+            ? 'flex flex-wrap-reverse items-center gap-y-1.5 px-3 pt-3 pb-1.5'
+            : 'flex flex-wrap-reverse items-center gap-y-2 px-4 pt-4 pb-2'
         }
       >
-        <div className="flex items-center gap-2">
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
           <Badge variant="secondary" className="text-xs">
             {t('reviewCount', { count: reviewCount })}
           </Badge>
@@ -210,21 +217,23 @@ export function CardShell({
             </Badge>
           )}
         </div>
-        <CardActionsMenu
-          isFavorite={isFavorite}
-          isMastered={masterActive}
-          isHidden={hideActive}
-          onFavorite={onFavorite}
-          onMaster={onMaster}
-          onHide={onHide}
-          onEdit={onEdit}
-          onDelete={onDelete}
-          onFlag={onFlag}
-          onRegenerateAudio={onRegenerateAudio}
-          pinnedActions={pinnedActions}
-          onUpdatePinnedActions={onUpdatePinnedActions}
-          quotaState={quotaState}
-        />
+        <div className="ml-auto flex pl-2">
+          <CardActionsMenu
+              isFavorite={isFavorite}
+            isMastered={masterActive}
+            isHidden={hideActive}
+            onFavorite={onFavorite}
+            onMaster={onMaster}
+            onHide={onHide}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onFlag={onFlag}
+            onRegenerateAudio={onRegenerateAudio}
+            pinnedActions={pinnedActions}
+            onUpdatePinnedActions={onUpdatePinnedActions}
+            quotaState={quotaState}
+          />
+        </div>
       </div>
 
       {/* Card text content */}

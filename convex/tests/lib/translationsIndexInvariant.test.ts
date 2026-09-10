@@ -26,7 +26,7 @@ const ALLOWED = new Set(['schema.ts', 'db/translationReads.ts', THIS_FILE]);
 const INDEX_LITERALS = [
   "'by_text_language_supersededAt'",
   "'by_textId_supersededAt'",
-  // Rendering variants (docs/architecture/translation-variants.md): every
+  // Rendering variants (docs/architecture/rendering-keys.md): every
   // point read pins the variant column too, and only the accessor module
   // knows that.
   "'by_text_language_variant_supersededAt'",

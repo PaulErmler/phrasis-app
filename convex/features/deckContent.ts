@@ -16,19 +16,11 @@ import {
 import { ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
 import { fetchFreePlayRotation } from '../lib/freePlay';
 import { fetchTrackDueCards } from '../lib/dueQueue';
-import {
-  flushRenderingStamps,
-  newMetadataCallBudget,
-  newRenderingStampCollector,
-  ProbeNeedsWork,
-  scheduleMissingContent,
-  scheduleMissingRenderings,
-} from '../lib/contentScheduling';
+import { ensureTextContent, ProbeNeedsWork } from '../lib/contentScheduling';
 import { renderingCardOf, renderingSettingsOf } from '../db/translationReads';
-import {
-  hasRenderingOverride,
-  type RenderingCard,
-  type RenderingSettings,
+import type {
+  RenderingCard,
+  RenderingSettings,
 } from '../../lib/preferenceResolution';
 import { getNextAddableTextsFromRank } from './collectionCardAdding';
 
@@ -61,37 +53,20 @@ export async function ensureCardContentHandler(
   const text = await ctx.db.get(args.textId);
   if (!text) return { translationsScheduled: 0, audioScheduled: 0 };
 
-  const canonical = await scheduleMissingContent(
+  // The learner has this card, so its wording AND its voice are card
+  // demand; the sweep resolves the card's rendering key per language
+  // (docs/architecture/rendering-keys.md).
+  const settings = renderingSettingsOf(
+    await getCourseSettings(ctx, active.course._id),
+  );
+  return ensureTextContent(
     ctx,
     args.textId,
     text,
     active.course.baseLanguages,
     active.course.targetLanguages,
+    { card: renderingCardOf(card), settings },
   );
-  // The card's rendering variants (docs/architecture/translation-variants.md):
-  // the learner has this card, so its wording AND its voice are card
-  // demand. A card from before the feature resolves to canonical inside.
-  const settings = renderingSettingsOf(
-    await getCourseSettings(ctx, active.course._id),
-  );
-  const renderingCard = renderingCardOf(card);
-  const variants =
-    card.followsCoursePreferences || hasRenderingOverride(renderingCard)
-      ? await scheduleMissingRenderings(
-          ctx,
-          args.textId,
-          text,
-          active.course.baseLanguages,
-          active.course.targetLanguages,
-          settings,
-          { card: renderingCard },
-        )
-      : { translationsScheduled: 0, audioScheduled: 0 };
-  return {
-    translationsScheduled:
-      canonical.translationsScheduled + variants.translationsScheduled,
-    audioScheduled: canonical.audioScheduled + variants.audioScheduled,
-  };
 }
 
 /**
@@ -183,12 +158,6 @@ async function scheduleContentForUpcomingCards(
   // Batch-load the texts up front (one concurrent read round, not one
   // sequential get per card) before the sequential probe loop.
   const texts = await Promise.all(cards.map((card) => ctx.db.get(card.textId)));
-  // Rows without rendering stamps across the whole batch, so the classifier
-  // is asked once per language per 25 rows rather than once per card.
-  const stamps = newRenderingStampCollector();
-  // Sentence-metadata calls this pass may cause (five), so a batch of
-  // unclassified curriculum texts is worked through over several passes.
-  const metadataCalls = newMetadataCallBudget();
   for (let i = 0; i < cards.length; i++) {
     const card = cards[i];
     const text = texts[i];
@@ -196,28 +165,14 @@ async function scheduleContentForUpcomingCards(
     const renderingCard = renderingCardOf(card);
     let needsWork = false;
     try {
-      await scheduleMissingContent(
+      await ensureTextContent(
         ctx,
         card.textId,
         text,
         active.course.baseLanguages,
         active.course.targetLanguages,
-        { probe: true, stamps, metadataCalls },
+        { probe: true, card: renderingCard, settings: renderingSettings },
       );
-      if (
-        card.followsCoursePreferences ||
-        hasRenderingOverride(renderingCard)
-      ) {
-        await scheduleMissingRenderings(
-          ctx,
-          card.textId,
-          text,
-          active.course.baseLanguages,
-          active.course.targetLanguages,
-          renderingSettings,
-          { probe: true, stamps, card: renderingCard },
-        );
-      }
     } catch (error) {
       if (error instanceof ProbeNeedsWork) {
         needsWork = true;
@@ -241,18 +196,13 @@ async function scheduleContentForUpcomingCards(
           textId: card.textId,
           baseLanguages: active.course.baseLanguages,
           targetLanguages: active.course.targetLanguages,
-          renderingSettings: card.followsCoursePreferences
-            ? renderingSettings
-            : undefined,
+          renderingSettings,
           renderingCard,
         },
       );
       processed++;
     }
   }
-  // Claims the rows in this transaction, so the dispatched
-  // `prepareCardContent` sweeps above find them requested and skip them.
-  await flushRenderingStamps(ctx, stamps);
 
   // This sweep does NOT reach past the deck into not-yet-added collection
   // texts; that proved too late for fast reviewers (batches observed added
@@ -357,47 +307,34 @@ export async function prepareCardContentHandler(
     llmPriority?: LlmPriority;
     /** Requester attribution for the cost events (see ContentSweepOpts). */
     requestedByUserId?: string;
-    /**
-     * The course's sentence-form settings, when the caller's card follows
-     * them: the rendering variants are filled after the canonical sweep.
-     * Absent = canonical only.
-     */
+    /** The course's politeness setting; absent = the primary form. */
     renderingSettings?: RenderingSettings;
     /**
-     * The caller's card, so a per-card correction renders even when the
-     * card follows no settings. Absent for callers without a card.
+     * The caller's card, so a per-card correction renders. Absent for
+     * callers without a card, which get the rendering a new card would.
      */
     renderingCard?: NonNullable<RenderingCard>;
+    /** Translation-only pass; see ContentSweepOpts. */
+    skipTts?: boolean;
   },
 ): Promise<null> {
   const text = await ctx.db.get(args.textId);
   if (!text) return null;
-
-  const opts = {
-    priority: args.priority,
-    llmPriority: args.llmPriority,
-    requestedByUserId: args.requestedByUserId,
-  };
-  await scheduleMissingContent(
+  await ensureTextContent(
     ctx,
     args.textId,
     text,
     args.baseLanguages,
     args.targetLanguages,
-    opts,
+    {
+      priority: args.priority,
+      llmPriority: args.llmPriority,
+      requestedByUserId: args.requestedByUserId,
+      card: args.renderingCard ?? null,
+      settings: args.renderingSettings,
+      skipTts: args.skipTts,
+    },
   );
-  const card = args.renderingCard ?? null;
-  if (args.renderingSettings || hasRenderingOverride(card)) {
-    await scheduleMissingRenderings(
-      ctx,
-      args.textId,
-      text,
-      args.baseLanguages,
-      args.targetLanguages,
-      args.renderingSettings,
-      { ...opts, card },
-    );
-  }
   return null;
 }
 
@@ -435,24 +372,17 @@ export async function warmNextCollectionBatchHandler(
     // OCC contention the ensure sweep needed dispatch for doesn't apply.
     // One bad text must still not abort the rest of the warm.
     try {
-      await scheduleMissingContent(
+      await ensureTextContent(
         ctx,
         text._id,
         text,
         course.baseLanguages,
         course.targetLanguages,
-      );
-      await scheduleMissingRenderings(
-        ctx,
-        text._id,
-        text,
-        course.baseLanguages,
-        course.targetLanguages,
-        renderingSettings,
+        { settings: renderingSettings },
       );
     } catch (error) {
       console.error(
-        '[warmNextCollectionBatch] scheduleMissingContent failed for one text — continuing',
+        '[warmNextCollectionBatch] ensureTextContent failed for one text — continuing',
         {
           textId: text._id,
           error,

@@ -75,7 +75,7 @@ const MAX_TTS_VALIDATION_ATTEMPTS = 2;
  * the pool job's onComplete (guaranteed), so staleness is only a catastrophic
  * backstop, e.g. the onComplete handler itself failing. Generous on purpose:
  * a pool job (retries included) can legitimately run for minutes, and a
- * premature "stale" verdict makes a concurrent `scheduleMissingContent`
+ * premature "stale" verdict makes a concurrent `ensureTextContent`
  * double-enqueue the same synthesis.
  */
 const TTS_CLAIM_STALE_MS = 10 * 60 * 1000;
@@ -113,10 +113,9 @@ const TTS_WARM_TOKEN_MAX_WAIT_MS = 1_000;
 const STT_TOKEN_MAX_WAIT_MS = 15_000;
 
 /**
- * Point-read the (textId, language, variant) TTS generation claim, if any.
- * `variantKey` undefined is the canonical clip; a rendering variant's audio
- * (`audioVariantKey`, docs/architecture/translation-variants.md) holds its
- * own claim.
+ * Point-read the (textId, language, key) TTS generation claim, if any.
+ * `variantKey` undefined is the legacy clip; a rendering key's audio
+ * (docs/architecture/rendering-keys.md) holds its own claim.
  */
 async function getTtsClaim(
   ctx: MutationCtx,
@@ -133,32 +132,6 @@ async function getTtsClaim(
         .eq('variantKey', variantKey),
     )
     .first();
-}
-
-/**
- * Every in-flight TTS claim of (text, language) that belongs to a rendering
- * VARIANT. Convex orders `undefined` before every string, so `.gt('', ...)`
- * starts the range past the canonical claim.
- *
- * Sibling of `variantLlmClaims` (llmTranslationQueue.ts), and the reason it
- * exists: `retireVariantRenderings` dropped the variant rows and their LLM
- * claims but had no way to reach the TTS claims, so a synthesis in flight
- * for a wording just retired survived, landed, and attached a pointer to
- * the OLD wording's asset. The next rewrite then found a pointer and
- * returned, leaving the card rendering one sentence and playing another for
- * good.
- */
-export async function variantTtsClaims(
-  ctx: MutationCtx,
-  textId: Id<'texts'>,
-  language: string,
-): Promise<Doc<'ttsGenerationClaims'>[]> {
-  return await ctx.db
-    .query('ttsGenerationClaims')
-    .withIndex('by_text_language_variant', (q) =>
-      q.eq('textId', textId).eq('language', language).gt('variantKey', ''),
-    )
-    .take(64);
 }
 
 /**
@@ -636,9 +609,9 @@ const ttsJobArgsValidator = v.object({
   // which speaks the live wording; the revision's `audioAssetId` is
   // re-pointed instead (convex/features/audioStorage.ts).
   supersededTranslationId: v.optional(v.id('translations')),
-  // Rendering variant this clip belongs to (`audioVariantKey`, see
-  // docs/architecture/translation-variants.md): the pointer row written and
-  // the claim held are keyed by it. Absent = the canonical clip.
+  // The rendering key this clip belongs to (docs/architecture/
+  // rendering-keys.md): the pointer row written and the claim held are
+  // keyed by it. Absent = a legacy clip.
   variantKey: v.optional(v.string()),
 });
 
@@ -963,7 +936,7 @@ export const storeTtsMismatch = internalMutation({
  * generated before timings were captured, with no `wordTimings` field, and
  * give an 'unchecked' clip, where STT failed at synthesis time, its verdict.
  * Called
- * from `scheduleMissingContent` after acquiring a TTS claim on (textId, lang).
+ * from `ensureTextContent` after acquiring a TTS claim on (textId, lang).
  *
  * Re-downloads the stored audio blob, runs it through STT, and persists the
  * resulting timings, but only if the storageId still matches, so a

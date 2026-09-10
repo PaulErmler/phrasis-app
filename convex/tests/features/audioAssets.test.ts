@@ -8,7 +8,7 @@ import type { Id } from '../../_generated/dataModel';
 import { scheduleAudioForLanguage } from '../../features/decks';
 import { deleteAudioRowsForTextLanguage } from '../../lib/audio';
 import { findAudioAssetByKey } from '../../lib/audioAssets';
-import { scheduleMissingContent } from '../../lib/contentScheduling';
+import { ensureTextContent } from '../../lib/contentScheduling';
 import { audioPointer } from '../../db/translationReads';
 import {
   getCurrentTranslationVersion,
@@ -351,9 +351,12 @@ describe('audioAssets content-addressed cache', () => {
         ttsVersion: 0,
       });
 
+      // A legacy card's view: the legacy pointer is this card's to maintain.
       const scheduled = await t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
-        return scheduleMissingContent(ctx, textId, text, ['de'], ['es']);
+        return ensureTextContent(ctx, textId, text, ['de'], ['es'], {
+          card: {},
+        });
       });
 
       expect(scheduled.audioScheduled).toBe(1);
@@ -374,9 +377,12 @@ describe('audioAssets content-addressed cache', () => {
         ttsVersion: getCurrentTtsVersion('es'),
       });
 
+      // A legacy card's view: the legacy pointer is this card's to maintain.
       const scheduled = await t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
-        return scheduleMissingContent(ctx, textId, text, ['de'], ['es']);
+        return ensureTextContent(ctx, textId, text, ['de'], ['es'], {
+          card: {},
+        });
       });
 
       expect(scheduled.audioScheduled).toBe(0);

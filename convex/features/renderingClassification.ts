@@ -1,12 +1,5 @@
-import { v } from 'convex/values';
 import { generateText } from 'ai';
-import {
-  internalAction,
-  internalMutation,
-  internalQuery,
-} from '../_generated/server';
-import { internal } from '../_generated/api';
-import type { Id } from '../_generated/dataModel';
+import type { ActionCtx } from '../_generated/server';
 import { OPENROUTER_MODELS } from '../config/aiModels';
 import { getOpenRouter } from '../lib/openrouter';
 import {
@@ -18,188 +11,117 @@ import { trackException } from '../analytics';
 import {
   buildRenderingClassifierPrompt,
   buildRenderingClassifierUserPrompt,
-  classificationLanguageForRow,
   parseRenderingClassifications,
   renderingAxesFor,
+  type RenderingClassification,
 } from '../lib/renderingClassifier';
-import { renderedGenderValidator, renderedPolitenessValidator } from '../types';
+import {
+  getPolitenessConfig,
+  NO_FORM,
+  unmarkedIsAcceptable,
+} from '../../lib/languageForms';
+import { axisOf, parseRenderingKey } from '../../lib/preferenceResolution';
 
 /**
- * Stamps `translations.renderedGender` / `renderedPoliteness`: what a stored
- * wording actually is. Two callers: the content sweep, lazily, for rows
- * from before the feature (`flushRenderingStamps` in
- * convex/lib/contentScheduling.ts, batched per ensure pass), and the
- * translation store paths, for every row generated from now on. Prompt
- * and parser live in convex/lib/renderingClassifier.ts.
+ * The rendering classifier as a VERIFIER: does a freshly generated wording
+ * carry the voice and the politeness form its rendering key asked for?
+ * Called by the LLM worker right after generation
+ * (docs/architecture/rendering-keys.md); the key is the truth about the row,
+ * and this is the check that the model honoured it. Prompt and parser live
+ * in convex/lib/renderingClassifier.ts.
  *
- * One LLM call classifies up to `MAX_ROWS_PER_CALL` rows of ONE language;
- * rows the model skips or answers badly stay unstamped (no chip) and the
- * next sweep after the request cooldown asks again.
+ * The verdict is `ok` when every axis the language marks agrees with the
+ * key, `mismatch` when one contradicts it, and `unknown` when the model
+ * gave no usable answer (the row is then stored unverified rather than
+ * rejected: a classifier hiccup must not block a translation).
  */
-export const MAX_ROWS_PER_CALL = 25;
+export type RenderingVerdict = 'ok' | 'mismatch' | 'unknown';
 
-type ClassificationRow = {
-  _id: Id<'translations'>;
-  targetLanguage: string;
-  regionVariant?: string;
-  translatedText: string;
-  alreadyStamped: boolean;
-};
-
-export const getRowsForClassification = internalQuery({
-  args: { translationIds: v.array(v.id('translations')) },
-  returns: v.array(
-    v.object({
-      _id: v.id('translations'),
-      targetLanguage: v.string(),
-      regionVariant: v.optional(v.string()),
-      translatedText: v.string(),
-      alreadyStamped: v.boolean(),
-    }),
-  ),
-  handler: async (ctx, args) => {
-    const out = [];
-    for (const id of args.translationIds) {
-      const row = await ctx.db.get(id);
-      if (!row) continue;
-      out.push({
-        _id: row._id,
-        targetLanguage: row.targetLanguage,
-        regionVariant: row.regionVariant,
-        translatedText: row.translatedText,
-        alreadyStamped:
-          row.renderedGender !== undefined &&
-          row.renderedPoliteness !== undefined,
-      });
+export function verdictForClassification(
+  language: string,
+  key: string,
+  classification: RenderingClassification | null,
+): RenderingVerdict {
+  if (classification === null) return 'unknown';
+  const axes = renderingAxesFor(language);
+  const { voice, formId } = parseRenderingKey(key);
+  // 'unmarked' on the gender axis is fine: the sentence has no first-person
+  // form to disagree with the voice ("It is raining").
+  const genderOk =
+    !axes.gender ||
+    classification.gender === 'unmarked' ||
+    classification.gender === axisOf(voice);
+  let politenessOk = true;
+  if (formId !== NO_FORM && axes.politeness) {
+    const config = getPolitenessConfig(language);
+    if (classification.politeness === 'unmarked') {
+      politenessOk = unmarkedIsAcceptable(language);
+    } else if (config) {
+      politenessOk = config.forms[classification.politeness].id === formId;
     }
-    return out;
-  },
-});
-
-export const stampRenderings = internalMutation({
-  args: {
-    stamps: v.array(
-      v.object({
-        translationId: v.id('translations'),
-        renderedGender: renderedGenderValidator,
-        renderedPoliteness: renderedPolitenessValidator,
-        /**
-         * The wording the classifier judged. A stamp lands only on the row
-         * still carrying it: a call delayed by a 429 backoff can land after
-         * a flag replaced the wording (and cleared the stamps) and after the
-         * new wording's own call, and would otherwise write the OLD
-         * wording's form onto the new one for good, since
-         * `needsRenderingStamp` never asks for a stamped row again. Same
-         * guard the annotation stores use (`forText`).
-         */
-        translatedText: v.string(),
-      }),
-    ),
-  },
-  returns: v.number(),
-  handler: async (ctx, args) => {
-    let written = 0;
-    for (const stamp of args.stamps) {
-      const row = await ctx.db.get(stamp.translationId);
-      if (!row) continue;
-      if (row.translatedText !== stamp.translatedText) continue;
-      await ctx.db.patch(stamp.translationId, {
-        renderedGender: stamp.renderedGender,
-        renderedPoliteness: stamp.renderedPoliteness,
-      });
-      written++;
-    }
-    return written;
-  },
-});
+  }
+  return genderOk && politenessOk ? 'ok' : 'mismatch';
+}
 
 /**
- * Classify and stamp a set of translation rows that share one language.
- * Rows of other languages, rows already stamped and rows of a language that
- * marks neither axis are skipped. Returns how many rows were stamped.
+ * Verify one wording against its rendering key with one classifier call.
+ * Languages that mark neither axis are `ok` without a call.
  */
-export const classifyAndStampTranslations = internalAction({
+export async function verifyRendering(
+  ctx: ActionCtx,
   args: {
-    translationIds: v.array(v.id('translations')),
-    // Attribution for the cost event; absent = the content-pipeline bucket.
-    userId: v.optional(v.string()),
-    // Skip rows that already carry stamps (the backfill); the variant store
-    // path passes false to restamp a regenerated wording.
-    skipStamped: v.optional(v.boolean()),
+    sentence: string;
+    /** The concrete classifier language (`classificationLanguageForRow`). */
+    language: string;
+    key: string;
+    /** Attribution for the cost event; absent = the content-pipeline bucket. */
+    userId?: string;
   },
-  returns: v.number(),
-  handler: async (ctx, args) => {
-    // Same-file references need explicit result types (TypeScript
-    // circularity through the generated `internal` object).
-    const rows: ClassificationRow[] = await ctx.runQuery(
-      internal.features.renderingClassification.getRowsForClassification,
-      { translationIds: args.translationIds },
+): Promise<{ verdict: RenderingVerdict; classification: RenderingClassification | null }> {
+  const axes = renderingAxesFor(args.language);
+  if (!axes.gender && !axes.politeness) {
+    return { verdict: 'ok', classification: null };
+  }
+  try {
+    const openrouter = getOpenRouter();
+    const startedAt = Date.now();
+    const { text, usage, providerMetadata } = await generateText({
+      model: openrouter(OPENROUTER_MODELS.renderingClassifier),
+      system: buildRenderingClassifierPrompt(args.language),
+      prompt: buildRenderingClassifierUserPrompt([args.sentence]),
+      temperature: 0,
+    });
+    await captureGeneration(ctx, {
+      distinctId: args.userId,
+      feature: 'rendering_classifier',
+      model: OPENROUTER_MODELS.renderingClassifier,
+      provider: 'openrouter',
+      latencyMs: Date.now() - startedAt,
+      inputTokens: usage?.inputTokens,
+      outputTokens: usage?.outputTokens,
+      costUsd: openrouterCostUsd(providerMetadata),
+      traceId: openrouterGenerationId(providerMetadata),
+      sharedContent: true,
+      extra: { language: args.language, key: args.key },
+    });
+    const [classification] = parseRenderingClassifications(
+      args.language,
+      text,
+      1,
     );
-    const candidates = rows.filter(
-      (row) => !(args.skipStamped ?? true) || !row.alreadyStamped,
-    );
-    if (candidates.length === 0) return 0;
-    const language = classificationLanguageForRow(candidates[0]);
-    const axes = renderingAxesFor(language);
-    if (!axes.gender && !axes.politeness) return 0;
-    const batch = candidates
-      .filter((row) => classificationLanguageForRow(row) === language)
-      .slice(0, MAX_ROWS_PER_CALL);
-    try {
-      const openrouter = getOpenRouter();
-      const startedAt = Date.now();
-      const { text, usage, providerMetadata } = await generateText({
-        model: openrouter(OPENROUTER_MODELS.renderingClassifier),
-        system: buildRenderingClassifierPrompt(language),
-        prompt: buildRenderingClassifierUserPrompt(
-          batch.map((row) => row.translatedText),
-        ),
-        temperature: 0,
-      });
-      await captureGeneration(ctx, {
-        distinctId: args.userId,
-        feature: 'rendering_classifier',
-        model: OPENROUTER_MODELS.renderingClassifier,
-        provider: 'openrouter',
-        latencyMs: Date.now() - startedAt,
-        inputTokens: usage?.inputTokens,
-        outputTokens: usage?.outputTokens,
-        costUsd: openrouterCostUsd(providerMetadata),
-        traceId: openrouterGenerationId(providerMetadata),
-        sharedContent: true,
-        extra: { language, rows: batch.length },
-      });
-      const parsed = parseRenderingClassifications(
-        language,
-        text,
-        batch.length,
-      );
-      const stamps = batch.flatMap((row, i) => {
-        const result = parsed[i];
-        return result
-          ? [
-              {
-                translationId: row._id,
-                renderedGender: result.gender,
-                renderedPoliteness: result.politeness,
-                translatedText: row.translatedText,
-              },
-            ]
-          : [];
-      });
-      if (stamps.length === 0) return 0;
-      const written: number = await ctx.runMutation(
-        internal.features.renderingClassification.stampRenderings,
-        { stamps },
-      );
-      return written;
-    } catch (error) {
-      await trackException(ctx, error, args.userId, {
-        source: 'classifyAndStampTranslations',
-        language,
-        rows: batch.length,
-      });
-      throw error;
-    }
-  },
-});
+    return {
+      verdict: verdictForClassification(args.language, args.key, classification),
+      classification,
+    };
+  } catch (error) {
+    // A verification failure is not a translation failure: report it and
+    // let the row land unverified. The worker never retries the
+    // translation over a classifier outage.
+    await trackException(ctx, error, args.userId, {
+      source: 'verifyRendering',
+      language: args.language,
+      key: args.key,
+    });
+    return { verdict: 'unknown', classification: null };
+  }
+}

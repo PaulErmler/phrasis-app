@@ -22,17 +22,13 @@ import {
 import { COLLECTION_PREVIEW_SIZE } from '../lib/collections';
 import { getPremadeLevelCollections } from '../db/collections';
 import { scheduleMissingTranslationsForText } from './collections';
-import {
-  flushRenderingStamps,
-  newRenderingStampCollector,
-} from '../lib/contentScheduling';
 import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 import {
   DAILY_TIME_CUSTOM_MIN,
   DAILY_TIME_CUSTOM_MAX,
 } from '../../lib/constants/dailyGoal';
 import { getCourseSettings } from '../db/courseSettings';
-import { scheduleMissingContent } from './decks';
+import { ensureTextContent } from '../lib/contentScheduling';
 import { rateLimiter } from '../rateLimiter';
 import type { TtsPriority } from '../types';
 
@@ -144,15 +140,15 @@ export const prepareLanguagePair = mutation({
 });
 
 /**
- * Run `scheduleMissingContent` for one batch of placement-test texts.
+ * Run `ensureTextContent` for one batch of placement-test texts.
  *
- * `scheduleMissingContent` handles source-language audio (the text's own
+ * `ensureTextContent` handles source-language audio (the text's own
  * language) AND translation enqueueing for every additional language AND the
  * downstream audio trigger via `storeTranslationAndScheduleTTS`, all with
  * idempotent claim/dedupe, so re-entrant batches do reads-only for rows that
  * are already covered. We pass the user's chosen base language as an additional
  * translation target so the placement test can render the source side in that
- * language; `scheduleMissingContent` filters out the text's own language
+ * language; `ensureTextContent` filters out the text's own language
  * internally, so the no-op case (`sourceLanguage === text.language`) is safe.
  */
 async function processPlacementSentences(
@@ -174,7 +170,7 @@ async function processPlacementSentences(
     const targetLanguages = Array.from(
       new Set([targetLanguage, sourceLanguage]),
     );
-    const result = await scheduleMissingContent(
+    const result = await ensureTextContent(
       ctx,
       text._id,
       text,
@@ -198,7 +194,7 @@ async function processPlacementSentences(
  * in `ensureFirstSentencesAcrossLevelCollections`
  * (`convex/features/collections.ts`). Sweeping the whole corpus inline used to
  * blow past Convex's per-mutation system-op ceiling. Each sentence runs the
- * heavy `scheduleMissingContent` (per-language reads, `storage.getUrl` checks,
+ * heavy `ensureTextContent` (per-language reads, `storage.getUrl` checks,
  * claim inserts, a nested `enqueueTtsJob` mutation, scheduler enqueues), so
  * ~256 sentences × ~20 ops overflowed one transaction.
  *
@@ -271,7 +267,7 @@ async function runPlacementContentSweep(
  * backoff (up to `PLACEMENT_BATCH_MAX_ATTEMPTS` total attempts), the error
  * is swallowed on purpose: rethrowing would roll back the transaction
  * *including* the retry enqueue. Retries re-run the full slice; that's safe
- * because `scheduleMissingContent`'s claim/dedupe checks make already-covered
+ * because `ensureTextContent`'s claim/dedupe checks make already-covered
  * rows reads-only. Bounded residual (accepted): a throw between a claim
  * insert and its pool enqueue commits a workId-less claim that blocks
  * re-enqueue until the claim goes stale (`TTS_CLAIM_STALE_MS`), after which
@@ -387,14 +383,14 @@ export const enqueueMissingPlacementTranslations = internalMutation({
  * When `processTTSForCard` exhausts its bounded retries (synthesis API
  * keeps throwing, transcription crashes, storage timeouts), or an LLM
  * translation never lands, the placement-test row stays silently
- * incomplete. Nothing else re-enters `scheduleMissingContent` for those
+ * incomplete. Nothing else re-enters `ensureTextContent` for those
  * texts afterwards.
  *
  * This covers every placement-test sentence. The first page inline, the rest
  * via the batch workers `runPlacementContentSweep` queues upfront, and
- * re-runs `scheduleMissingContent` for both the source language (English
+ * re-runs `ensureTextContent` for both the source language (English
  * audio) and the target language (translation + downstream audio). All checks
- * inside `scheduleMissingContent` are idempotent. Rows that already have
+ * inside `ensureTextContent` are idempotent. Rows that already have
  * translations + audio do nothing but reads.
  *
  * Scheduled 60s after `prepareLanguagePair` so most in-flow translations
@@ -547,9 +543,6 @@ export const warmupTranslationsBatch = internalMutation({
   returns: v.object({ translationsScheduled: v.number() }),
   handler: async (ctx, { textIds, languages, attempt = 0 }) => {
     try {
-      // One rendering-stamp collector for the batch, so the classifier is
-      // asked once per language per 25 rows, not once per text.
-      const stamps = newRenderingStampCollector();
       let translationsScheduled = 0;
       for (const textId of textIds) {
         const text = await ctx.db.get(textId);
@@ -561,10 +554,9 @@ export const warmupTranslationsBatch = internalMutation({
           // Nobody is waiting on a warmup run, and it enqueues thousands of
           // jobs at once. Route them to llmWarmPool so they can't queue ahead
           // of a user's own translations.
-          { llmPriority: 'background', stamps },
+          { llmPriority: 'background' },
         );
       }
-      await flushRenderingStamps(ctx, stamps);
       return { translationsScheduled };
     } catch (error) {
       if (attempt + 1 < PLACEMENT_BATCH_MAX_ATTEMPTS) {

@@ -1418,10 +1418,10 @@
         "single": "Jeder Satz ist {level}.",
         "mixed": "Die Sätze wechseln zwischen {levels}, wo es einen Unterschied macht."
       },
-      "all": {
-        "title": "Alle Stufen",
+      "recommended": {
+        "title": "Unsere empfohlene Voreinstellung verwenden",
         "badge": "Empfohlen",
-        "description": "Die Sätze wechseln zwischen den Stufen, sodass du jede verstehen und verwenden lernst."
+        "description": "Die Sätze wechseln zwischen den Stufen, die wir für deine Sprachen empfehlen, sodass du jede verstehen und verwenden lernst."
       },
       "orPick": "Oder wähle die Stufen selbst"
     }

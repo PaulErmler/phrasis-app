@@ -17,7 +17,9 @@ import {
 } from '../../lib/textAnnotations';
 import { getRomanizationSource } from '../../lib/localRomanization';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
-import { liveTranslation } from '../../db/translationReads';
+import { liveTranslation, renderingTextOf } from '../../db/translationReads';
+import { primaryRenderingKey } from '../../../lib/preferenceResolution';
+import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -266,6 +268,14 @@ describe('preview-path scheduling gate', () => {
         userCreated: false,
         collectionId: collId,
         collectionRank: 1,
+        metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
+      });
+      // A keyed row, as the pipeline writes them: the preview reads the
+      // row at its key and annotates that one.
+      const key = primaryRenderingKey({
+        text: renderingTextOf((await ctx.db.get(textId))!),
+        textId,
+        code: 'el',
       });
       // Current translation with romanization already present, IPA missing:
       // the gate must schedule ONLY the missing kind.
@@ -275,6 +285,7 @@ describe('preview-path scheduling gate', () => {
         translatedText: 'Καλημέρα',
         romanizedText: 'kalimera',
         romanizationSource: 'greek-utils-v1',
+        variantKey: key,
       });
       return { collId, textId };
     });
