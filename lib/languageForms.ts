@@ -5,7 +5,7 @@
  *   - `politenessLevels`: a SET of the three global levels below. Each
  *     language maps the levels onto its own forms (`POLITENESS_CONFIG`); a
  *     two-form language points two levels at the same form, so a set like
- *     {casual, polite} on Spanish is a single form (tú) and never alternates.
+ *     {casual, polite} on Dutch is a single form (je) and never alternates.
  * The speaker's gender is not a course setting (the choice was withdrawn on
  * 2026-09-08): a card is rendered in its text's own voice, and only the
  * Flag dialog's per-card correction moves it. Which languages change
@@ -122,9 +122,10 @@ function withPromptLabel(
 
 /**
  * A two-form language. `split` says where the boundary sits: 'familiar'
- * renders levels 1 and 2 as the low form (Spanish tú at "polite"),
+ * renders levels 1 and 2 as the low form (Dutch je at "polite"),
  * 'distance' renders levels 2 and 3 as the high form (French vous at
- * "polite").
+ * "polite"). Dialects of one language must agree (es and es_latam are both
+ * 'distance'), or their mixed course shows a row split between them.
  */
 function twoForm(spec: {
   marking: PolitenessMarking;
@@ -548,8 +549,12 @@ export const POLITENESS_CONFIG: Record<string, PolitenessConfig> = {
     },
     sources: [TV_WIKI],
   }),
+  // Distance split, like es_latam: Spain leans on tú far more than Latin
+  // America does, but the two dialects must share a boundary or es_mixed
+  // shows a middle row where one dialect says tú and the other usted
+  // (Paul, 2026-09-10). usted is never wrong in Spain, so the shared
+  // boundary is the distance one; the form's copy carries the real usage.
   es: tv({
-    split: 'familiar',
     intro:
       'Spanish in Spain uses tú with almost everyone and usted mainly with elderly people, officials, and in formal service.',
     exampleEn: 'Are you coming?',
@@ -1512,7 +1517,7 @@ export function politenessFormForLevel(
 
 /**
  * The distinct forms a selected set of levels resolves to for one language,
- * in level order. {casual, polite} on Spanish is [tú]; on Japanese it is
+ * in level order. {casual, polite} on Dutch is [je]; on Japanese it is
  * [plain, desu-masu]. Empty when the language is unmarked.
  */
 export function selectedPolitenessForms(
@@ -1610,9 +1615,10 @@ export function coursePolitenessRows(
  * The levels a set of ticked rows stands for. A ticked row means its level;
  * a hidden level (one no course language distinguishes from the level
  * below) follows the visible level below it, so a Spanish-only course with
- * both rows ticked stores {casual, polite, formal}: the polite row is hidden
- * there and inherits casual (tú). Adding Japanese later shows the polite row
- * as ticked, which is what the learner had (levels 1 and 2 were one form).
+ * both rows ticked stores {casual, polite, formal}: the formal row is hidden
+ * there and inherits polite (usted). Adding Japanese later shows the formal
+ * row as ticked, which is what the learner had (levels 2 and 3 were one
+ * form).
  */
 export function levelsFromTickedRows(
   rows: readonly PolitenessRow[],
@@ -1633,7 +1639,7 @@ export function levelsFromTickedRows(
  * ones every marked language leaves out of its `recommendedLevels` (the
  * honorific third form of Japanese and Korean). A language without a
  * recommendation wants every level, so a course mixing Spanish with
- * Japanese keeps the formal row for usted.
+ * Japanese keeps the formal row, keigo and all.
  */
 export function recommendedPolitenessLevels(
   rows: readonly PolitenessRow[],

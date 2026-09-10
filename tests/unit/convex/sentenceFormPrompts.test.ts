@@ -140,11 +140,13 @@ describe('buildFormChips', () => {
         [{ language, isTargetLanguage: true, politenessLevel: level }],
         t,
       )[0].label;
-    // Spain Spanish: tú covers casual and polite, usted is formal.
+    // Dutch: je covers casual and polite, u is formal.
+    expect(label('nl', 'casual')).toBe('CASUAL');
+    expect(label('nl', 'polite')).toBe('CASUAL');
+    expect(label('nl', 'formal')).toBe('FORMAL');
+    // Spanish and German: the high form from the polite level.
     expect(label('es', 'casual')).toBe('CASUAL');
-    expect(label('es', 'polite')).toBe('CASUAL');
-    expect(label('es', 'formal')).toBe('FORMAL');
-    // German: Sie from the polite level.
+    expect(label('es', 'polite')).toBe('FORMAL');
     expect(label('de', 'polite')).toBe('FORMAL');
     expect(label('ko', 'casual')).toBe('반말');
   });

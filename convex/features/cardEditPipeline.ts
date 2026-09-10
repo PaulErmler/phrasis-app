@@ -584,10 +584,9 @@ export async function forkSharedTextForEdit(
     const rowLang = rowLanguages.get(lang) ?? lang;
     // The rendering the plan already resolved WITH the canonical row's
     // dialect. Recomputing it here without one resolved a mixed code under
-    // its default dialect (es_mixed → Spain, familiar split) while the served
-    // row had resolved under the row's own (es_latam, distance split), so the
-    // keyed lookup missed and the copy paired a variant wording with the
-    // canonical clip. The source slot of a card with no accent row is backed
+    // its default dialect (es_mixed → es) while the served row had resolved
+    // under the row's own (es_latam), so the keyed lookup missed and the copy
+    // paired a variant wording with the canonical clip. The source slot of a card with no accent row is backed
     // by no row, so it has no entry: its wording is the text and only the
     // voice can vary.
     const rendering =

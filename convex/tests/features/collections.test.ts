@@ -241,8 +241,8 @@ describe('features/collections', () => {
         await ctx.db.insert('courseSettings', {
           courseId,
           initialReviewCount: 5,
-          // Spain Spanish is a familiar split, so "formal" is usted (form v)
-          // while the stored wording below is tú (form t).
+          // "formal" is usted on Spain Spanish (form v) while the stored
+          // wording below is tú (form t).
           politenessLevels: ['formal'],
         });
         const textId = await ctx.db.insert('texts', {

@@ -175,23 +175,23 @@ describe('resolveLanguageRendering', () => {
       resolve('de', {}, { userCreated: false, register: 'neutral' }).language
         .form?.id,
     ).toBe('t');
-    // Spanish is familiar-split: formal register is still the usted form.
+    // Spanish is distance-split like German: a formal register is usted.
     expect(
       resolve('es', {}, { userCreated: false, register: 'formal' }).language
         .form?.id,
     ).toBe('v');
   });
 
-  // Spain Spanish is a FAMILIAR split (casual and polite both render tú), so
-  // this level set really does collapse to one form.
+  // Dutch is a FAMILIAR split (casual and polite both render je), so this
+  // level set really does collapse to one form.
   it('levels that map to one form on this language do not alternate', () => {
-    const { language } = resolve('es', {
+    const { language } = resolve('nl', {
       politenessLevels: ['casual', 'polite'],
     });
     expect(language.form?.id).toBe('t');
     for (let i = 0; i < 50; i++) {
       expect(
-        pickPolitenessForm('es', ['casual', 'polite'], `no-alt-${i}`)!.id,
+        pickPolitenessForm('nl', ['casual', 'polite'], `no-alt-${i}`)!.id,
       ).toBe('t');
     }
   });
@@ -335,8 +335,15 @@ describe('resolveLanguageRendering', () => {
   it('mixed dialects resolve through the concrete sub-code', () => {
     const { language } = resolve('es_latam', { politenessLevels: ['polite'] });
     expect(language.form?.id).toBe('v');
+    expect(language.form?.prompt).toContain('ustedes');
+    // The dialects agree on the level, so es_mixed shows one polite row,
+    // and each still carries its own prompt (vosotros vs ustedes).
     const spain = resolve('es', { politenessLevels: ['polite'] }).language;
-    expect(spain.form?.id).toBe('t');
+    expect(spain.form?.id).toBe('v');
+    expect(spain.form?.prompt).toContain('ustedes');
+    expect(
+      resolve('es', { politenessLevels: ['casual'] }).language.form?.prompt,
+    ).toContain('vosotros');
   });
 });
 

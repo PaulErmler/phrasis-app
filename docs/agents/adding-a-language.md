@@ -51,7 +51,7 @@ Two files, one language.
   example, see docs/architecture/rendering-keys.md "Prompts"). The
   builders derive `promptLabel` ("Polite · Sie") for the model-facing
   prompts. Use the `tv(...)` builder for a T-V language and say whether
-  level 2 is the familiar form (`split: 'familiar'`, like Spanish tú) or
+  level 2 is the familiar form (`split: 'familiar'`, like Dutch je) or
   the distance form (the default, like French vous and German Sie).
 - `FIRST_PERSON_CONFIG[code]`: `intro`, `exampleEn`, `masculine`,
   `feminine`, optional `note`, `sources`.
@@ -71,6 +71,10 @@ Dialect variants inherit: a mixed dialect (`es_mixed`) resolves through
 its `variants` sub-codes, an accent variant (`en_gb`) through
 `sharesTextWith`; give the config to the concrete codes only. Two dialects
 with the same forms share one config object (`vi_south` reuses the `vi` object).
+Two dialects of one language must use the same `split` even when their usage
+differs (`es` takes the distance split of `es_latam` though Spain leans on
+tú): a mixed course draws one row per level, so a disagreeing pair shows a
+middle row where one dialect says tú and the other usted.
 
 ## What to research, in this order
 

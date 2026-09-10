@@ -111,7 +111,8 @@ describe('language forms config', () => {
     expect(recommendedPolitenessLevels(coursePolitenessRows(['de', 'en']))).toEqual(
       ['casual', 'polite', 'formal'],
     );
-    // Spanish needs its formal row for usted, so a mixed course keeps it.
+    // Spanish recommends nothing, so it wants every level and a mixed
+    // course keeps the formal row (keigo) Japanese alone would drop.
     expect(recommendedPolitenessLevels(coursePolitenessRows(['ja', 'es']))).toEqual(
       ['casual', 'polite', 'formal'],
     );
@@ -170,8 +171,8 @@ describe('language forms config', () => {
     expect(unmarkedIsAcceptable('de')).toBe(false);
   });
 
-  it('Spanish is familiar-split, German and French distance-split', () => {
-    expect(distinctPolitenessForms('es').map((d) => d.levels)).toEqual([
+  it('Dutch is familiar-split, German and French distance-split', () => {
+    expect(distinctPolitenessForms('nl').map((d) => d.levels)).toEqual([
       ['casual', 'polite'],
       ['formal'],
     ]);
@@ -185,10 +186,25 @@ describe('language forms config', () => {
     ]);
   });
 
+  // Two dialects of one language must split at the same level, or es_mixed
+  // draws a middle row where Spain says tú and Latin America usted.
+  it('both Spanish dialects split at the same level', () => {
+    expect(distinctPolitenessForms('es').map((d) => d.levels)).toEqual([
+      ['casual'],
+      ['polite', 'formal'],
+    ]);
+    expect(distinctPolitenessForms('es_latam').map((d) => d.levels)).toEqual(
+      distinctPolitenessForms('es').map((d) => d.levels),
+    );
+  });
+
   it('a level set resolves to distinct forms per language', () => {
     expect(
-      selectedPolitenessForms('es', ['casual', 'polite']).map((f) => f.id),
+      selectedPolitenessForms('nl', ['casual', 'polite']).map((f) => f.id),
     ).toEqual(['t']);
+    expect(
+      selectedPolitenessForms('es', ['casual', 'polite']).map((f) => f.id),
+    ).toEqual(['t', 'v']);
     expect(
       selectedPolitenessForms('de', ['casual', 'polite']).map((f) => f.id),
     ).toEqual(['t', 'v']);
@@ -246,8 +262,10 @@ describe('course helpers', () => {
       'Casual · du',
       'Polite · Sie',
     ]);
+    const nl = coursePolitenessRows(['nl']);
+    expect(nl.map((r) => r.level)).toEqual(['casual', 'formal']);
     const es = coursePolitenessRows(['es']);
-    expect(es.map((r) => r.level)).toEqual(['casual', 'formal']);
+    expect(es.map((r) => r.level)).toEqual(['casual', 'polite']);
   });
 
   it('Japanese + German shows three rows with per-language forms', () => {
@@ -259,19 +277,30 @@ describe('course helpers', () => {
     ]);
   });
 
-  it('Spanish + French shows three rows from two two-form languages', () => {
-    const rows = coursePolitenessRows(['es', 'fr']);
+  it('Dutch + French shows three rows from two two-form languages', () => {
+    const rows = coursePolitenessRows(['nl', 'fr']);
     expect(rows.map((r) => r.level)).toEqual(['casual', 'polite', 'formal']);
     expect(rows[1].perLanguage.map((p) => p.form.id)).toEqual(['t', 'v']);
   });
 
+  it('two-form languages splitting alike share their two rows', () => {
+    const rows = coursePolitenessRows(['es_mixed', 'fr']);
+    expect(rows.map((r) => r.level)).toEqual(['casual', 'polite']);
+    expect(rows[1].perLanguage.map((p) => `${p.code}:${p.form.name}`)).toEqual([
+      'es:usted',
+      'es_latam:usted',
+      'fr:vous',
+    ]);
+  });
+
   it('a mixed dialect course shows the union of its sub-variants', () => {
     const rows = coursePolitenessRows(['es_mixed']);
-    expect(rows.map((r) => r.level)).toEqual(['casual', 'polite', 'formal']);
+    expect(rows.map((r) => r.level)).toEqual(['casual', 'polite']);
+    expect(rows[0].perLanguage.map((p) => p.code)).toEqual(['es', 'es_latam']);
   });
 
   it('hidden levels inherit the visible level below them', () => {
-    const rows = coursePolitenessRows(['es']);
+    const rows = coursePolitenessRows(['nl']);
     expect(levelsFromTickedRows(rows, ['casual'])).toEqual([
       'casual',
       'polite',
@@ -282,6 +311,13 @@ describe('course helpers', () => {
       'polite',
       'formal',
     ]);
+    // A distance split hides the top level instead: it follows polite.
+    const esRows = coursePolitenessRows(['es']);
+    expect(levelsFromTickedRows(esRows, ['polite'])).toEqual([
+      'polite',
+      'formal',
+    ]);
+    expect(levelsFromTickedRows(esRows, ['casual'])).toEqual(['casual']);
     const jaRows = coursePolitenessRows(['ja']);
     expect(levelsFromTickedRows(jaRows, ['polite'])).toEqual(['polite']);
   });
