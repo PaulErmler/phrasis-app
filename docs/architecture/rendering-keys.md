@@ -118,8 +118,6 @@ rolled back for free.
 
 Production held only unkeyed rows when this shipped, so the storage
 contract changed without a data migration. Dev and staging had run the
-withdrawn politeness build, whose extra rows, pointers, claims and columns
-the runAll-chained migrations in convex/migrations.ts remove. The
-transitional `v.optional(v.any())` columns in `convex/schema.ts` are
-dropped once those have run everywhere (kanban card
-drop-rendering-cutover-columns).
+withdrawn politeness build; its extra rows, pointers, claims and columns
+were removed by the runAll-chained migrations of the previous deploy, and
+the transitional columns went with this one.

@@ -23,16 +23,7 @@ const CONVEX_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const THIS_FILE = relative(CONVEX_ROOT, fileURLToPath(import.meta.url))
   .split('\\')
   .join('/');
-const ALLOWED = new Set([
-  'schema.ts',
-  'db/translationReads.ts',
-  // The one-off collapse of the withdrawn politeness renderings reads the
-  // whole live range of a pair, which the accessor deliberately does not
-  // expose. It goes away with the transitional columns (kanban:
-  // drop-rendering-cutover-columns).
-  'migrations.ts',
-  THIS_FILE,
-]);
+const ALLOWED = new Set(['schema.ts', 'db/translationReads.ts', THIS_FILE]);
 const INDEX_LITERALS = [
   "'by_text_language_supersededAt'",
   "'by_textId_supersededAt'",

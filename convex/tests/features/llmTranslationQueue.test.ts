@@ -122,7 +122,6 @@ describe('features/llmTranslationQueue', () => {
         await ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: Date.now(),
         });
       });
@@ -139,7 +138,6 @@ describe('features/llmTranslationQueue', () => {
         ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: Date.now(),
           priority: 'background',
           workId: 'llm-warm-work-1',
@@ -164,7 +162,6 @@ describe('features/llmTranslationQueue', () => {
         await ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: Date.now(),
           priority: 'background',
         });
@@ -180,7 +177,6 @@ describe('features/llmTranslationQueue', () => {
         await ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: Date.now(),
           priority: 'background',
           workId: 'llm-warm-work-2',
@@ -197,7 +193,6 @@ describe('features/llmTranslationQueue', () => {
         ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: Date.now() - 11 * 60 * 1000,
           priority: 'background',
           workId: 'llm-warm-work-3',
@@ -219,7 +214,6 @@ describe('features/llmTranslationQueue', () => {
         ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: claimedBefore,
         }),
       );
@@ -268,7 +262,6 @@ describe('features/llmTranslationQueue', () => {
         ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: Date.now() - 60_000,
           priority: 'background',
         }),
@@ -337,7 +330,6 @@ describe('features/llmTranslationQueue', () => {
         await ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: claimedBefore,
           workId: 'live-owner',
         });
@@ -364,7 +356,6 @@ describe('features/llmTranslationQueue', () => {
         await ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: Date.now() - 11 * 60 * 1000,
           workId: 'dead-owner',
         });
@@ -417,7 +408,6 @@ describe('features/llmTranslationQueue', () => {
         await ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: Date.now(),
           workId: 'llm-w-1',
         });
@@ -439,7 +429,6 @@ describe('features/llmTranslationQueue', () => {
         await ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: Date.now(),
           workId: 'llm-w-1',
         });
@@ -458,7 +447,6 @@ describe('features/llmTranslationQueue', () => {
         await ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: Date.now(),
         });
       });
@@ -478,7 +466,6 @@ describe('features/llmTranslationQueue', () => {
         await ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: Date.now(),
           workId: 'newer-owner',
         });
@@ -502,7 +489,6 @@ describe('features/llmTranslationQueue', () => {
         ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: claimedBefore,
           workId: 'llm-w-1',
         }),
@@ -563,7 +549,6 @@ describe('features/llmTranslationQueue', () => {
         await ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: claimedBefore,
           workId: 'newer-owner',
         });
@@ -629,7 +614,6 @@ describe('features/llmTranslationQueue', () => {
         await ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: Date.now(),
           workId: 'pool-w-1',
         });
@@ -995,7 +979,6 @@ describe('features/llmTranslationQueue', () => {
           ctx.db.insert('llmTranslationClaims', {
             textId,
             targetLanguage: 'en_gb',
-            variantKey: 'female',
             claimedAt: Date.now(),
             workId: 'llm-w-accent',
           }),
@@ -1222,7 +1205,6 @@ describe('features/llmTranslationQueue', () => {
         ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: KEY,
           claimedAt: Date.now(),
           workId: 'llm-w-1',
         }),
