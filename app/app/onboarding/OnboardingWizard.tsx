@@ -58,7 +58,7 @@ import {
 /**
  * The onboarding wizard proper: step order, per-step state, persistence
  * hooks and the shared footer. app/app/onboarding/page.tsx wires it to the
- * signed-in user's progress row; app/onboarding-preview renders it with
+ * signed-in user's progress row; app/dev/onboarding-preview renders it with
  * in-memory handlers so the flow can be looked at without a fresh sign-up.
  * The step list and the finish semantics are documented on the page.
  */

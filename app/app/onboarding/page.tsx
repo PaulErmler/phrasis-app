@@ -61,7 +61,8 @@ import { OnboardingWizard, reportOnboardingFailure } from './OnboardingWizard';
  * from `onboardingProgress.step`.
  *
  * The wizard itself (state, step order, footer) lives in OnboardingWizard.tsx
- * so the dev-only /onboarding-preview route can render it without a session.
+ * so the local-only /dev/onboarding-preview route can render it without a
+ * session.
  */
 
 export default function OnboardingPage() {
