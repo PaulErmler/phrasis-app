@@ -47,6 +47,10 @@ export interface OnboardingWalkOptions {
   // `placementMaxQuestions` to bail if something goes wrong.
   placementAnswer?: 'knew' | 'didnt'; // applied to every question
   placementMaxQuestions?: number;
+  // Politeness step (Sep 2026), right after the language pair and only for
+  // Japanese and Korean targets, so the walker checks which step appeared.
+  // Default: every row, the preselected recommended answer.
+  politeness?: ('casual' | 'polite' | 'formal')[];
   // Final step: review-mode pick. Shadowing (audio) is the default;
   // translate/transcribe both land in the writing mode with that input style.
   reviewMode?: 'audio' | 'translate' | 'transcribe';
@@ -103,7 +107,47 @@ export async function completeOnboardingFresh(
   });
   await page.getByTestId(`language-option-${target}`).first().click();
   await page.getByTestId(`language-option-${source}`).first().click();
-  await advance(null, 'onboarding-step-acquisition');
+  await page.getByTestId('onboarding-continue').click();
+
+  // 1b. Politeness, only for Japanese and Korean targets. Whichever of the
+  // two steps appears next decides. Every row starts ticked (the
+  // recommended answer). No `politeness` option keeps that; otherwise
+  // toggle each row to the wanted state.
+  await expect
+    .poll(
+      async () => {
+        await dismissErrorBoundary(page);
+        const politeness = await page
+          .getByTestId('onboarding-step-politeness')
+          .isVisible()
+          .catch(() => false);
+        const acquisition = await page
+          .getByTestId('onboarding-step-acquisition')
+          .isVisible()
+          .catch(() => false);
+        return politeness || acquisition;
+      },
+      { timeout: 20_000 },
+    )
+    .toBe(true);
+  if (await page.getByTestId('onboarding-step-politeness').isVisible()) {
+    const levels = opts.politeness;
+    if (levels && levels.length > 0) {
+      const rows = page.locator(
+        '[data-testid^="politeness-"][role="checkbox"]',
+      );
+      for (const row of await rows.all()) {
+        const level = (await row.getAttribute('data-testid'))?.replace(
+          'politeness-',
+          '',
+        );
+        const wanted = levels.includes(level as (typeof levels)[number]);
+        const ticked = (await row.getAttribute('aria-checked')) === 'true';
+        if (wanted !== ticked) await row.click();
+      }
+    }
+    await advance(null, 'onboarding-step-acquisition');
+  }
 
   // 2. Acquisition source.
   await page.getByTestId(`acquisition-option-${acquisition}`).click();
@@ -182,6 +226,20 @@ export async function completeOnboardingFresh(
     ).toBeVisible({ timeout: 20_000 });
     await page.getByTestId('placement-result-continue').click();
   }
+
+  // 6b. Every level branch lands on the review mode.
+  await expect
+    .poll(
+      async () => {
+        await dismissErrorBoundary(page);
+        return page
+          .getByTestId('onboarding-step-review-mode')
+          .isVisible()
+          .catch(() => false);
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true);
 
   // 7. Review mode. The final step. Continue ("Start learning") runs
   // completeOnboarding (course + deck + seeded cards) inline behind a
@@ -457,11 +515,21 @@ export function appMain(page: Page): Locator {
  * attempts). Instead retry the whole cycle: click toward the desired
  * state, give the mutation a bounded flush window, reload, re-read. A
  * write the reload killed is simply re-issued on the next pass.
+ *
+ * `reopen` is for controls that do not survive the reload on their own —
+ * anything inside a sheet or dialog. It runs after `page.reload()` and
+ * before the re-read, so the toggles are mounted again by the time this
+ * checks them. Without it the caller is stuck hand-rolling the fragile
+ * half of the pattern (a fixed pause, then one un-retried read), which is
+ * what learning-settings.spec.ts still does.
  */
 export async function ensureTogglesSaved(
   page: Page,
   expected: Array<{ toggle: Locator; on: boolean }>,
-  timeoutMs = 45_000,
+  {
+    reopen,
+    timeoutMs = 45_000,
+  }: { reopen?: (page: Page) => Promise<void>; timeoutMs?: number } = {},
 ): Promise<void> {
   // Once ANY click happened, only a post-reload read proves persistence —
   // before that, aria-checked may be the optimistic patch of a write that
@@ -482,6 +550,7 @@ export async function ensureTogglesSaved(
     // the reload below kills the websocket.
     if (clickedThisPass) await page.waitForTimeout(1_000);
     await page.reload();
+    if (reopen) await reopen(page);
     for (const { toggle, on } of expected) {
       await expect(toggle).toBeVisible({ timeout: 15_000 });
       expect(await toggle.getAttribute('aria-checked')).toBe(String(on));

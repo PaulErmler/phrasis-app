@@ -2,6 +2,7 @@ import { convexTest, type TestConvex } from 'convex-test';
 import { describe, it, expect } from 'vitest';
 import schema from '../../schema';
 import { api, internal } from '../../_generated/api';
+import { pickPolitenessForm } from '../../../lib/preferenceResolution';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -132,6 +133,22 @@ describe('features/writingAlternatives generation pipeline', () => {
     expect(row?.audioAssetId).toBe(context?.reusableAssetId);
   });
 
+  it('getAlternativeContext voices a per-card gender correction on a course without settings', async () => {
+    const t = convexTest(schema, modules);
+    const a = await seedAlternative(t, 'A');
+    await t.run(async (ctx) => {
+      await ctx.db.patch(a.textId, { audioSpeakerGender: 'male' });
+      await ctx.db.patch(a.cardId, { renderingGenderOverride: 'female' });
+    });
+    const context = await t.query(
+      internal.features.writingAlternatives.getAlternativeContext,
+      { alternativeId: a.alternativeId },
+    );
+    // The card hears a female voice (the Flag dialog's correction), so the
+    // alternative is probed and voiced female first.
+    expect(context?.genders).toEqual(['female', 'male']);
+  });
+
   it('hasAudio short-circuits the pipeline for rows that already carry audio', async () => {
     const t = convexTest(schema, modules);
     const a = await seedAlternative(t, 'A');
@@ -256,6 +273,44 @@ describe('features/writingAlternatives edit-dialog CRUD', () => {
         text: 'quisiera un café',
       });
 
+    expect(await t.run((ctx) => ctx.db.get(a.alternativeId))).toBeNull();
+  });
+
+  it('updateAlternative measures "the primary" against the rendering the card shows', async () => {
+    // A course set to formal serves the usted variant. Rewording an
+    // alternative to the CANONICAL tú wording is then a real alternative,
+    // not the card's own sentence; the served wording is (2026-09-09 review).
+    const t = convexTest(schema, modules);
+    const a = await seedAlternative(t, 'A');
+    const formId = pickPolitenessForm('es', ['formal'], a.textId)!.id;
+    await t.run(async (ctx) => {
+      const card = (await ctx.db.get(a.cardId))!;
+      const deck = (await ctx.db.get(card.deckId))!;
+      await ctx.db.insert('courseSettings', {
+        courseId: deck.courseId,
+        initialReviewCount: 3,
+        politenessLevels: ['formal'],
+      });
+      await ctx.db.patch(a.cardId, { followsCoursePreferences: true });
+      await ctx.db.insert('translations', {
+        textId: a.textId,
+        targetLanguage: 'es',
+        translatedText: 'Querría un café, por favor.',
+        variantKey: `auto|${formId}`,
+      });
+    });
+    const asUser = t.withIdentity({ subject: 'user_A' });
+    await asUser.mutation(api.features.writingAlternatives.updateAlternative, {
+      alternativeId: a.alternativeId,
+      text: 'quisiera un café',
+    });
+    expect((await t.run((ctx) => ctx.db.get(a.alternativeId)))?.text).toBe(
+      'quisiera un café',
+    );
+    await asUser.mutation(api.features.writingAlternatives.updateAlternative, {
+      alternativeId: a.alternativeId,
+      text: 'Querría un café, por favor.',
+    });
     expect(await t.run((ctx) => ctx.db.get(a.alternativeId))).toBeNull();
   });
 

@@ -1,27 +1,7 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NextIntlClientProvider } from 'next-intl';
-
-// cmdk uses ResizeObserver and Element.scrollIntoView; jsdom ships neither.
-// Polyfill before any component renders so the Command palette can mount.
-beforeAll(() => {
-  if (typeof globalThis.ResizeObserver === 'undefined') {
-    class StubResizeObserver {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    }
-    (globalThis as any).ResizeObserver = StubResizeObserver;
-  }
-  if (
-    typeof window !== 'undefined' &&
-    !(Element.prototype as unknown as { scrollIntoView?: unknown })
-      .scrollIntoView
-  ) {
-    (Element.prototype as any).scrollIntoView = function () {};
-  }
-});
 
 vi.mock('@/components/ui/checkbox', () => ({
   Checkbox: ({ checked }: { checked?: boolean }) => (

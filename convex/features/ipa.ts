@@ -53,11 +53,17 @@ async function getEspeakWorker(): Promise<EspeakNgWorkerInstance> {
  * ("h_ə_l_ˈoʊ w_ˈɜː_l_d\n"). Strip the separators, join clauses with a
  * space, collapse whitespace. Punctuation is dropped by espeak itself;
  * that's normal for IPA transcriptions.
+ *
+ * Two voices also leak an internal marker into the stream. Danish writes some
+ * glottal stops as ASCII `?` while writing others as `ʔ` in the same word
+ * ("ˈalʔesˌ?ɑmən"), and Icelandic emits a stray `#` ("kʋˈɛrdn#ɪx"). espeak
+ * has already dropped the input's own punctuation by this point, so neither
+ * rewrite can reach real text.
  */
 export function cleanEspeakIpa(raw: string): string {
   return raw
     .split('\n')
-    .map((line) => line.replace(/_/g, '').trim())
+    .map((line) => line.replace(/_|#/g, '').replace(/\?/g, 'ʔ').trim())
     .filter((line) => line.length > 0)
     .join(' ')
     .replace(/\s{2,}/g, ' ')
@@ -65,8 +71,23 @@ export function cleanEspeakIpa(raw: string): string {
 }
 
 /**
- * IPA for `text` in `language`. Throws when the language has no espeak voice
- * or espeak returns nothing; callers convert that into the `''` sentinel.
+ * espeak switches voice mid-sentence when it recognises a word as belonging
+ * to another language, and marks the switch inline: the French voice renders
+ * "And you?" as "(en)and(fr) jˈu".
+ *
+ * The markers are not the real problem. The switched-to word is left as RAW
+ * TEXT — "and", not "ænd" — so the line reads as if a Latin word were IPA,
+ * and stripping the markers alone would hide that rather than fix it. There
+ * is no way to disable the switching through this binding, so a transcription
+ * carrying one is treated as failed.
+ */
+const LANGUAGE_SWITCH = /\([a-z]{2,3}(?:-[a-z0-9-]+)?\)/i;
+
+/**
+ * IPA for `text` in `language`. Throws when the language has no espeak voice,
+ * when espeak returns nothing, or when it switched language mid-sentence;
+ * callers convert that into the `''` sentinel, so the line is simply absent
+ * rather than wrong.
  */
 export async function ipaForText(
   text: string,
@@ -83,6 +104,12 @@ export async function ipaForText(
   const ipa = cleanEspeakIpa(worker.synthesize_ipa(text).ipa ?? '');
   if (ipa.length === 0) {
     throw new Error(`espeak produced empty IPA for "${language}"`);
+  }
+  if (LANGUAGE_SWITCH.test(ipa)) {
+    throw new Error(
+      `espeak switched language mid-sentence for "${language}" (${ipa.slice(0, 60)}); ` +
+        'the switched span is untranscribed, so the whole line is unusable',
+    );
   }
   return ipa;
 }

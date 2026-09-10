@@ -300,6 +300,14 @@ describe('features/curriculumFlagTesting', () => {
             baseLanguages: ['en'],
             targetLanguages: ['sv'],
           });
+          // B needs an ACTIVE course, not just a course: the count resolves
+          // the same active course `armProbe` arms in, so the assertion is a
+          // true inverse of the arm step.
+          await ctx.db.insert('userSettings', {
+            userId: 'user_B',
+            hasCompletedOnboarding: true,
+            activeCourseId: courseB,
+          });
           const deckB = await ctx.db.insert('decks', {
             courseId: courseB,
             name: 'd',
@@ -328,6 +336,58 @@ describe('features/curriculumFlagTesting', () => {
           await t.query(
             internal.features.curriculumFlagTesting.userCardCountForText,
             { email: EMAIL_B, textId },
+          ),
+        ).toBe(1);
+      });
+
+      it('is not truncated by other accounts studying the same text', async () => {
+        // Regression: the count used to scan `cards` on `by_textId` across
+        // EVERY account under a `.take(200)` ceiling and filter afterwards.
+        // A popular curriculum sentence carries one row per account, so on a
+        // deployment with leftover fixture users the caller's own card fell
+        // outside the window and the count came back 0 with nothing wrong.
+        // That read as "the card already forked" and broke
+        // e2e/curriculum-edit-flag.spec.ts twice (2026-09-09).
+        const t = convexTest(schema, modules);
+        const { textId, collectionId, cardId, deckId } =
+          await seedCurriculumFixture(t);
+        await t.run(async (ctx) => {
+          // The caller's own card has to sort AFTER the crowd, which is what
+          // production looks like: the leftover accounts signed up before
+          // this run's fixture user did. Re-inserted below.
+          const own = (await ctx.db.get(cardId))!;
+          await ctx.db.delete(cardId);
+          for (let i = 0; i < 250; i++) {
+            const courseId = await ctx.db.insert('courses', {
+              userId: `filler_${i}`,
+              baseLanguages: ['en'],
+              targetLanguages: ['sv'],
+            });
+            const fillerDeckId = await ctx.db.insert('decks', {
+              courseId,
+              name: 'd',
+              cardCount: 1,
+            });
+            await ctx.db.insert('cards', {
+              deckId: fillerDeckId,
+              textId,
+              collectionId,
+              collectionOrigin: 'premade',
+              dueDate: Date.now(),
+              isMastered: false,
+              isHidden: false,
+              schedulingPhase: 'preReview',
+              preReviewCount: 0,
+            });
+          }
+          const { _id: _drop, _creationTime: _ts, ...fields } = own;
+          await ctx.db.insert('cards', { ...fields, deckId });
+        });
+
+        expect(
+          await t.query(
+            internal.features.curriculumFlagTesting.userCardCountForText,
+            { email: EMAIL, textId },
           ),
         ).toBe(1);
       });

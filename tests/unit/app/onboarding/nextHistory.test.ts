@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextHistory } from '@/app/app/onboarding/page';
+import { nextHistory } from '@/app/app/onboarding/OnboardingWizard';
 
 /**
  * The wizard's Back stack. `placement-test` is the step these tests exist

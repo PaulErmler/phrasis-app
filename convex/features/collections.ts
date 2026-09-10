@@ -27,10 +27,17 @@ import {
   sourceTextFromContent,
 } from '../lib/cardContent';
 import {
+  collectRenderingStamp,
   enqueueVersionBumpRegen,
+  flushRenderingStamps,
+  newMetadataCallBudget,
+  newRenderingStampCollector,
+  type RenderingStampCollector,
   scheduleMissingContent,
   scheduleTranslationForLanguage,
   scheduleAudioForLanguage,
+  scheduleMissingRenderings,
+  ensureVariantAudio,
 } from '../lib/contentScheduling';
 import {
   isCollectionAccessible,
@@ -49,7 +56,9 @@ import {
   resolveCardSpeakerGenders,
 } from '../../lib/languages';
 import {
+  annotationFieldsOf,
   missingAnnotationKinds,
+  annotationRequestInFlight,
   scheduleTranslationAnnotations,
   TEXT_ANNOTATIONS,
 } from '../lib/textAnnotations';
@@ -78,7 +87,14 @@ import {
   liveTranslation,
   servedSourceText,
   viewOfCard,
+  audioPointer,
+  previewView,
+  renderingSettingsOf,
+  renderingTextOf,
+  resolveServedRendering,
 } from '../db/translationReads';
+import { getCourseSettings } from '../db/courseSettings';
+import type { RenderingSettings } from '../../lib/preferenceResolution';
 
 // ============================================================================
 // QUERIES
@@ -138,6 +154,16 @@ export const browseCollectionTexts = query({
       audioRecordings: v.array(audioRecordingValidator),
       missingTranslationLanguages: v.array(v.string()),
       needsAnnotationBackfill: v.boolean(),
+      /**
+       * The course's sentence-form settings want a rendering this row does
+       * not have yet. Same reason `needsAnnotationBackfill` exists: the
+       * client's `requestPreviewTranslations` batching keys off
+       * `missingTranslationLanguages`, and a row whose canonical
+       * translations are all present is never sent, so the rewrite was
+       * never asked for and the row sat on "updating" for good
+       * (2026-09-09, the Thai pre-A1 rows).
+       */
+      needsRenderingRewrite: v.boolean(),
     }),
   ),
   handler: async (ctx, args) => {
@@ -250,19 +276,26 @@ export const browseCollectionTexts = query({
       mark: marks[i],
     }));
 
+    const renderingSettings = renderingSettingsOf(
+      await getCourseSettings(ctx, course._id),
+    );
     const inputs = rows.map((row, i) => ({
       key: String(i),
       textId: row.text._id,
       sourceText: row.text.text,
       sourceLanguage: row.text.language,
-      sourceRomanization: row.text.romanizedText ?? undefined,
-      sourceIpa: row.text.ipaText ?? undefined,
-      sourceFurigana: row.text.furiganaText ?? undefined,
+      // Values and engine tags together: see sourceAnnotations in
+      // convex/lib/cardContent.ts.
+      sourceAnnotations: annotationFieldsOf(row.text),
       userCreated: row.text.userCreated,
+      renderingText: renderingTextOf(row.text),
       // The learner's card when they have one, so the preview shows the
-      // wording that card shows, with its pin and its accent. Otherwise the
-      // live rows and the accent row a new card would get.
-      view: row.card ? viewOfCard(row.card) : null,
+      // wording that card shows, with its pin, its accent and its
+      // rendering. Otherwise the live rows, the accent row and the
+      // rendering a new card would get (canonical until the variant lands).
+      view: row.card
+        ? viewOfCard(row.card, renderingSettings)
+        : previewView(renderingSettings),
     }));
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
@@ -290,21 +323,15 @@ export const browseCollectionTexts = query({
       // the feature). The client's requestPreviewTranslations batching keys
       // off `missingTranslationLanguages`, so without this flag those rows
       // were never requested and the annotation gap stayed visible forever
-      // in the preview. Projected values mirror the stored tri-state for
-      // course languages, so `=== undefined` (via missingAnnotationKinds)
-      // honours the '' failure sentinel here too.
-      const needsAnnotationBackfill =
-        missingAnnotationKinds(row.text.language, row.text).length > 0 ||
-        content.translations.some(
-          (tr) =>
-            tr.language !== row.text.language &&
-            tr.text.length > 0 &&
-            missingAnnotationKinds(tr.language, {
-              romanizedText: tr.romanization,
-              ipaText: tr.ipa,
-              furiganaText: tr.furigana,
-            }).length > 0,
-        );
+      // in the preview. The batch's own probe reads the stored rows with
+      // their engine tags; re-deriving it from the projected values here
+      // could not see a stale-engine row, so a Hebrew preview kept its old
+      // consonant-only line until the card was opened elsewhere.
+      const needsAnnotationBackfill = content.hasMissingAnnotation;
+      // `formPending` is per language; the row is what the client batches.
+      const needsRenderingRewrite = content.translations.some(
+        (tr) => tr.formPending === true,
+      );
       return {
         _id: row.text._id,
         text: sourceTextFromContent(content, row.text),
@@ -325,6 +352,7 @@ export const browseCollectionTexts = query({
         audioRecordings: content.audioRecordings,
         missingTranslationLanguages,
         needsAnnotationBackfill,
+        needsRenderingRewrite,
       };
     });
 
@@ -436,13 +464,34 @@ export const setCollectionTextMark = mutation({
  * `opts.llmPriority` tiers the translation enqueues. A parameter rather than a
  * constant because the preview paths that share this function are user-facing:
  * only the onboarding warmup passes 'background'.
+ *
+ * `opts.stamps` collects the rendering stamps this pass finds missing, so a
+ * browsed collection shows its form chips like a card does. A caller looping
+ * over texts passes one collector and flushes it once (25 rows per
+ * classifier call); without one this text flushes its own.
  */
 export async function scheduleMissingTranslationsForText(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   languages: string[],
-  opts?: { llmPriority?: LlmPriority; requestedByUserId?: string },
+  opts?: {
+    llmPriority?: LlmPriority;
+    requestedByUserId?: string;
+    stamps?: RenderingStampCollector;
+    /**
+     * The course's sentence-form settings, when the caller is a browse
+     * surface that should render them. Passing them runs the variant sweep
+     * for this text, TEXT ONLY (`skipTts`), which is Paul's 2026-08-28 rule
+     * for browse surfaces: they may buy a translation, never a clip. Without
+     * it a collection preview showed the canonical wording no matter what
+     * politeness level the course had set, since only the review ensure path
+     * ever asked for a variant.
+     */
+    renderingSettings?: RenderingSettings;
+  },
 ): Promise<number> {
+  const ownStampCollector = opts?.stamps === undefined;
+  const stamps = opts?.stamps ?? newRenderingStampCollector();
   const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
     text,
     text._id,
@@ -453,13 +502,23 @@ export async function scheduleMissingTranslationsForText(
   // Backfill missing annotations (romanization, IPA) for the source text.
   // Same `=== undefined` test as the card sweep. The empty-string sentinel
   // means "tried and failed", and re-running it would burn the retries again
-  // on every page reveal.
-  for (const kind of missingAnnotationKinds(text.language, text)) {
-    await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].sourceTextAction, {
-      textId: text._id,
-      text: text.text,
-      language: text.language,
-    });
+  // on every page reveal. Same request claim as the card sweep too
+  // (`annotationRequestInFlight`), so a transient failure is retried once
+  // per cooldown rather than on every reveal.
+  const sourceKinds = missingAnnotationKinds(text.language, text);
+  if (sourceKinds.length > 0 && !annotationRequestInFlight(text)) {
+    await ctx.db.patch(text._id, { annotationRequestedAt: Date.now() });
+    for (const kind of sourceKinds) {
+      await ctx.scheduler.runAfter(
+        0,
+        TEXT_ANNOTATIONS[kind].sourceTextAction,
+        {
+          textId: text._id,
+          text: text.text,
+          language: text.language,
+        },
+      );
+    }
   }
 
   // A Mixed English course shows a British- or Australian-voiced text its
@@ -502,6 +561,11 @@ export async function scheduleMissingTranslationsForText(
         // annotation gap until the text was added to a deck. Mirrors that
         // sweep's loop in decks.ts.
         await scheduleTranslationAnnotations(ctx, existing, undefined);
+        // Rows translated before the sentence-form settings carry no
+        // classifier stamps, so the preview would show no form chips for
+        // them. The card sweep stamps its rows the same way; this is the
+        // only path that meets a collection's rows before they are cards.
+        collectRenderingStamp(existing, stamps);
         continue;
       }
       // Mirror the sweep's deferrals: never regenerate under an active TTS
@@ -544,6 +608,34 @@ export async function scheduleMissingTranslationsForText(
       scheduled++;
     }
   }
+  // The rendering the course's sentence-form settings ask for, so a browse
+  // surface shows the level the learner picked instead of the canonical
+  // wording. Text only: `skipTts` keeps the browse-surface rule that a
+  // preview may buy a translation but never a clip. A course with no
+  // settings returns after zero reads.
+  if (opts?.renderingSettings !== undefined) {
+    const variants = await scheduleMissingRenderings(
+      ctx,
+      text._id,
+      text,
+      wantedLanguages,
+      [],
+      opts.renderingSettings,
+      {
+        skipTts: true,
+        stamps,
+        requestedByUserId: opts?.requestedByUserId,
+        llmPriority: opts?.llmPriority,
+        // Same tier as the canonical enqueues above: a browse surface never
+        // competes with a card a learner is looking at.
+        priority: 'background',
+      },
+    );
+    scheduled += variants.translationsScheduled;
+  }
+  if (ownStampCollector) {
+    await flushRenderingStamps(ctx, stamps, opts?.requestedByUserId);
+  }
   return scheduled;
 }
 
@@ -581,6 +673,12 @@ export const requestPreviewTranslations = mutation({
       course.targetLanguages,
     );
 
+    // One collector for the batch, so the classifier is asked once per
+    // language per 25 rows instead of once per text.
+    const stamps = newRenderingStampCollector();
+    const renderingSettings = renderingSettingsOf(
+      await getCourseSettings(ctx, course._id),
+    );
     let translationsScheduled = 0;
     for (const textId of textIds) {
       const text = await ctx.db.get(textId);
@@ -599,9 +697,10 @@ export const requestPreviewTranslations = mutation({
         languages,
         // Explicit preview request: the viewing user caused this spend. The
         // prewarm sibling below stays unattributed (speculative work).
-        { requestedByUserId: userId },
+        { requestedByUserId: userId, stamps, renderingSettings },
       );
     }
+    await flushRenderingStamps(ctx, stamps, userId);
 
     return { translationsScheduled };
   },
@@ -646,14 +745,24 @@ export const prewarmPreviewTranslations = mutation({
       course.targetLanguages,
     );
 
+    const stamps = newRenderingStampCollector();
     let translationsScheduled = 0;
     for (const text of texts) {
       translationsScheduled += await scheduleMissingTranslationsForText(
         ctx,
         text,
         languages,
+        // No `renderingSettings`: prewarm fills MISSING canonical rows for a
+        // page the learner has not reached, and buying a politeness rewrite
+        // of a row that already exists is speculative spend on a sentence
+        // they may never open. The explicit `requestPreviewTranslations`
+        // below passes them, which is also the mutation that attributes the
+        // cost to a user. Prewarm deliberately does not attribute, because
+        // nobody asked for it.
+        { stamps },
       );
     }
+    await flushRenderingStamps(ctx, stamps);
 
     return { translationsScheduled };
   },
@@ -706,12 +815,44 @@ export const requestPreviewAudio = mutation({
         : null;
     const audioLanguage = source?.language ?? args.language;
 
-    const existingAudio = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('language', audioLanguage),
-      )
-      .first();
+    // The preview serves the rendering a NEW card would get, so on a course
+    // with a politeness level the row on screen can be a variant wording
+    // (`previewView`). Its clip lives under `audioVariantKey`, and
+    // `buildTextContentBatchForLanguages` refuses to play the canonical
+    // pointer for such a row: voicing the canonical one here left the button
+    // dead, resetting at once when a canonical clip existed and spinning
+    // through a whole synthesis when it did not. A preview row has no card,
+    // so only a target language can carry a key (the source slot's voice
+    // varies only under a card override).
+    if (audioLanguage !== text.language) {
+      const rendering = await resolveServedRendering(ctx, {
+        textId: args.textId,
+        targetLanguage: audioLanguage,
+        text: renderingTextOf(text),
+        view: previewView(
+          renderingSettingsOf(await getCourseSettings(ctx, course._id)),
+        ),
+      });
+      const servedRow = rendering.served?.row;
+      if (rendering.rendering.audioVariantKey !== null && servedRow) {
+        // `ensureVariantAudio` derives the voice from the rendering itself,
+        // so no `resolveCardSpeakerGenders` call is needed here.
+        const scheduled = await ensureVariantAudio(
+          ctx,
+          args.textId,
+          {
+            language: audioLanguage,
+            text: servedRow.translatedText,
+            regionVariant: servedRow.regionVariant,
+          },
+          rendering.rendering,
+          { requestedByUserId: userId },
+        );
+        return { scheduled };
+      }
+    }
+
+    const existingAudio = await audioPointer(ctx, args.textId, audioLanguage);
     if (existingAudio) {
       // A row only counts as "audio exists" if it still resolves to a
       // playable blob. A dangling pointer. Asset row deleted, or asset
@@ -843,6 +984,11 @@ export const ensureFirstSentencesForCollection = internalMutation({
       .order('asc')
       .take(COLLECTION_PREVIEW_SIZE);
 
+    // One rendering-stamp flush for the batch (25 rows per classifier call),
+    // and one metadata-call budget so the warm asks the sentence classifier
+    // for at most five texts per collection.
+    const stamps = newRenderingStampCollector();
+    const metadataCalls = newMetadataCallBudget();
     await Promise.all(
       texts.map((text) =>
         scheduleMissingContent(
@@ -853,10 +999,11 @@ export const ensureFirstSentencesForCollection = internalMutation({
           args.targetLanguages,
           // Signup-time warm of ~20 collections × 5 texts: background, so
           // this burst can't queue ahead of the user's own cards.
-          { priority: 'background' },
+          { priority: 'background', stamps, metadataCalls },
         ),
       ),
     );
+    await flushRenderingStamps(ctx, stamps);
     return null;
   },
 });

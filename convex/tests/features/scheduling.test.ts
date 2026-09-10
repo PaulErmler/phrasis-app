@@ -6,6 +6,11 @@ import schema from '../../schema';
 import { api } from '../../_generated/api';
 import type { Id } from '../../_generated/dataModel';
 import { PROGRESS_DISPLAY_INTERVAL } from '../../../lib/constants/learning';
+import {
+  FLAG_REWARD_CREDITS,
+  FLAG_REWARDS_PER_MONTH,
+} from '../../../lib/languages';
+import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
 import { llmPool } from '@/convex/lib/workpools';
 import { CLAIM_STALE_MS } from '../../features/llmTranslationQueue';
 import { resolveAudioPayload } from '../../lib/audioAssets';
@@ -156,6 +161,36 @@ describe('features/scheduling', () => {
         {},
       );
       expect(res).toBeNull();
+    });
+
+    // The chips travel through `translationValidator`, so a field the
+    // content builder emits but the validator does not declare fails the
+    // QUERY, not the builder. The variant suites assert on
+    // `buildTextContentBatchForLanguages` directly and never see that, which
+    // is how `formLanguage` shipped undeclared (2026-09-09).
+    it('returns the chip fields through the query validator', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedCardWithCourse(t);
+      await t.run(async (ctx) => {
+        // A premade text so the card can carry a rendering at all, with a
+        // target row the classifier has stamped.
+        await ctx.db.patch(textId, { userCreated: false, userId: undefined });
+        await ctx.db.insert('translations', {
+          textId,
+          targetLanguage: 'en',
+          translatedText: 'Hello',
+          renderedPoliteness: 'polite',
+          renderedGender: 'feminine',
+        });
+      });
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      const res = await asUser.query(
+        api.features.scheduling.getCardForReview,
+        {},
+      );
+      const en = res?.translations.find((tr) => tr.language === 'en');
+      expect(en?.renderedPoliteness).toBe('polite');
+      expect(en?.formLanguage).toBe('en');
     });
 
     it("returns due card for user's active deck", async () => {
@@ -421,6 +456,9 @@ describe('features/scheduling', () => {
           romanization: 'heh-loh',
           ipa: 'ipa-en',
           retranslating: false,
+          // The card's one voice (the seeded text's audioSpeakerGender),
+          // carried on every entry for the gender chip.
+          voiceGender: 'female',
         },
         {
           language: 'de',
@@ -429,6 +467,7 @@ describe('features/scheduling', () => {
           isTargetLanguage: true,
           ipa: 'ipa-de',
           retranslating: false,
+          voiceGender: 'female',
         },
         {
           // Source entry: text comes from texts.text (no translations row),
@@ -440,6 +479,7 @@ describe('features/scheduling', () => {
           romanization: 'oh-la moon-doh',
           ipa: 'ipa-es',
           retranslating: false,
+          voiceGender: 'female',
         },
       ]);
       // audioRecordings mirrors the same language order, one entry per language.
@@ -3134,6 +3174,8 @@ describe('features/scheduling', () => {
         flagsBalance?: number;
         flagCount?: number;
         userCreated?: boolean;
+        /** Seed a `credits` balance too (the flag reward's target). */
+        credits?: number;
       } = {},
     ) {
       return t.run(async (ctx) => {
@@ -3202,6 +3244,16 @@ describe('features/scheduling', () => {
               used: 10 - flagsBalance,
               unlimited: false,
             },
+            ...(opts.credits !== undefined
+              ? {
+                  credits: {
+                    balance: opts.credits,
+                    included: opts.credits,
+                    used: 0,
+                    unlimited: false,
+                  },
+                }
+              : {}),
           },
           lastSyncedAt: Date.now(),
         });
@@ -3218,9 +3270,14 @@ describe('features/scheduling', () => {
         api.features.scheduling.flagTranslation,
         {
           cardId,
+          reasons: ['wrong_translation'],
         },
       );
-      expect(res).toEqual({ retranslated: true, updatedToLatest: false });
+      expect(res).toEqual({
+        retranslated: true,
+        updatedToLatest: false,
+        creditsAwarded: 0,
+      });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(1);
@@ -3272,9 +3329,14 @@ describe('features/scheduling', () => {
         api.features.scheduling.flagTranslation,
         {
           cardId,
+          reasons: ['wrong_translation'],
         },
       );
-      expect(res).toEqual({ retranslated: false, updatedToLatest: false });
+      expect(res).toEqual({
+        retranslated: false,
+        updatedToLatest: false,
+        creditsAwarded: 0,
+      });
 
       expect(llmEnqueues()).toHaveLength(0);
 
@@ -3293,6 +3355,247 @@ describe('features/scheduling', () => {
           .first(),
       );
       expect(quota?.features.translation_flags.balance).toBe(10);
+    });
+
+    const pendingJobs = (t: TestConvex<typeof schema>, name: string) =>
+      t.run(async (ctx) =>
+        (await ctx.db.system.query('_scheduled_functions').collect()).filter(
+          (job) => job.name.includes(name) && job.state.kind === 'pending',
+        ),
+      );
+    const creditsBalance = (t: TestConvex<typeof schema>) =>
+      t.run(
+        async (ctx) =>
+          (
+            await ctx.db
+              .query('usageQuotas')
+              .withIndex('by_userId', (q) => q.eq('userId', 'user_A'))
+              .first()
+          )?.features.credits?.balance,
+      );
+
+    it('stores the reasons and the note on the audit row', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedFlaggableCard(t);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+        reasons: ['other', 'wrong_translation', 'other'],
+        note: '  the verb is in the wrong tense  ',
+      });
+      const edit = await t.run(async (ctx) =>
+        ctx.db
+          .query('cardEdits')
+          .withIndex('by_kind', (q) => q.eq('kind', 'flag'))
+          .first(),
+      );
+      expect(edit?.flagReasons).toEqual(['other', 'wrong_translation']);
+      expect(edit?.flagNote).toBe('the verb is in the wrong tense');
+      expect(llmEnqueues()).toHaveLength(1);
+    });
+
+    it('rejects an empty reason list', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedFlaggableCard(t);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      await expect(
+        asUser.mutation(api.features.scheduling.flagTranslation, {
+          cardId,
+          reasons: [],
+        }),
+      ).rejects.toThrow();
+    });
+
+    it('wrong_gender: no retranslation, no quota; the override lands and the classifier is asked from the source', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId, translationId } = await seedFlaggableCard(t);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      const res = await asUser.mutation(
+        api.features.scheduling.flagTranslation,
+        {
+          cardId,
+          reasons: ['wrong_gender'],
+          requestedGender: 'female',
+        },
+      );
+      expect(res).toEqual({
+        retranslated: false,
+        updatedToLatest: false,
+        creditsAwarded: 0,
+      });
+      expect(llmEnqueues()).toHaveLength(0);
+      // The counter still rose (QC), the quota was not charged.
+      expect((await t.run((ctx) => ctx.db.get(translationId)))?.flagCount).toBe(
+        1,
+      );
+      const quota = await t.run(async (ctx) =>
+        ctx.db
+          .query('usageQuotas')
+          .withIndex('by_userId', (q) => q.eq('userId', 'user_A'))
+          .first(),
+      );
+      expect(quota?.features.translation_flags.balance).toBe(10);
+      const card = await t.run((ctx) => ctx.db.get(cardId));
+      expect(card?.renderingGenderOverride).toBe('female');
+      expect(card?.renderingPolitenessOverride).toBeUndefined();
+      const classify = await pendingJobs(t, 'fetchSentenceMetadata');
+      expect(classify).toHaveLength(1);
+      expect(classify[0].args[0]).toMatchObject({
+        textId,
+        translations: [{ language: 'es', text: 'Hola mundo' }],
+      });
+      expect(
+        (await t.run((ctx) => ctx.db.get(textId)))?.metadataRequestedAt,
+      ).toBeDefined();
+      const ensure = await pendingJobs(t, 'prepareCardContent');
+      expect(ensure).toHaveLength(1);
+      expect(ensure[0].args[0]).toMatchObject({
+        textId,
+        renderingCard: { renderingGenderOverride: 'female' },
+      });
+    });
+
+    it('wrong_gender on a text the current classifier already judged is not re-asked', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, textId } = await seedFlaggableCard(t);
+      await t.run((ctx) =>
+        ctx.db.patch(textId, {
+          metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
+          speakerGender: 'neutral',
+        }),
+      );
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+        reasons: ['wrong_gender'],
+      });
+      expect(await pendingJobs(t, 'fetchSentenceMetadata')).toHaveLength(0);
+    });
+
+    it('wrong_gender without a pick falls back to a retranslation, like wrong_politeness', async () => {
+      // Every flag under the cap attempts a fix (Paul, 2026-09-09). With no
+      // pick there is no override to write and, on a text the classifier
+      // already judged, nothing to ask it; the shared row is retranslated.
+      const t = convexTest(schema, modules);
+      const { cardId, textId } = await seedFlaggableCard(t);
+      await t.run((ctx) =>
+        ctx.db.patch(textId, {
+          metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
+          speakerGender: 'neutral',
+        }),
+      );
+      vi.mocked(llmPool.enqueueAction).mockClear();
+      await t
+        .withIdentity({ subject: 'user_A' })
+        .mutation(api.features.scheduling.flagTranslation, {
+          cardId,
+          reasons: ['wrong_gender'],
+        });
+      expect(llmEnqueues()).toHaveLength(1);
+    });
+
+    it('wrong_politeness with a level writes the override and skips the retranslation; without one it retranslates', async () => {
+      const t = convexTest(schema, modules);
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      const { cardId } = await seedFlaggableCard(t);
+      await asUser.mutation(api.features.scheduling.flagTranslation, {
+        cardId,
+        reasons: ['wrong_politeness'],
+        requestedPolitenessLevel: 'polite',
+      });
+      expect(llmEnqueues()).toHaveLength(0);
+      expect(
+        (await t.run((ctx) => ctx.db.get(cardId)))?.renderingPolitenessOverride,
+      ).toBe('polite');
+
+      const t2 = convexTest(schema, modules);
+      const { cardId: cardId2 } = await seedFlaggableCard(t2);
+      vi.mocked(llmPool.enqueueAction).mockClear();
+      await t2
+        .withIdentity({ subject: 'user_A' })
+        .mutation(api.features.scheduling.flagTranslation, {
+          cardId: cardId2,
+          reasons: ['wrong_politeness'],
+        });
+      expect(llmEnqueues()).toHaveLength(1);
+    });
+
+    it('pays the reward once per card, counted against the month, and never for a custom sentence', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId } = await seedFlaggableCard(t, { credits: 10 });
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      const first = await asUser.mutation(
+        api.features.scheduling.flagTranslation,
+        {
+          cardId,
+          reasons: ['wrong_gender'],
+        },
+      );
+      expect(first.creditsAwarded).toBe(FLAG_REWARD_CREDITS);
+      expect(await creditsBalance(t)).toBe(10 + FLAG_REWARD_CREDITS);
+      const period = new Date().toISOString().slice(0, 7);
+      const reward = await t.run(async (ctx) =>
+        ctx.db
+          .query('flagRewards')
+          .withIndex('by_user_and_period', (q) =>
+            q.eq('userId', 'user_A').eq('period', period),
+          )
+          .first(),
+      );
+      expect(reward?.count).toBe(1);
+
+      // The same card again: still flagged, not paid again.
+      const second = await asUser.mutation(
+        api.features.scheduling.flagTranslation,
+        {
+          cardId,
+          reasons: ['wrong_gender'],
+        },
+      );
+      expect(second.creditsAwarded).toBe(0);
+      expect(await creditsBalance(t)).toBe(10 + FLAG_REWARD_CREDITS);
+
+      // A custom sentence: nothing shared improves, nothing is paid.
+      const t2 = convexTest(schema, modules);
+      const { cardId: own } = await seedFlaggableCard(t2, {
+        credits: 10,
+        userCreated: true,
+      });
+      const res = await t2
+        .withIdentity({ subject: 'user_A' })
+        .mutation(api.features.scheduling.flagTranslation, {
+          cardId: own,
+          reasons: ['wrong_translation'],
+        });
+      expect(res.creditsAwarded).toBe(0);
+      expect(await creditsBalance(t2)).toBe(10);
+    });
+
+    it('stops paying at the monthly cap; the flag itself still works', async () => {
+      const t = convexTest(schema, modules);
+      const { cardId, translationId } = await seedFlaggableCard(t, {
+        credits: 10,
+      });
+      const period = new Date().toISOString().slice(0, 7);
+      await t.run((ctx) =>
+        ctx.db.insert('flagRewards', {
+          userId: 'user_A',
+          period,
+          count: FLAG_REWARDS_PER_MONTH,
+        }),
+      );
+      const res = await t
+        .withIdentity({ subject: 'user_A' })
+        .mutation(api.features.scheduling.flagTranslation, {
+          cardId,
+          reasons: ['wrong_translation'],
+        });
+      expect(res.creditsAwarded).toBe(0);
+      expect(res.retranslated).toBe(true);
+      expect(await creditsBalance(t)).toBe(10);
+      expect((await t.run((ctx) => ctx.db.get(translationId)))?.flagCount).toBe(
+        1,
+      );
     });
 
     it('flags every non-source-language translation at once, single quota charge', async () => {
@@ -3367,9 +3670,14 @@ describe('features/scheduling', () => {
         api.features.scheduling.flagTranslation,
         {
           cardId,
+          reasons: ['wrong_translation'],
         },
       );
-      expect(res).toEqual({ retranslated: true, updatedToLatest: false });
+      expect(res).toEqual({
+        retranslated: true,
+        updatedToLatest: false,
+        creditsAwarded: 0,
+      });
 
       // Both translation rows got their flagCount bumped.
       const translations = await t.run(async (ctx) =>
@@ -3414,9 +3722,14 @@ describe('features/scheduling', () => {
         api.features.scheduling.flagTranslation,
         {
           cardId,
+          reasons: ['wrong_translation'],
         },
       );
-      expect(res).toEqual({ retranslated: true, updatedToLatest: false });
+      expect(res).toEqual({
+        retranslated: true,
+        updatedToLatest: false,
+        creditsAwarded: 0,
+      });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(2);
@@ -3448,9 +3761,14 @@ describe('features/scheduling', () => {
         api.features.scheduling.flagTranslation,
         {
           cardId,
+          reasons: ['wrong_translation'],
         },
       );
-      expect(res).toEqual({ retranslated: false, updatedToLatest: false });
+      expect(res).toEqual({
+        retranslated: false,
+        updatedToLatest: false,
+        creditsAwarded: 0,
+      });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(3);
@@ -3485,9 +3803,14 @@ describe('features/scheduling', () => {
         api.features.scheduling.flagTranslation,
         {
           cardId,
+          reasons: ['wrong_translation'],
         },
       );
-      expect(res).toEqual({ retranslated: false, updatedToLatest: false });
+      expect(res).toEqual({
+        retranslated: false,
+        updatedToLatest: false,
+        creditsAwarded: 0,
+      });
 
       const translation = await t.run(async (ctx) => ctx.db.get(translationId));
       expect(translation?.flagCount).toBe(1);
@@ -3513,6 +3836,7 @@ describe('features/scheduling', () => {
       await expect(
         asUser.mutation(api.features.scheduling.flagTranslation, {
           cardId,
+          reasons: ['wrong_translation'],
         }),
       ).rejects.toThrow();
 

@@ -53,6 +53,44 @@ describe('CardShell smoke', () => {
     expect(body.dataset.target).toBe('es');
   });
 
+  it('renders the sentence-form chips of the served target rows', () => {
+    render(
+      <CardShell
+        presentation={makePresentation({
+          sourceText: 'Is that car yours?',
+          translations: [
+            {
+              language: 'en',
+              text: 'Is that car yours?',
+              isBaseLanguage: true,
+              isTargetLanguage: false,
+            },
+            {
+              language: 'fr',
+              text: 'Cette voiture-là est à toi ?',
+              isBaseLanguage: false,
+              isTargetLanguage: true,
+              voiceGender: 'male',
+              renderedPoliteness: 'casual',
+            },
+          ],
+        })}
+        reviewCount={4}
+        bare
+      >
+        {() => <div data-testid="card-children" />}
+      </CardShell>,
+    );
+
+    // Built inside the shell, so every surface that renders a card through
+    // it (review, library) shows them without wiring anything.
+    expect(screen.getByTestId('form-chip-masculine')).toBeInTheDocument();
+    // A two-form language reads the generic word, not its own form (tu).
+    expect(screen.getByTestId('form-chip-fr-casual')).toHaveTextContent(
+      /^casual$/i,
+    );
+  });
+
   it('falls back to the raw source text when there is no base translation, and bare skips the <main> wrapper', () => {
     render(
       <CardShell

@@ -30,6 +30,9 @@ export async function upsertCourseSettings(
     autoAddCards?: boolean;
     cardsToAddBatchSize?: number;
     dailyTimeGoalMinutes?: number;
+    // The politeness preference (see lib/languageForms.ts). Stamped from the
+    // onboarding answer; undefined keeps the canonical renderings.
+    politenessLevels?: ('casual' | 'polite' | 'formal')[];
   },
 ): Promise<Id<'courseSettings'>> {
   const existing = await ctx.db

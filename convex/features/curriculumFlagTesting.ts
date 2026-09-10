@@ -1,8 +1,12 @@
 import { v } from 'convex/values';
 import { internalMutation, internalQuery } from '../_generated/server';
-import { assertTestHooksEnabled, requireUserIdByEmail } from '../lib/testHooks';
+import {
+  activeCourseForEmail,
+  assertTestHooksEnabled,
+} from '../lib/testHooks';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
+import { politenessLevelValidator, voiceGenderValidator } from '../types';
 import {
   liveTranslation,
   liveTranslationsForText,
@@ -30,6 +34,12 @@ import {
  */
 
 /**
+ * Decks scanned per call. A course has one deck today; the headroom is for
+ * the multi-deck shape without turning either hook into an unbounded scan.
+ */
+const MAX_DECKS = 5;
+
+/**
  * Find a card in the user's active course that is backed by a SHARED
  * curriculum text and has a flaggable translation, park that translation's
  * `flagCount` at the cap, and report what the spec needs to drive the UI.
@@ -55,21 +65,12 @@ export const armProbe = internalMutation({
   ),
   handler: async (ctx, args) => {
     assertTestHooksEnabled();
-    const userId = await requireUserIdByEmail(ctx, args.email);
-
-    const settings = await ctx.db
-      .query('userSettings')
-      .withIndex('by_userId', (q) => q.eq('userId', userId))
-      .first();
-    const courseId = settings?.activeCourseId;
-    if (!courseId) throw new Error(`No active course for "${args.email}"`);
-    const course = await ctx.db.get(courseId);
-    if (!course) throw new Error(`Active course ${courseId} is missing`);
+    const { course } = await activeCourseForEmail(ctx, args.email);
 
     const decks = await ctx.db
       .query('decks')
-      .withIndex('by_courseId', (q) => q.eq('courseId', courseId))
-      .take(5);
+      .withIndex('by_courseId', (q) => q.eq('courseId', course._id))
+      .take(MAX_DECKS);
 
     const courseLanguages = new Set([
       ...course.baseLanguages,
@@ -145,28 +146,43 @@ export const readTranslation = internalQuery({
 });
 
 /**
- * How many of this user's cards still point at the given text. Scoped to one
- * user because the dev deployment's other fixture users study the same shared
- * curriculum rows; a global count would never reach zero.
+ * How many cards in this user's ACTIVE course still point at the given text.
+ * The spec's inverse of `armProbe`: it arms a card in the active course, so
+ * the count that proves the fork has to look in the same place. The count
+ * must be per-user, not global — the deployment's other fixture users study
+ * the same shared curriculum rows, so a global count would never reach zero.
+ *
+ * Walked deck-first through `by_deckId_and_textId`, never `by_textId`. The
+ * old version scanned `by_textId` across EVERY account and filtered down to
+ * the caller afterwards, under a `.take(200)` ceiling: one row per account
+ * that studies the sentence, so on a deployment carrying leftover fixture
+ * users the caller's own card fell outside the window and the count read 0
+ * with nothing wrong. That broke curriculum-edit-flag.spec.ts twice (see
+ * e2e/global-teardown.ts, which purges accounts to keep the ceiling out of
+ * reach). Deck-scoped, the read is bounded by the deck count instead and no
+ * number of other users can push the answer around.
  */
 export const userCardCountForText = internalQuery({
   args: { email: v.string(), textId: v.id('texts') },
   returns: v.number(),
   handler: async (ctx, args) => {
     assertTestHooksEnabled();
-    const userId = await requireUserIdByEmail(ctx, args.email);
+    const { course } = await activeCourseForEmail(ctx, args.email);
 
-    const cards = await ctx.db
-      .query('cards')
-      .withIndex('by_textId', (q) => q.eq('textId', args.textId))
-      .take(200);
+    const decks = await ctx.db
+      .query('decks')
+      .withIndex('by_courseId', (q) => q.eq('courseId', course._id))
+      .take(MAX_DECKS);
 
     let count = 0;
-    for (const card of cards) {
-      const deck = await ctx.db.get(card.deckId);
-      if (!deck) continue;
-      const course = await ctx.db.get(deck.courseId);
-      if (course?.userId === userId) count += 1;
+    for (const deck of decks) {
+      const cards = await ctx.db
+        .query('cards')
+        .withIndex('by_deckId_and_textId', (q) =>
+          q.eq('deckId', deck._id).eq('textId', args.textId),
+        )
+        .collect();
+      count += cards.length;
     }
     return count;
   },
@@ -186,6 +202,48 @@ export const restoreProbe = internalMutation({
     if (row) {
       await ctx.db.patch(row._id, {
         flagCount: args.originalFlagCount ?? undefined,
+      });
+    }
+    return null;
+  },
+});
+
+/**
+ * The per-card rendering corrections the Flag dialog writes
+ * (`cards.renderingGenderOverride` / `renderingPolitenessOverride`), so the
+ * spec can prove the dialog's politeness pick reached the mutation.
+ */
+export const readCardRendering = internalQuery({
+  args: { cardId: v.id('cards') },
+  returns: v.union(
+    v.null(),
+    v.object({
+      renderingGenderOverride: v.optional(voiceGenderValidator),
+      renderingPolitenessOverride: v.optional(politenessLevelValidator),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    assertTestHooksEnabled();
+    const card = await ctx.db.get(args.cardId);
+    if (!card) return null;
+    return {
+      renderingGenderOverride: card.renderingGenderOverride,
+      renderingPolitenessOverride: card.renderingPolitenessOverride,
+    };
+  },
+});
+
+/** Drop the corrections a spec's flag wrote, so repeat runs start clean. */
+export const clearCardRendering = internalMutation({
+  args: { cardId: v.id('cards') },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    assertTestHooksEnabled();
+    const card = await ctx.db.get(args.cardId);
+    if (card) {
+      await ctx.db.patch(card._id, {
+        renderingGenderOverride: undefined,
+        renderingPolitenessOverride: undefined,
       });
     }
     return null;

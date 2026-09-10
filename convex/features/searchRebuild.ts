@@ -87,6 +87,7 @@ export async function rebuildSearchableTextForTextHandler(
   // build runs once per distinct language list and revision set.
   const caches = {
     deckLanguages: new Map<Id<'decks'>, string[] | null>(),
+    deckRenderingSettings: new Map(),
     liveRows: new Map<string, (Doc<'translations'> | null)[]>(),
     built: new Map<
       string,

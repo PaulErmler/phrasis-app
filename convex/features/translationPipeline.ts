@@ -9,6 +9,7 @@ import { getRomanizationSource } from '../lib/localRomanization';
 import {
   getVoiceForText,
   getMixedVariantByRegion,
+  pickMixedVariantForNewRow,
   resolveMixedVariant,
   ROMANIZATION_LANGUAGES,
   IPA_LANGUAGES,
@@ -32,8 +33,13 @@ import {
   findReusableAudioAssetForVoice,
   upsertAudioPointer,
 } from '../lib/audioAssets';
-import { claimTtsIfAvailable } from './ttsProcessing';
-import { getLlmClaim } from './llmTranslationQueue';
+import { claimTtsIfAvailable, variantTtsClaims } from './ttsProcessing';
+import { deleteAudioRow } from '../lib/audio';
+import {
+  classificationLanguageForRow,
+  renderingAxesFor,
+} from '../lib/renderingClassifier';
+import { getLlmClaim, variantLlmClaims } from './llmTranslationQueue';
 import { enqueueTtsForVoice } from '../lib/contentScheduling';
 import { scheduleSearchableTextRebuild } from './searchRebuild';
 import {
@@ -42,8 +48,16 @@ import {
   voiceGenderValidator,
   asVoiceGender,
 } from '../types';
-import { liveTranslation } from '../db/translationReads';
-import { scheduleTranslationAnnotations } from '../lib/textAnnotations';
+import {
+  liveTranslation,
+  audioPointer,
+  audioPointersForTextLanguage,
+  variantTranslationsForTextLanguage,
+} from '../db/translationReads';
+import {
+  romanizationAfterFailure,
+  scheduleTranslationAnnotations,
+} from '../lib/textAnnotations';
 
 /**
  * Translation write pipeline: the legacy Google Translate worker action and
@@ -239,6 +253,25 @@ const vStoreTranslationAndScheduleTtsArgs = v.object({
    * ordinary fill, which is the overwhelming majority of calls.
    */
   retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
+  /**
+   * Rendering VARIANT write (docs/architecture/translation-variants.md):
+   * the row is keyed by `variantKey` (`textVariantKey`) and its audio by
+   * `audioVariantKey`. The wording is compared with the canonical live
+   * row's and stored with `sameAsCanonical` when identical, in which case
+   * no annotations or classifier stamp are scheduled (the canonical row
+   * serves) but audio in the card's voice still is when `audioVariantKey`
+   * is set. Absent on every canonical write.
+   */
+  variantKey: v.optional(v.string()),
+  audioVariantKey: v.optional(v.string()),
+  /**
+   * The canonical wording a variant job rewrote (`rewriteOf` on the job).
+   * A rewrite of a wording that is no longer the canonical one (a flag or
+   * a bump landed while the job ran) is refused: the variant of the new
+   * wording is asked for by the next ensure pass. Absent on canonical
+   * writes and on variant jobs from before the field.
+   */
+  rewriteOf: v.optional(v.string()),
 });
 export const storeTranslationAndScheduleTtsArgs =
   vStoreTranslationAndScheduleTtsArgs.fields;
@@ -304,7 +337,12 @@ export async function processTranslationForCardHandler(
           args.preferredRegionVariant,
         )
       : null) ??
-    resolveMixedVariant(args.targetLanguage, args.textId as string);
+    // An existing row with no pin predates the column and keeps the legacy
+    // coin its wording was written under; only a brand-new row gets the
+    // decorrelated pick. See `pickMixedVariantForNewRow`.
+    (existingRow === null
+      ? pickMixedVariantForNewRow(args.targetLanguage, args.textId as string)
+      : resolveMixedVariant(args.targetLanguage, args.textId as string));
   const translateTarget = mixed ? mixed.subCode : args.targetLanguage;
   const regionVariant = mixed?.regionVariant;
 
@@ -326,10 +364,14 @@ export async function processTranslationForCardHandler(
     ) {
       try {
         romanizedText = await romanizeText(translation, translateTarget);
-      } catch {
-        // 3 retries already exhausted. Persist sentinel so subsequent
-        // ensureContent runs see "tried" and skip rescheduling.
-        romanizedText = '';
+      } catch (err) {
+        // 3 retries already exhausted. Persist the sentinel so subsequent
+        // ensureContent runs see "tried" and skip rescheduling; a transient
+        // failure leaves the field undefined for the sweep to retry.
+        romanizedText = romanizationAfterFailure(
+          err,
+          `[translationPipeline] ${translateTarget}`,
+        );
       }
     } else {
       romanizedText = existingRow!.romanizedText;
@@ -363,13 +405,13 @@ export async function processTranslationForCardHandler(
       try {
         romanizedText = await romanizeText(translation, translateTarget);
       } catch (err) {
-        // 3 retries already exhausted. Persist the empty-string
-        // sentinel so ensureContent doesn't reschedule another burst.
-        console.error(
-          `Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
-          err instanceof Error ? err.message : err,
+        // 3 retries already exhausted. Persist the empty-string sentinel so
+        // ensureContent doesn't reschedule another burst; a transient
+        // failure leaves the field undefined for the sweep to retry.
+        romanizedText = romanizationAfterFailure(
+          err,
+          `[translationPipeline] ${translateTarget}`,
         );
-        romanizedText = '';
       }
     }
   }
@@ -475,6 +517,10 @@ type TranslationWriteResult = {
  *    not write. The reclaiming job owns the row now, and a late stale result
  *    landing after the owner's would silently revert it (worst case: a
  *    flag-retranslation's text overwritten while its audio survives).
+ *  - stale rewrite: a variant job carries the canonical wording it rewrote
+ *    (`rewriteOf`); when the canonical row has moved on since (a flag or a
+ *    bump retired the pair's variants and claims), the rewrite describes a
+ *    wording no card shows and is dropped.
  *  - backstop at the write choke point: no job may overwrite existing wording
  *    on a user-created card, whatever enqueued it. Callers already refuse to
  *    ask (`flagTranslation` short-circuits on user-created texts, and
@@ -506,7 +552,12 @@ async function guardTranslationWrite(
   }
 
   if (args.expectedClaimId !== undefined) {
-    const llmClaim = await getLlmClaim(ctx, args.textId, args.targetLanguage);
+    const llmClaim = await getLlmClaim(
+      ctx,
+      args.textId,
+      args.targetLanguage,
+      args.variantKey,
+    );
     if (llmClaim?._id !== args.expectedClaimId) {
       await resolveRetranslation(
         ctx,
@@ -517,7 +568,36 @@ async function guardTranslationWrite(
     }
   }
 
-  const existing = await liveTranslation(ctx, args.textId, args.targetLanguage);
+  if (args.variantKey !== undefined && args.rewriteOf !== undefined) {
+    const canonical = await liveTranslation(
+      ctx,
+      args.textId,
+      args.targetLanguage,
+    );
+    if (canonical !== null && canonical.translatedText !== args.rewriteOf) {
+      console.warn(
+        '[storeTranslationAndScheduleTTS] dropping a variant rewrite of a superseded canonical wording',
+        {
+          textId: args.textId,
+          targetLanguage: args.targetLanguage,
+          variantKey: args.variantKey,
+        },
+      );
+      await resolveRetranslation(
+        ctx,
+        args.retranslationAuditId,
+        'dropped_superseded',
+      );
+      return null;
+    }
+  }
+
+  const existing = await liveTranslation(
+    ctx,
+    args.textId,
+    args.targetLanguage,
+    args.variantKey,
+  );
 
   if (existing && args.replaceExisting && isUserCreatedText(text)) {
     await resolveRetranslation(
@@ -559,6 +639,7 @@ async function insertTranslationRow(
       : {}),
     ...(args.regionVariant ? { regionVariant: args.regionVariant } : {}),
     ...(args.speakerGender ? { speakerGender: args.speakerGender } : {}),
+    ...(args.variantKey ? { variantKey: args.variantKey } : {}),
     // Freshly produced row → stamp the language's current method version.
     translationVersion: getCurrentTranslationVersion(args.targetLanguage),
   });
@@ -619,6 +700,11 @@ async function replaceTranslationRow(
     existing.translatedText,
     translatedText,
   );
+  // The rendering variants of this pair are rewrites of the wording being
+  // replaced; the next ensure pass rewrites them from the new one.
+  if (args.variantKey === undefined) {
+    await retireVariantRenderings(ctx, args.textId, args.targetLanguage);
+  }
 
   const patch: Partial<{
     translatedText: string;
@@ -632,6 +718,9 @@ async function replaceTranslationRow(
     regionVariant: string | undefined;
     speakerGender: 'male' | 'female';
     translationVersion: number;
+    renderedGender: 'masculine' | 'feminine' | 'unmarked' | undefined;
+    renderedPoliteness: 'casual' | 'polite' | 'formal' | 'unmarked' | undefined;
+    renderingStampAttempts: number | undefined;
   }> = {
     translatedText,
     // A retranslation is freshly produced → stamp the current method version.
@@ -653,6 +742,19 @@ async function replaceTranslationRow(
   // Furigana: same reasoning as IPA, same follow-up.
   patch.furiganaText = undefined;
   patch.furiganaSource = undefined;
+  // The rendering stamps describe the wording being replaced, so they go the
+  // same way as the annotations. `scheduleRenderingStamp` asks the
+  // classifier once right after this write, and that used to be the ONLY
+  // chance: keeping the old stamps made `needsRenderingStamp` refuse the row
+  // for good, so one failed or unparseable call left the chips labelling the
+  // new wording with the old form and `canonicalSatisfies` suppressing the
+  // variant the learner asked for. Cleared, the row falls back into the lazy
+  // sweep and `renderingStampPending` holds rewrites until the new stamp
+  // lands. The attempt counter resets with them: a new wording deserves its
+  // own budget.
+  patch.renderedGender = undefined;
+  patch.renderedPoliteness = undefined;
+  patch.renderingStampAttempts = undefined;
   if (args.translationSource) {
     patch.translationSource = args.translationSource;
   }
@@ -672,6 +774,79 @@ async function replaceTranslationRow(
     ipaMissingAfterWrite: true,
     furiganaMissingAfterWrite: true,
   };
+}
+
+/**
+ * Drop the rendering variants of (text, language): their live rows, their
+ * keyed audio pointers (assets kept in the content-addressed cache) and
+ * their in-flight LLM claims. The one deletion the variant model allows
+ * (docs/architecture/translation-variants.md): a canonical WORDING change
+ * (flag, curriculum fix, version bump) makes every rewrite of the old
+ * wording obsolete, the same way it drops the canonical clip. Never a
+ * switch of settings. A rewrite job still running lands its result against
+ * `rewriteOf` (`guardTranslationWrite`) and is dropped there; releasing
+ * its claim here lets the next ensure pass ask for the rewrite of the new
+ * wording right away instead of after the claim goes stale.
+ */
+export async function retireVariantRenderings(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  targetLanguage: string,
+): Promise<void> {
+  for (const row of await variantTranslationsForTextLanguage(
+    ctx,
+    textId,
+    targetLanguage,
+  )) {
+    await ctx.db.delete(row._id);
+  }
+  for (const pointer of await audioPointersForTextLanguage(
+    ctx,
+    textId,
+    targetLanguage,
+  )) {
+    if (pointer.variantKey === undefined) continue;
+    await deleteAudioRow(ctx, pointer, { keepAsset: true });
+  }
+  for (const claim of await variantLlmClaims(ctx, textId, targetLanguage)) {
+    await ctx.db.delete(claim._id);
+  }
+  // The TTS claims too. A synthesis in flight for a wording being retired
+  // would otherwise land after this and attach a pointer to the old
+  // wording's asset, which the next rewrite then treats as "already voiced".
+  for (const claim of await variantTtsClaims(ctx, textId, targetLanguage)) {
+    await ctx.db.delete(claim._id);
+  }
+}
+
+/**
+ * Stamp what a freshly landed CANONICAL wording is (renderedGender /
+ * renderedPoliteness) so the chips and the canonical-satisfies shortcut
+ * work without waiting for the lazy sweep. Only for languages that mark an
+ * axis; the classifier batches one row per call here.
+ */
+async function scheduleRenderingStamp(
+  ctx: MutationCtx,
+  args: StoreTranslationAndScheduleTtsArgs,
+): Promise<void> {
+  const axes = renderingAxesFor(
+    classificationLanguageForRow({
+      targetLanguage: args.targetLanguage,
+      regionVariant: args.regionVariant,
+    }),
+  );
+  if (!axes.gender && !axes.politeness) return;
+  const row = await liveTranslation(ctx, args.textId, args.targetLanguage);
+  if (!row) return;
+  await ctx.scheduler.runAfter(
+    0,
+    internal.features.renderingClassification.classifyAndStampTranslations,
+    {
+      translationIds: [row._id],
+      skipStamped: false,
+      userId: args.requestedByUserId,
+    },
+  );
 }
 
 /** Copy of `value` with every `undefined` property dropped, for inserts. */
@@ -716,12 +891,22 @@ async function archiveTranslationRevision(
       regionVariant: existing.regionVariant,
       speakerGender: existing.speakerGender,
       translationVersion: existing.translationVersion,
+      variantKey: existing.variantKey,
+      sameAsCanonical: existing.sameAsCanonical,
+      renderedGender: existing.renderedGender,
+      renderedPoliteness: existing.renderedPoliteness,
       audioAssetId,
       supersededAt,
     }),
   );
   await ctx.db.patch(existing._id, { lastArchivedAt: supersededAt });
-  await scheduleTranslationAnnotations(ctx, existing, supersededId);
+  // The archive row is new: the live row's request claim does not carry
+  // over, or a copy made inside the cooldown would wait it out for nothing.
+  await scheduleTranslationAnnotations(
+    ctx,
+    { ...existing, annotationRequestedAt: undefined },
+    supersededId,
+  );
 }
 
 /**
@@ -757,6 +942,17 @@ async function replaceForVersionBump(
       ...(args.translationSource
         ? { translationSource: args.translationSource }
         : {}),
+      // A `metadata_correction` that came back byte-identical must still
+      // record the gender it was regenerated under, or the sweep's
+      // `firstGenderCorrection` test (contentScheduling.ts) stays true and
+      // buys the same regeneration on every ensure pass, for good: the
+      // retry counter is only spent on the `retryGenderCorrection` branch,
+      // which a row can never reach while its `speakerGender` still holds
+      // the pre-correction value. A `version_bump` needs no equivalent,
+      // since stamping the version is itself what clears its trigger.
+      ...(args.translationReason === 'metadata_correction' && args.speakerGender
+        ? { speakerGender: args.speakerGender }
+        : {}),
     });
     return {
       outcome: 'restamped',
@@ -779,12 +975,12 @@ async function replaceForVersionBump(
           .withIndex('by_textId', (q) => q.eq('textId', args.textId))
           .first();
   if (referencingCard) {
-    const audio = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('language', args.targetLanguage),
-      )
-      .first();
+    const audio = await audioPointer(
+      ctx,
+      args.textId,
+      args.targetLanguage,
+      args.variantKey,
+    );
     if (audio) {
       await archiveTranslationRevision(ctx, existing, audio.assetId);
     }
@@ -937,6 +1133,10 @@ async function scheduleAnnotationRegeneration(
   args: StoreTranslationAndScheduleTtsArgs,
   write: TranslationWriteResult,
   translatedText: string,
+  // The row the annotations land on. A VARIANT write names its own row:
+  // the store resolves an unnamed row to the canonical one, whose wording
+  // guard would refuse the variant's text. Absent = the live canonical row.
+  translationId?: Id<'translations'>,
 ): Promise<void> {
   if (write.ipaMissingAfterWrite && IPA_LANGUAGES.has(args.targetLanguage)) {
     await ctx.scheduler.runAfter(
@@ -946,6 +1146,7 @@ async function scheduleAnnotationRegeneration(
         textId: args.textId,
         text: translatedText,
         language: args.targetLanguage,
+        translationId,
       },
     );
   }
@@ -960,6 +1161,7 @@ async function scheduleAnnotationRegeneration(
         textId: args.textId,
         text: translatedText,
         language: args.targetLanguage,
+        translationId,
       },
     );
   }
@@ -994,12 +1196,30 @@ async function scheduleTtsForLandedTranslation(
     ttsPriority = undefined;
   }
 
-  const existingAudio = await ctx.db
-    .query('audioRecordings')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', args.textId).eq('language', args.targetLanguage),
-    )
-    .first();
+  let existingAudio = await audioPointer(
+    ctx,
+    args.textId,
+    args.targetLanguage,
+    args.audioVariantKey,
+  );
+
+  // VARIANT pointers only. A pointer speaking a different sentence is not
+  // "already voiced", and for a variant nothing else will ever notice:
+  // `ensureVariantAudio` checks the blob, the provider and the ttsVersion
+  // but not the wording, so a clip that outlived its wording (a TTS job
+  // still in flight when `retireVariantRenderings` ran, see
+  // `variantTtsClaims`) is treated as valid on every later pass and the
+  // card renders one sentence while playing another, permanently. The
+  // canonical pointer is deliberately left alone here: `sweepInvalidAudio`
+  // owns that drift, which is what the decks.test.ts cases pin. Detach with
+  // the asset kept: it is still correct audio for its own string.
+  if (existingAudio && args.audioVariantKey !== undefined) {
+    const asset = await ctx.db.get(existingAudio.assetId);
+    if (asset && asset.spokenText !== translatedText) {
+      await deleteAudioRow(ctx, existingAudio, { keepAsset: true });
+      existingAudio = null;
+    }
+  }
 
   if (!existingAudio) {
     // A translation just landed. Check the content-addressed store before
@@ -1020,6 +1240,7 @@ async function scheduleTtsForLandedTranslation(
         args.textId,
         args.targetLanguage,
         asset._id,
+        args.audioVariantKey,
       );
     } else {
       const claimed = await claimTtsIfAvailable(
@@ -1027,6 +1248,7 @@ async function scheduleTtsForLandedTranslation(
         args.textId,
         args.targetLanguage,
         ttsPriority,
+        args.audioVariantKey,
       );
       if (claimed) {
         await enqueueTtsForVoice(ctx, {
@@ -1037,6 +1259,7 @@ async function scheduleTtsForLandedTranslation(
           regionVariant: args.regionVariant,
           priority: ttsPriority,
           requestedByUserId: args.requestedByUserId,
+          variantKey: args.audioVariantKey,
         });
       }
     }
@@ -1110,7 +1333,8 @@ export async function storeTranslationAndScheduleTTSHandler(
   const write = !existing
     ? await insertTranslationRow(ctx, args, translatedText, romanizedText)
     : args.replaceExisting
-      ? args.translationReason === 'version_bump'
+      ? args.translationReason === 'version_bump' ||
+        args.translationReason === 'metadata_correction'
         ? await replaceForVersionBump(
             ctx,
             args,
@@ -1129,11 +1353,18 @@ export async function storeTranslationAndScheduleTTSHandler(
 
   await resolveAuditForWriteOutcome(ctx, args, write, translatedText);
 
+  if (args.variantKey !== undefined) {
+    return finishVariantWrite(ctx, args, translatedText, write);
+  }
+
   if (write.searchableContentChanged) {
     await scheduleSearchableTextRebuild(ctx, args.textId);
   }
 
   await scheduleAnnotationRegeneration(ctx, args, write, translatedText);
+  if (write.outcome === 'inserted' || write.outcome === 'replaced') {
+    await scheduleRenderingStamp(ctx, args);
+  }
 
   // `audioUnchangedBySound`: the retained audio row already serves this
   // (text, language), skip outright.
@@ -1141,5 +1372,87 @@ export async function storeTranslationAndScheduleTTSHandler(
     return null;
   }
   await scheduleTtsForLandedTranslation(ctx, args, translatedText);
+  return null;
+}
+
+/**
+ * The follow-ups of a rendering VARIANT write. Generate-and-compare: a
+ * wording identical to the canonical live row's is stamped
+ * `sameAsCanonical` and gets no annotations, no classifier stamp and no
+ * search rebuild (the canonical row serves the text); a differing wording
+ * gets the classifier stamp, its own annotations and, unless the write
+ * was inaudible, its audio. Either way, when `audioVariantKey` names a
+ * voice the canonical pointer is not in, the served wording is voiced
+ * under that key. Search strings index the canonical wording only.
+ */
+async function finishVariantWrite(
+  ctx: MutationCtx,
+  args: StoreTranslationAndScheduleTtsArgs,
+  translatedText: string,
+  write: TranslationWriteResult,
+): Promise<null> {
+  const row = await liveTranslation(
+    ctx,
+    args.textId,
+    args.targetLanguage,
+    args.variantKey,
+  );
+  if (!row) return null;
+  const canonical = await liveTranslation(
+    ctx,
+    args.textId,
+    args.targetLanguage,
+  );
+  const sameAsCanonical =
+    canonical !== null && canonical.translatedText === translatedText;
+  const collapseChanged = sameAsCanonical !== (row.sameAsCanonical === true);
+  if (collapseChanged) {
+    await ctx.db.patch(row._id, {
+      sameAsCanonical: sameAsCanonical ? true : undefined,
+      // Clearing the stamps on collapse, not just skipping new ones: a row
+      // that used to differ carries a stamp describing a wording it no
+      // longer has, and the chips read the stamp of the row they serve.
+      // The canonical row's own stamp describes what is now shown.
+      ...(sameAsCanonical
+        ? { renderedGender: undefined, renderedPoliteness: undefined }
+        : {}),
+    });
+  }
+  // The cards following this rendering now show different words, so their
+  // search string is stale. `searchableText` follows the served rendering
+  // (`buildSearchableTextPatchForCard`), and this is the only place a
+  // variant wording changes, so without this the index kept the canonical
+  // wording and the library found a card by words it does not display.
+  if (write.searchableContentChanged || collapseChanged) {
+    await scheduleSearchableTextRebuild(ctx, args.textId);
+  }
+  if (!sameAsCanonical) {
+    if (write.outcome !== 'metadata_filled') {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.renderingClassification.classifyAndStampTranslations,
+        {
+          translationIds: [row._id],
+          skipStamped: false,
+          userId: args.requestedByUserId,
+        },
+      );
+    }
+    await scheduleAnnotationRegeneration(
+      ctx,
+      args,
+      write,
+      translatedText,
+      row._id,
+    );
+  }
+  if (args.audioVariantKey === undefined || write.audioUnchangedBySound) {
+    return null;
+  }
+  // The wording the card is served: the variant's own, or the canonical
+  // one it collapsed onto. Voiced under the audio variant key either way.
+  const spoken =
+    sameAsCanonical && canonical ? canonical.translatedText : translatedText;
+  await scheduleTtsForLandedTranslation(ctx, args, spoken);
   return null;
 }

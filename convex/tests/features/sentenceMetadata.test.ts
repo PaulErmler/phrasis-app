@@ -38,6 +38,7 @@ describe('features/sentenceMetadata', () => {
         speakerGender: 'female',
         addresseeGender: 'male',
         addressesSomeone: true,
+        referentGender: 'neutral',
       });
       expect(result).toEqual({
         register: 'formal',
@@ -45,6 +46,7 @@ describe('features/sentenceMetadata', () => {
         speakerGender: 'female',
         addresseeGender: 'male',
         addressesSomeone: true,
+        referentGender: 'neutral',
       });
     });
 

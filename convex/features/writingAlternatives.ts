@@ -1,8 +1,10 @@
 import {
-  cardPinAt,
   servedSourceText,
-  servedTranslatedText,
   viewOfCard,
+  renderingCardOf,
+  renderingSettingsOf,
+  renderingTextOf,
+  resolveServedRendering,
 } from '../db/translationReads';
 import { ConvexError, v } from 'convex/values';
 import {
@@ -14,6 +16,11 @@ import {
   type MutationCtx,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
+import { getCourseSettings } from '../db/courseSettings';
+import {
+  hasRenderingOverride,
+  resolveCardRendering,
+} from '../../lib/preferenceResolution';
 import type { Id } from '../_generated/dataModel';
 import {
   MAX_CARD_TEXT_LENGTH,
@@ -160,12 +167,24 @@ async function primaryTextForLanguage(
     // As the card shows it: the accent row on a Mixed English course.
     return (await servedSourceText(ctx, text, viewOfCard(card))).text;
   }
-  // The served revision, not necessarily the live row (pinned cards).
-  return servedTranslatedText(ctx, {
+  // The wording the card shows: the served revision (a pinned card may be
+  // on a superseded one) AND the rendering variant when the course's
+  // politeness setting or a Flag-dialog correction serves one. The accept
+  // path (`writingFeedback.getGradingContext`) resolves the primary the
+  // same way; reading the canonical row here made the edit dialog treat
+  // the canonical wording as "the card's own sentence" on a variant-served
+  // card, deleting a real alternative and accepting the card's sentence.
+  const deck = await ctx.db.get(card.deckId);
+  const settings = deck
+    ? renderingSettingsOf(await getCourseSettings(ctx, deck.courseId))
+    : undefined;
+  const rendering = await resolveServedRendering(ctx, {
     textId: card.textId,
     targetLanguage: language,
-    pinAt: cardPinAt(card),
+    text: renderingTextOf(text),
+    view: viewOfCard(card, settings),
   });
+  return rendering.served?.row.translatedText ?? null;
 }
 
 /**
@@ -309,10 +328,27 @@ export const getAlternativeContext = internalQuery({
     if (!row) return null;
     const card = await ctx.db.get(row.cardId);
     const text = card ? await ctx.db.get(card.textId) : null;
-    const primaryGender = resolveAudioSpeakerGender(
-      text?.audioSpeakerGender ?? text?.speakerGender,
-      alternativeId,
-    );
+    // The voice the card is spoken in: its rendering when the course has
+    // sentence-form settings or the card carries its own correction (which
+    // needs no settings, hence the empty stand-in, like `viewOfCard`), else
+    // the text's resolved audio speaker
+    // (docs/architecture/translation-variants.md).
+    const deck = card ? await ctx.db.get(card.deckId) : null;
+    const settings = deck
+      ? renderingSettingsOf(await getCourseSettings(ctx, deck.courseId))
+      : undefined;
+    const renderingCard = card ? renderingCardOf(card) : null;
+    const primaryGender =
+      text && renderingCard && (settings || hasRenderingOverride(renderingCard))
+        ? resolveCardRendering({
+            text: renderingTextOf(text),
+            textId: text._id,
+            card: renderingCard,
+          }).voiceGender
+        : resolveAudioSpeakerGender(
+            text?.audioSpeakerGender ?? text?.speakerGender,
+            alternativeId,
+          );
     const genders: ('male' | 'female')[] = [
       primaryGender,
       primaryGender === 'male' ? 'female' : 'male',
@@ -398,7 +434,13 @@ export const saveAlternativeAudio = internalMutation({
       regionVariant: undefined,
       spokenText: args.spokenText,
     });
-    const existing = await findAudioAssetByKey(ctx, key);
+    // The clip's own setup, as in `saveApprovalAudioAsset`: a clip from
+    // another setup is a sibling asset, not "existing".
+    const ttsVersion = getCurrentTtsVersion(key.language, key.regionVariant);
+    const existing = await findAudioAssetByKey(ctx, key, {
+      provider: args.provider,
+      version: ttsVersion,
+    });
     let assetId: Id<'audioAssets'>;
     if (existing && existing.ttsQuality !== 'unknown') {
       await deleteStorageBlobIfUnreferenced(ctx, args.storageId);
@@ -411,7 +453,7 @@ export const saveAlternativeAudio = internalMutation({
         ttsProvider: args.provider,
         ttsQuality: 'unvalidated',
         speed: 1,
-        ttsVersion: getCurrentTtsVersion(args.language),
+        ttsVersion,
       });
       if (result.outcome === 'kept') {
         await deleteStorageBlobIfUnreferenced(ctx, args.storageId);

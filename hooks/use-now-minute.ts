@@ -5,6 +5,20 @@ const MINUTE_MS = 60_000;
 const quantize = () => Math.floor(Date.now() / MINUTE_MS) * MINUTE_MS;
 
 /**
+ * The first `useNowMinute` value at or after `ms`: when a query bounded by that
+ * value will admit something due at `ms`.
+ *
+ * The inverse of this hook's quantization, and it lives here so the two cannot
+ * drift. Due dates are scattered across the first minute of a study day
+ * (`pickUniqueDueSlot`), so a card due at 04:00:37 is only served once the
+ * minute-floored `now` reaches 04:01:00. A countdown aimed at the raw due date
+ * would hit zero with nothing on screen.
+ */
+export function minuteBoundaryAtOrAfter(ms: number): number {
+  return Math.ceil(ms / MINUTE_MS) * MINUTE_MS;
+}
+
+/**
  * Current time quantized to the minute, refreshed once a minute.
  *
  * Meant as a stable `now` argument for reactive Convex queries (per the

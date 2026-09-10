@@ -18,6 +18,7 @@ import {
   buildJudgePrompt,
   buildPrompt,
   MAX_OUTPUT_TOKENS,
+  requestedFormInstruction,
   translateBestOfN,
   translateTextWithLLM,
 } from '../../features/translationLLM';
@@ -342,11 +343,131 @@ describe('features/translationLLM', () => {
       expect(p).toContain('<register>neutral</register>');
     });
 
+    describe('requested sentence forms (lib/preferenceResolution.ts variants)', () => {
+      const form = {
+        id: 'v',
+        label: 'Sie-form · formal',
+        prompt:
+          'Sie (Ihnen, Ihr, capitalised) with third-person plural verb forms.',
+      };
+
+      it('emits <register> for a requested form even without an addressee', () => {
+        const p = buildPrompt({
+          ...baseArgs,
+          addressesSomeone: false,
+          requestedForm: form,
+        });
+        expect(p).toContain('<register>v</register>');
+        expect(p).not.toContain('<addressee_gender>');
+        expect(p).toContain('Required politeness form: Sie-form · formal.');
+        expect(p).toContain(form.prompt);
+        expect(p).toContain('register-locked');
+      });
+
+      it('a requested form replaces the metadata register tag', () => {
+        const p = buildPrompt({
+          ...baseArgs,
+          addressesSomeone: true,
+          formality: 'informal',
+          requestedForm: form,
+        });
+        expect(p).toContain('<register>v</register>');
+        expect(p).not.toContain('<register>informal</register>');
+      });
+
+      it('a requested gender overrides the speaker gender tag and adds the first-person instruction', () => {
+        const p = buildPrompt({
+          ...baseArgs,
+          addressesSomeone: false,
+          speakerGender: 'neutral',
+          requestedGender: 'female',
+        });
+        expect(p).toContain('<speaker_gender>female</speaker_gender>');
+        expect(p).toContain('feminine first-person forms');
+      });
+
+      it('the literature wording names speech level and speaker gender agreement', () => {
+        const lines = requestedFormInstruction({
+          requestedForm: form,
+          requestedGender: 'male',
+          promptWording: 'literature',
+        });
+        expect(lines.join(' ')).toContain('speech level');
+        expect(lines.join(' ')).toContain('Speaker gender agreement');
+      });
+
+      // 2026-09-08 review: a politeness-only variant has no requestedGender,
+      // so the rewrite prompt carried no speaker at all. On Thai, going from
+      // the plain form to the particle form means ADDING ครับ or ค่ะ, and the
+      // form prompt's own fallback for an unstated speaker is ค่ะ — a
+      // male-voiced card got the female particle in a male voice.
+      it('a rewrite names the speaker as context when no gender was requested', () => {
+        const p = buildPrompt({
+          ...baseArgs,
+          targetLang: 'th',
+          targetLangName: 'Thai',
+          addressesSomeone: false,
+          speakerGender: 'male',
+          rewriteOf: 'ขอบคุณ',
+          requestedForm: form,
+        });
+        expect(p).toContain('The speaker is a man.');
+        expect(p).toContain('politeness particle');
+        // Context, not a re-gendering request: the wording the sentence
+        // already has must survive untouched.
+        expect(p).toContain(
+          'do not re-gender wording the sentence already has',
+        );
+        expect(p).not.toContain('masculine first-person forms');
+      });
+
+      it('a rewrite WITH a requested gender does not stack a second speaker line', () => {
+        const p = buildPrompt({
+          ...baseArgs,
+          addressesSomeone: false,
+          speakerGender: 'male',
+          requestedGender: 'female',
+          rewriteOf: 'Kommst du?',
+          requestedForm: form,
+        });
+        expect(p).toContain('feminine first-person forms');
+        expect(p).not.toContain('The speaker is a man.');
+      });
+
+      it('a rewrite with a neutral speaker names nobody', () => {
+        const p = buildPrompt({
+          ...baseArgs,
+          addressesSomeone: false,
+          speakerGender: 'neutral',
+          rewriteOf: 'Kommst du?',
+          requestedForm: form,
+        });
+        expect(p).not.toContain('The speaker is');
+      });
+
+      it('nothing requested: no instruction lines and the prompt is unchanged', () => {
+        expect(requestedFormInstruction({})).toEqual([]);
+        const p = buildPrompt({ ...baseArgs, addressesSomeone: false });
+        expect(p).not.toContain('Required politeness form');
+      });
+
+      it('the best-of-N judge sees the same requested-form instruction', () => {
+        const p = buildJudgePrompt(
+          { ...baseArgs, addressesSomeone: false, requestedForm: form },
+          ['a', 'b'],
+        );
+        expect(p).toContain('<register>v</register>');
+        expect(p).toContain('Required politeness form: Sie-form · formal.');
+      });
+    });
+
     it("includes the 'neutral is informal' instruction so German doesn't default to Sie", () => {
       const p = buildPrompt({ ...baseArgs, addressesSomeone: true });
-      expect(p).toMatch(
-        /'informal' and 'neutral' both mean the casual T-form/i,
-      );
+      expect(p).toMatch(/'informal' and 'neutral' both mean casual/i);
+      expect(p).toContain('DO NOT default to the polite form');
+      // Three named levels, and the aggressive exemplar is gone.
+      expect(p).toContain('です・ます');
+      expect(p).not.toContain('おまえ)');
     });
 
     it('mentions the referent_gender role for gendered occupation nouns', () => {

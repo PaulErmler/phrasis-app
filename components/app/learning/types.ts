@@ -46,6 +46,34 @@ export interface CardTranslation {
    * color "Retranslating" pill in the card header.
    */
   retranslating?: boolean;
+  /**
+   * The voice this card is spoken in (one per card). Drives the gender
+   * chip in the header, shown on every card.
+   */
+  voiceGender?: 'male' | 'female';
+  /**
+   * What the served wording is on the sentence-form axes (classifier
+   * stamps, docs/architecture/translation-variants.md); absent when the
+   * axis is unmarked or not yet classified. `renderedPoliteness` drives the
+   * politeness chip; `renderedGender` is the chip's fallback for a payload
+   * without a voice.
+   */
+  renderedGender?: 'masculine' | 'feminine';
+  renderedPoliteness?: 'casual' | 'polite' | 'formal';
+  /**
+   * The code whose politeness config names `renderedPoliteness`. On a mixed
+   * code that is the served row's own dialect, not the course language:
+   * `es_mixed` has no config of its own, and Spain and Latin America map
+   * the levels onto different forms.
+   */
+  formLanguage?: string;
+  /**
+   * The course's sentence-form settings ask for a rendering this language
+   * does not have yet: `text` is the canonical wording and will change once
+   * the rewrite lands. Drives the "updating" chip, so the sentence on screen
+   * is not presented as the final answer.
+   */
+  formPending?: boolean;
 }
 
 export interface WordTiming {

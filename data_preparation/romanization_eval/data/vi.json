@@ -1,0 +1,2259 @@
+{
+  "language": "vi",
+  "curatedAt": "2026-09-07",
+  "notes": "SOURCE. Every IPA string is copied verbatim from the English Wiktionary entry named in sourceUrl. Bulk harvesting used the kaikki.org machine-readable extraction of English Wiktionary (https://kaikki.org/dictionary/Vietnamese/kaikki.org-dictionary-Vietnamese.jsonl, downloaded 2026-09-07). Nothing here was transcribed by hand. All 281 sourceUrl pages were confirmed to exist via the MediaWiki API; 15 rows drawn at random across three seeded rounds were re-fetched from the live pages and their IPA matched byte-for-byte, as were both readings of the one multi-reading row.\n\nDIALECT. HANOI / NORTHERN ONLY. Wiktionary gives Hà-Nội, Huế and Saigon transcriptions separately; only the row tagged Hà-Nội was taken, and the Huế and Saigon variants were discarded. Do not mix this file with a Southern reference.\n\nTONE NOTATION — READ BEFORE SCORING. Tone is marked with CHAO TONE LETTERS at the end of each syllable, and Wiktionary's tone letters do NOT match Wikipedia's Help:IPA/Vietnamese for four of the six tones. Help:IPA/Vietnamese gives the Hanoi tones as ngang [˧], huyền [˨˩], sắc [˧˥], hỏi [˧˩], ngã [˧ˀ˥], nặng [˧ˀ˩]. This file, following Wiktionary, uses a doubled ˧˧ for ngang, ˧˦ (not ˧˥) for sắc, ˦ˀ˥ (not ˧ˀ˥) for ngã, and ˧˨ʔ (not ˧ˀ˩, and with a full glottal stop ʔ rather than the superscript ˀ) for nặng. Only huyền ˨˩ and hỏi ˧˩ agree. Both are attested descriptions of the same six tones and nothing here was converted between them; the file is internally consistent in Wiktionary's convention, which is what the scorer compares against. A scorer that hard-codes the Help:IPA values will mark every row wrong. All six tones occur in this file.\n\nIPA CONVENTION. Wiktionary publishes these in square brackets (phonetic); the brackets were stripped and nothing else was altered. Syllables are separated by SPACES (not '.'), so a multi-syllable entry's IPA has as many space-separated groups as the orthography has syllables.\n\nSYMBOL OUTLIERS. Two symbols used by Wiktionary's {{vi-pron}} module are not in the Help:IPA/Vietnamese table. 'ï' is the centralized allophone of /i/ before a velar-ish final, as in sinh [sïŋ˧˧] and tính [tïŋ˧˦]. 'ʊ' appears in the labialized velar codas after round vowels, as in hùng [hʊwŋ͡m˨˩]. The doubly-articulated codas ŋ͡m and k͡p, the unreleased-stop diacritic ̚, and the glottalization mark ˀ are all documented in Help:IPA/Vietnamese and appear as expected. These codas and the connected-syllable behaviour they encode are precisely what makes this tier worth evaluating.\n\nROMANIZATION. Set to null on every item. Vietnamese quốc ngữ is already Latin script, so there is no romanization step to evaluate; the orthography in 'text' is the romanization.\n\nWORD TIER (181 items). Ranked by corpus frequency, not by hand: the OpenSubtitles-derived Vietnamese frequency list from hermitdave/FrequencyWords (https://github.com/hermitdave/FrequencyWords/blob/master/content/2018/vi/vi_50k.txt, CC BY-SA-4.0), which is well behaved for Vietnamese because the orthography puts spaces between syllables. The top 180 frequency-ranked entries surviving the filters below were kept. This list is cited as a source for Vietnamese frequency data by Wiktionary:Frequency_lists/Vietnamese. Wiktionary's Appendix:Vietnamese_Swadesh_list was used as a coverage cross-check.\n\nMULTIPLE READINGS. Exactly one row needs this: 'ra', which is [zaː˧˧] as the verb 'to go out' but [ɹaː˧˧] as the noun 'bed sheet' (from French drap, which keeps its [ɹ] in the North). The second reading is in 'ipaAlternatives'. Because Vietnamese carries no romanization in this file, 'romanizationAlternatives' is null on that row, mirroring 'romanization'.\n\n  Vietnamese needed almost nothing here, unlike Thai. Scanning the frequency list to rank 3000 turns up only 15 words with several Hanoi readings, and 14 of those are not genuine lexical ambiguity: they are single Latin letters transcribed as letter names (t, c, m, l, v, b, h, g, đ) or loanwords with a spelling pronunciation (video, pin, gen, game), plus 'chia' whose second reading is the letter spelling 'xi a'. Those were left out for the same reason Thai excludes initialism readings: crediting them would let a wrong transcription score as correct.\n\nSENTENCE TIER (100 items). As with Thai, Wiktionary carries no IPA on usage examples, so the tier is drawn from headword entries with part of speech 'phrase', 'proverb' or 'intj' — everyday expressions and full-clause proverbs, each transcribed across the whole expression. Unlike Thai the supply here is NOT exhausted: roughly 340 further qualifying candidates of three syllables or more remain in the dump, so this tier can be extended without lowering the bar. Rows were chosen for everyday usefulness first, then well-known proverbs, and all are multi-word.\n\nWHAT WAS EXCLUDED AND WHY. (1) Nothing is dropped for having several Hanoi readings any more; such a word carries them all in 'ipaAlternatives' (see MULTIPLE READINGS). (2) Entries with no Hà-Nội row at all (about 37% of the dump, mostly Han characters and rare or dialect-only terms). (3) Han/Nom character entries, romanization stubs, bound affixes and syllable-only entries. (4) Obsolete/archaic entries, alternative forms, nonstandard spellings, abbreviations. (5) Capitalized proper names in the word tier. (6) Vulgar and insult phrases (quỷ tha ma bắt, giấu như mèo giấu cứt, cái lồn gì thế, tiên sư, mẹ nó). (7) Political slogans whose inclusion in a shipped dataset would be a liability rather than a phonetics problem — 'từ sông ra biển' and its two alternative forms, 'vô sản toàn thế giới, đoàn kết lại', 'một quốc gia, hai chế độ'. (8) Near-duplicates of a row already present. (9) Word-tier items longer than two syllables, to keep that tier a word tier.",
+  "items": [
+    {
+      "tier": "word",
+      "text": "tôi",
+      "ipa": "toj˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tôi"
+    },
+    {
+      "tier": "word",
+      "text": "không",
+      "ipa": "xəwŋ͡m˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/không"
+    },
+    {
+      "tier": "word",
+      "text": "là",
+      "ipa": "laː˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/là"
+    },
+    {
+      "tier": "word",
+      "text": "anh",
+      "ipa": "ʔajŋ̟˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/anh"
+    },
+    {
+      "tier": "word",
+      "text": "có",
+      "ipa": "kɔ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/có"
+    },
+    {
+      "tier": "word",
+      "text": "ta",
+      "ipa": "taː˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ta"
+    },
+    {
+      "tier": "word",
+      "text": "của",
+      "ipa": "kuə˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/của"
+    },
+    {
+      "tier": "word",
+      "text": "đi",
+      "ipa": "ʔɗi˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đi"
+    },
+    {
+      "tier": "word",
+      "text": "đã",
+      "ipa": "ʔɗaː˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đã"
+    },
+    {
+      "tier": "word",
+      "text": "đó",
+      "ipa": "ʔɗɔ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đó"
+    },
+    {
+      "tier": "word",
+      "text": "sẽ",
+      "ipa": "sɛ˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/sẽ"
+    },
+    {
+      "tier": "word",
+      "text": "chúng",
+      "ipa": "t͡ɕʊwŋ͡m˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chúng"
+    },
+    {
+      "tier": "word",
+      "text": "gì",
+      "ipa": "zi˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/gì"
+    },
+    {
+      "tier": "word",
+      "text": "một",
+      "ipa": "mot̚˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/một"
+    },
+    {
+      "tier": "word",
+      "text": "được",
+      "ipa": "ʔɗɨək̚˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/được"
+    },
+    {
+      "tier": "word",
+      "text": "và",
+      "ipa": "vaː˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/và"
+    },
+    {
+      "tier": "word",
+      "text": "cô",
+      "ipa": "ko˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cô"
+    },
+    {
+      "tier": "word",
+      "text": "làm",
+      "ipa": "laːm˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/làm"
+    },
+    {
+      "tier": "word",
+      "text": "phải",
+      "ipa": "faːj˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/phải"
+    },
+    {
+      "tier": "word",
+      "text": "rồi",
+      "ipa": "zoj˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/rồi"
+    },
+    {
+      "tier": "word",
+      "text": "người",
+      "ipa": "ŋɨəj˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/người"
+    },
+    {
+      "tier": "word",
+      "text": "này",
+      "ipa": "naj˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/này"
+    },
+    {
+      "tier": "word",
+      "text": "cho",
+      "ipa": "t͡ɕɔ˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cho"
+    },
+    {
+      "tier": "word",
+      "text": "em",
+      "ipa": "ʔɛm˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/em"
+    },
+    {
+      "tier": "word",
+      "text": "đây",
+      "ipa": "ʔɗəj˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đây"
+    },
+    {
+      "tier": "word",
+      "text": "con",
+      "ipa": "kɔn˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/con"
+    },
+    {
+      "tier": "word",
+      "text": "sao",
+      "ipa": "saːw˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/sao"
+    },
+    {
+      "tier": "word",
+      "text": "biết",
+      "ipa": "ʔɓiət̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/biết"
+    },
+    {
+      "tier": "word",
+      "text": "ông",
+      "ipa": "ʔəwŋ͡m˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ông"
+    },
+    {
+      "tier": "word",
+      "text": "nói",
+      "ipa": "nɔj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nói"
+    },
+    {
+      "tier": "word",
+      "text": "nó",
+      "ipa": "nɔ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nó"
+    },
+    {
+      "tier": "word",
+      "text": "thể",
+      "ipa": "tʰe˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thể"
+    },
+    {
+      "tier": "word",
+      "text": "với",
+      "ipa": "vəːj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/với"
+    },
+    {
+      "tier": "word",
+      "text": "cậu",
+      "ipa": "kəw˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cậu"
+    },
+    {
+      "tier": "word",
+      "text": "thế",
+      "ipa": "tʰe˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thế"
+    },
+    {
+      "tier": "word",
+      "text": "lại",
+      "ipa": "laːj˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/lại"
+    },
+    {
+      "tier": "word",
+      "text": "vậy",
+      "ipa": "vəj˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/vậy"
+    },
+    {
+      "tier": "word",
+      "text": "để",
+      "ipa": "ʔɗe˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/để"
+    },
+    {
+      "tier": "word",
+      "text": "nào",
+      "ipa": "naːw˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nào"
+    },
+    {
+      "tier": "word",
+      "text": "ấy",
+      "ipa": "ʔəj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ấy"
+    },
+    {
+      "tier": "word",
+      "text": "cái",
+      "ipa": "kaːj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cái"
+    },
+    {
+      "tier": "word",
+      "text": "đang",
+      "ipa": "ʔɗaːŋ˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đang"
+    },
+    {
+      "tier": "word",
+      "text": "muốn",
+      "ipa": "muən˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/muốn"
+    },
+    {
+      "tier": "word",
+      "text": "trong",
+      "ipa": "t͡ɕawŋ͡m˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/trong"
+    },
+    {
+      "tier": "word",
+      "text": "mà",
+      "ipa": "maː˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/mà"
+    },
+    {
+      "tier": "word",
+      "text": "như",
+      "ipa": "ɲɨ˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/như"
+    },
+    {
+      "tier": "word",
+      "text": "nhưng",
+      "ipa": "ɲɨŋ˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nhưng"
+    },
+    {
+      "tier": "word",
+      "text": "khi",
+      "ipa": "xi˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/khi"
+    },
+    {
+      "tier": "word",
+      "text": "những",
+      "ipa": "ɲɨŋ˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/những"
+    },
+    {
+      "tier": "word",
+      "text": "đến",
+      "ipa": "ʔɗen˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đến"
+    },
+    {
+      "tier": "word",
+      "text": "đâu",
+      "ipa": "ʔɗəw˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đâu"
+    },
+    {
+      "tier": "word",
+      "text": "chuyện",
+      "ipa": "t͡ɕwiən˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chuyện"
+    },
+    {
+      "tier": "word",
+      "text": "chỉ",
+      "ipa": "t͡ɕi˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chỉ"
+    },
+    {
+      "tier": "word",
+      "text": "cả",
+      "ipa": "kaː˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cả"
+    },
+    {
+      "tier": "word",
+      "text": "về",
+      "ipa": "ve˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/về"
+    },
+    {
+      "tier": "word",
+      "text": "họ",
+      "ipa": "hɔ˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/họ"
+    },
+    {
+      "tier": "word",
+      "text": "giờ",
+      "ipa": "zəː˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/giờ"
+    },
+    {
+      "tier": "word",
+      "text": "thôi",
+      "ipa": "tʰoj˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thôi"
+    },
+    {
+      "tier": "word",
+      "text": "thấy",
+      "ipa": "tʰəj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thấy"
+    },
+    {
+      "tier": "word",
+      "text": "còn",
+      "ipa": "kɔn˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/còn"
+    },
+    {
+      "tier": "word",
+      "text": "cũng",
+      "ipa": "kʊwŋ͡m˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cũng"
+    },
+    {
+      "tier": "word",
+      "text": "vào",
+      "ipa": "vaːw˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/vào"
+    },
+    {
+      "tier": "word",
+      "text": "các",
+      "ipa": "kaːk̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/các"
+    },
+    {
+      "tier": "word",
+      "text": "bị",
+      "ipa": "ʔɓi˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bị"
+    },
+    {
+      "tier": "word",
+      "text": "nghĩ",
+      "ipa": "ŋi˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nghĩ"
+    },
+    {
+      "tier": "word",
+      "text": "đấy",
+      "ipa": "ʔɗəj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đấy"
+    },
+    {
+      "tier": "word",
+      "text": "ai",
+      "ipa": "ʔaːj˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ai"
+    },
+    {
+      "tier": "word",
+      "text": "thật",
+      "ipa": "tʰət̚˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thật"
+    },
+    {
+      "tier": "word",
+      "text": "hắn",
+      "ipa": "han˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/hắn"
+    },
+    {
+      "tier": "word",
+      "text": "nếu",
+      "ipa": "new˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nếu"
+    },
+    {
+      "tier": "word",
+      "text": "việc",
+      "ipa": "viək̚˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/việc"
+    },
+    {
+      "tier": "word",
+      "text": "nữa",
+      "ipa": "nɨə˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nữa"
+    },
+    {
+      "tier": "word",
+      "text": "rất",
+      "ipa": "zət̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/rất"
+    },
+    {
+      "tier": "word",
+      "text": "vì",
+      "ipa": "vi˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/vì"
+    },
+    {
+      "tier": "word",
+      "text": "cần",
+      "ipa": "kən˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cần"
+    },
+    {
+      "tier": "word",
+      "text": "chứ",
+      "ipa": "t͡ɕɨ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chứ"
+    },
+    {
+      "tier": "word",
+      "text": "à",
+      "ipa": "ʔaː˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/à"
+    },
+    {
+      "tier": "word",
+      "text": "điều",
+      "ipa": "ʔɗiəw˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/điều"
+    },
+    {
+      "tier": "word",
+      "text": "tới",
+      "ipa": "təːj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tới"
+    },
+    {
+      "tier": "word",
+      "text": "xin",
+      "ipa": "sin˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/xin"
+    },
+    {
+      "tier": "word",
+      "text": "thứ",
+      "ipa": "tʰɨ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thứ"
+    },
+    {
+      "tier": "word",
+      "text": "chưa",
+      "ipa": "t͡ɕɨə˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chưa"
+    },
+    {
+      "tier": "word",
+      "text": "nhà",
+      "ipa": "ɲaː˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nhà"
+    },
+    {
+      "tier": "word",
+      "text": "lên",
+      "ipa": "len˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/lên"
+    },
+    {
+      "tier": "word",
+      "text": "đúng",
+      "ipa": "ʔɗʊwŋ͡m˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đúng"
+    },
+    {
+      "tier": "word",
+      "text": "từ",
+      "ipa": "tɨ˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/từ"
+    },
+    {
+      "tier": "word",
+      "text": "mẹ",
+      "ipa": "mɛ˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/mẹ"
+    },
+    {
+      "tier": "word",
+      "text": "nghe",
+      "ipa": "ŋɛ˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nghe"
+    },
+    {
+      "tier": "word",
+      "text": "hơn",
+      "ipa": "həːn˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/hơn"
+    },
+    {
+      "tier": "word",
+      "text": "mọi",
+      "ipa": "mɔj˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/mọi"
+    },
+    {
+      "tier": "word",
+      "text": "bạn",
+      "ipa": "ʔɓaːn˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bạn"
+    },
+    {
+      "tier": "word",
+      "text": "tớ",
+      "ipa": "təː˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tớ"
+    },
+    {
+      "tier": "word",
+      "text": "nên",
+      "ipa": "nen˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nên"
+    },
+    {
+      "tier": "word",
+      "text": "chết",
+      "ipa": "t͡ɕet̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chết"
+    },
+    {
+      "tier": "word",
+      "text": "mày",
+      "ipa": "maj˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/mày"
+    },
+    {
+      "tier": "word",
+      "text": "ơn",
+      "ipa": "ʔəːn˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ơn"
+    },
+    {
+      "tier": "word",
+      "text": "đầu",
+      "ipa": "ʔɗəw˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đầu"
+    },
+    {
+      "tier": "word",
+      "text": "đừng",
+      "ipa": "ʔɗɨŋ˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đừng"
+    },
+    {
+      "tier": "word",
+      "text": "tìm",
+      "ipa": "tim˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tìm"
+    },
+    {
+      "tier": "word",
+      "text": "tốt",
+      "ipa": "tot̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tốt"
+    },
+    {
+      "tier": "word",
+      "text": "tin",
+      "ipa": "tin˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tin"
+    },
+    {
+      "tier": "word",
+      "text": "hãy",
+      "ipa": "haj˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/hãy"
+    },
+    {
+      "tier": "word",
+      "text": "quá",
+      "ipa": "kwaː˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/quá"
+    },
+    {
+      "tier": "word",
+      "text": "nhiều",
+      "ipa": "ɲiəw˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nhiều"
+    },
+    {
+      "tier": "word",
+      "text": "trước",
+      "ipa": "t͡ɕɨək̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/trước"
+    },
+    {
+      "tier": "word",
+      "text": "cảm",
+      "ipa": "kaːm˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cảm"
+    },
+    {
+      "tier": "word",
+      "text": "bà",
+      "ipa": "ʔɓaː˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bà"
+    },
+    {
+      "tier": "word",
+      "text": "ý",
+      "ipa": "ʔi˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ý"
+    },
+    {
+      "tier": "word",
+      "text": "hay",
+      "ipa": "haj˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/hay"
+    },
+    {
+      "tier": "word",
+      "text": "công",
+      "ipa": "kəwŋ͡m˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/công"
+    },
+    {
+      "tier": "word",
+      "text": "nhất",
+      "ipa": "ɲət̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nhất"
+    },
+    {
+      "tier": "word",
+      "text": "tao",
+      "ipa": "taːw˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tao"
+    },
+    {
+      "tier": "word",
+      "text": "bố",
+      "ipa": "ʔɓo˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bố"
+    },
+    {
+      "tier": "word",
+      "text": "tất",
+      "ipa": "tət̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tất"
+    },
+    {
+      "tier": "word",
+      "text": "bao",
+      "ipa": "ʔɓaːw˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bao"
+    },
+    {
+      "tier": "word",
+      "text": "trên",
+      "ipa": "t͡ɕen˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/trên"
+    },
+    {
+      "tier": "word",
+      "text": "tên",
+      "ipa": "ten˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tên"
+    },
+    {
+      "tier": "word",
+      "text": "lỗi",
+      "ipa": "loj˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/lỗi"
+    },
+    {
+      "tier": "word",
+      "text": "tại",
+      "ipa": "taːj˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tại"
+    },
+    {
+      "tier": "word",
+      "text": "thành",
+      "ipa": "tʰajŋ̟˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thành"
+    },
+    {
+      "tier": "word",
+      "text": "sau",
+      "ipa": "saw˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/sau"
+    },
+    {
+      "tier": "word",
+      "text": "cháu",
+      "ipa": "t͡ɕaw˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cháu"
+    },
+    {
+      "tier": "word",
+      "text": "ngày",
+      "ipa": "ŋaj˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ngày"
+    },
+    {
+      "tier": "word",
+      "text": "khác",
+      "ipa": "xaːk̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/khác"
+    },
+    {
+      "tier": "word",
+      "text": "xem",
+      "ipa": "sɛm˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/xem"
+    },
+    {
+      "tier": "word",
+      "text": "theo",
+      "ipa": "tʰɛw˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/theo"
+    },
+    {
+      "tier": "word",
+      "text": "chắc",
+      "ipa": "t͡ɕak̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chắc"
+    },
+    {
+      "tier": "word",
+      "text": "gặp",
+      "ipa": "ɣap̚˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/gặp"
+    },
+    {
+      "tier": "word",
+      "text": "bắt",
+      "ipa": "ʔɓat̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bắt"
+    },
+    {
+      "tier": "word",
+      "text": "yêu",
+      "ipa": "ʔiəw˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/yêu"
+    },
+    {
+      "tier": "word",
+      "text": "cứ",
+      "ipa": "kɨ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cứ"
+    },
+    {
+      "tier": "word",
+      "text": "qua",
+      "ipa": "kwaː˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/qua"
+    },
+    {
+      "tier": "word",
+      "text": "vẫn",
+      "ipa": "vən˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/vẫn"
+    },
+    {
+      "tier": "word",
+      "text": "cùng",
+      "ipa": "kʊwŋ͡m˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cùng"
+    },
+    {
+      "tier": "word",
+      "text": "ngay",
+      "ipa": "ŋaj˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ngay"
+    },
+    {
+      "tier": "word",
+      "text": "cách",
+      "ipa": "kajk̟̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cách"
+    },
+    {
+      "tier": "word",
+      "text": "nhìn",
+      "ipa": "ɲin˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nhìn"
+    },
+    {
+      "tier": "word",
+      "text": "sống",
+      "ipa": "səwŋ͡m˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/sống"
+    },
+    {
+      "tier": "word",
+      "text": "bọn",
+      "ipa": "ʔɓɔn˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bọn"
+    },
+    {
+      "tier": "word",
+      "text": "lúc",
+      "ipa": "lʊwk͡p̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/lúc"
+    },
+    {
+      "tier": "word",
+      "text": "giết",
+      "ipa": "ziət̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/giết"
+    },
+    {
+      "tier": "word",
+      "text": "mới",
+      "ipa": "məːj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/mới"
+    },
+    {
+      "tier": "word",
+      "text": "quan",
+      "ipa": "kwaːn˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/quan"
+    },
+    {
+      "tier": "word",
+      "text": "chào",
+      "ipa": "t͡ɕaːw˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chào"
+    },
+    {
+      "tier": "word",
+      "text": "đưa",
+      "ipa": "ʔɗɨə˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đưa"
+    },
+    {
+      "tier": "word",
+      "text": "lắm",
+      "ipa": "lam˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/lắm"
+    },
+    {
+      "tier": "word",
+      "text": "gọi",
+      "ipa": "ɣɔj˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/gọi"
+    },
+    {
+      "tier": "word",
+      "text": "hết",
+      "ipa": "het̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/hết"
+    },
+    {
+      "tier": "word",
+      "text": "bảo",
+      "ipa": "ʔɓaːw˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bảo"
+    },
+    {
+      "tier": "word",
+      "text": "hai",
+      "ipa": "haːj˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/hai"
+    },
+    {
+      "tier": "word",
+      "text": "rằng",
+      "ipa": "zaŋ˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/rằng"
+    },
+    {
+      "tier": "word",
+      "text": "ăn",
+      "ipa": "ʔan˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ăn"
+    },
+    {
+      "tier": "word",
+      "text": "giúp",
+      "ipa": "zup̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/giúp"
+    },
+    {
+      "tier": "word",
+      "text": "hiểu",
+      "ipa": "hiəw˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/hiểu"
+    },
+    {
+      "tier": "word",
+      "text": "lấy",
+      "ipa": "ləj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/lấy"
+    },
+    {
+      "tier": "word",
+      "text": "ngài",
+      "ipa": "ŋaːj˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ngài"
+    },
+    {
+      "tier": "word",
+      "text": "tự",
+      "ipa": "tɨ˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tự"
+    },
+    {
+      "tier": "word",
+      "text": "lần",
+      "ipa": "lən˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/lần"
+    },
+    {
+      "tier": "word",
+      "text": "tay",
+      "ipa": "taj˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tay"
+    },
+    {
+      "tier": "word",
+      "text": "nhân",
+      "ipa": "ɲən˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nhân"
+    },
+    {
+      "tier": "word",
+      "text": "cuộc",
+      "ipa": "kuək̚˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cuộc"
+    },
+    {
+      "tier": "word",
+      "text": "bỏ",
+      "ipa": "ʔɓɔ˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bỏ"
+    },
+    {
+      "tier": "word",
+      "text": "năm",
+      "ipa": "nam˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/năm"
+    },
+    {
+      "tier": "word",
+      "text": "mất",
+      "ipa": "mət̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/mất"
+    },
+    {
+      "tier": "word",
+      "text": "hả",
+      "ipa": "haː˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/hả"
+    },
+    {
+      "tier": "word",
+      "text": "vụ",
+      "ipa": "vu˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/vụ"
+    },
+    {
+      "tier": "word",
+      "text": "xe",
+      "ipa": "sɛ˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/xe"
+    },
+    {
+      "tier": "word",
+      "text": "ngươi",
+      "ipa": "ŋɨəj˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ngươi"
+    },
+    {
+      "tier": "word",
+      "text": "nhận",
+      "ipa": "ɲən˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nhận"
+    },
+    {
+      "tier": "word",
+      "text": "cha",
+      "ipa": "t͡ɕaː˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cha"
+    },
+    {
+      "tier": "word",
+      "text": "chúa",
+      "ipa": "t͡ɕuə˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chúa"
+    },
+    {
+      "tier": "word",
+      "text": "khỏi",
+      "ipa": "xɔj˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/khỏi"
+    },
+    {
+      "tier": "word",
+      "text": "nay",
+      "ipa": "naj˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nay"
+    },
+    {
+      "tier": "word",
+      "text": "tiền",
+      "ipa": "tiən˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tiền"
+    },
+    {
+      "tier": "word",
+      "text": "thời",
+      "ipa": "tʰəːj˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thời"
+    },
+    {
+      "tier": "word",
+      "text": "cơ",
+      "ipa": "kəː˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cơ"
+    },
+    {
+      "tier": "word",
+      "text": "nhé",
+      "ipa": "ɲɛ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nhé"
+    },
+    {
+      "tier": "word",
+      "text": "do",
+      "ipa": "zɔ˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/do"
+    },
+    {
+      "tier": "word",
+      "text": "trở",
+      "ipa": "t͡ɕəː˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/trở"
+    },
+    {
+      "tier": "word",
+      "text": "bé",
+      "ipa": "ʔɓɛ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bé"
+    },
+    {
+      "tier": "sentence",
+      "text": "không có gì",
+      "ipa": "xəwŋ͡m˧˧ kɔ˧˦ zi˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/không_có_gì"
+    },
+    {
+      "tier": "sentence",
+      "text": "cái này là gì",
+      "ipa": "kaːj˧˦ naj˨˩ laː˨˩ zi˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cái_này_là_gì"
+    },
+    {
+      "tier": "sentence",
+      "text": "anh yêu em",
+      "ipa": "ʔajŋ̟˧˧ ʔiəw˧˧ ʔɛm˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/anh_yêu_em"
+    },
+    {
+      "tier": "sentence",
+      "text": "em yêu anh",
+      "ipa": "ʔɛm˧˧ ʔiəw˧˧ ʔajŋ̟˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/em_yêu_anh"
+    },
+    {
+      "tier": "sentence",
+      "text": "xin lỗi",
+      "ipa": "sin˧˧ loj˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/xin_lỗi"
+    },
+    {
+      "tier": "sentence",
+      "text": "tôi có một câu hỏi",
+      "ipa": "toj˧˧ kɔ˧˦ mot̚˧˨ʔ kəw˧˧ hɔj˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tôi_có_một_câu_hỏi"
+    },
+    {
+      "tier": "sentence",
+      "text": "cám ơn rất nhiều",
+      "ipa": "kaːm˧˦ ʔəːn˧˧ zət̚˧˦ ɲiəw˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cám_ơn_rất_nhiều"
+    },
+    {
+      "tier": "sentence",
+      "text": "chào buổi sáng",
+      "ipa": "t͡ɕaːw˨˩ ʔɓuəj˧˩ saːŋ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chào_buổi_sáng"
+    },
+    {
+      "tier": "sentence",
+      "text": "bảo trọng",
+      "ipa": "ʔɓaːw˧˩ t͡ɕawŋ͡m˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bảo_trọng"
+    },
+    {
+      "tier": "sentence",
+      "text": "an toàn là trên hết",
+      "ipa": "ʔaːn˧˧ twaːn˨˩ laː˨˩ t͡ɕen˧˧ het̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/an_toàn_là_trên_hết"
+    },
+    {
+      "tier": "sentence",
+      "text": "cần lời giải thích",
+      "ipa": "kən˨˩ ləːj˨˩ zaːj˧˩ tʰïk̟̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cần_lời_giải_thích"
+    },
+    {
+      "tier": "sentence",
+      "text": "thật sự mà nói",
+      "ipa": "tʰət̚˧˨ʔ sɨ˧˨ʔ maː˨˩ nɔj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thật_sự_mà_nói"
+    },
+    {
+      "tier": "sentence",
+      "text": "chúc mừng sinh nhật",
+      "ipa": "t͡ɕʊwk͡p̚˧˦ mɨŋ˨˩ sïŋ˧˧ ɲət̚˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chúc_mừng_sinh_nhật"
+    },
+    {
+      "tier": "sentence",
+      "text": "chúc mừng năm mới",
+      "ipa": "t͡ɕʊwk͡p̚˧˦ mɨŋ˨˩ nam˧˧ məːj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chúc_mừng_năm_mới"
+    },
+    {
+      "tier": "sentence",
+      "text": "càng đông càng vui",
+      "ipa": "kaːŋ˨˩ ʔɗəwŋ͡m˧˧ kaːŋ˨˩ vuj˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/càng_đông_càng_vui"
+    },
+    {
+      "tier": "sentence",
+      "text": "cá lớn nuốt cá bé",
+      "ipa": "kaː˧˦ ləːn˧˦ nuət̚˧˦ kaː˧˦ ʔɓɛ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cá_lớn_nuốt_cá_bé"
+    },
+    {
+      "tier": "sentence",
+      "text": "cha nào con nấy",
+      "ipa": "t͡ɕaː˧˧ naːw˨˩ kɔn˧˧ nəj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cha_nào_con_nấy"
+    },
+    {
+      "tier": "sentence",
+      "text": "chín người mười ý",
+      "ipa": "t͡ɕin˧˦ ŋɨəj˨˩ mɨəj˨˩ ʔi˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chín_người_mười_ý"
+    },
+    {
+      "tier": "sentence",
+      "text": "một công đôi việc",
+      "ipa": "mot̚˧˨ʔ kəwŋ͡m˧˧ ʔɗoj˧˧ viək̚˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/một_công_đôi_việc"
+    },
+    {
+      "tier": "sentence",
+      "text": "thương người như thể thương thân",
+      "ipa": "tʰɨəŋ˧˧ ŋɨəj˨˩ ɲɨ˧˧ tʰe˧˩ tʰɨəŋ˧˧ tʰən˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thương_người_như_thể_thương_thân"
+    },
+    {
+      "tier": "sentence",
+      "text": "trước sau như một",
+      "ipa": "t͡ɕɨək̚˧˦ saw˧˧ ɲɨ˧˧ mot̚˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/trước_sau_như_một"
+    },
+    {
+      "tier": "sentence",
+      "text": "có bệnh thì vái tứ phương",
+      "ipa": "kɔ˧˦ ʔɓəjŋ̟˧˨ʔ tʰi˨˩ vaːj˧˦ tɨ˧˦ fɨəŋ˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/có_bệnh_thì_vái_tứ_phương"
+    },
+    {
+      "tier": "sentence",
+      "text": "còn nước còn tát",
+      "ipa": "kɔn˨˩ nɨək̚˧˦ kɔn˨˩ taːt̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/còn_nước_còn_tát"
+    },
+    {
+      "tier": "sentence",
+      "text": "gần đất xa trời",
+      "ipa": "ɣən˨˩ ʔɗət̚˧˦ saː˧˧ t͡ɕəːj˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/gần_đất_xa_trời"
+    },
+    {
+      "tier": "sentence",
+      "text": "mất ăn mất ngủ",
+      "ipa": "mət̚˧˦ ʔan˧˧ mət̚˧˦ ŋu˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/mất_ăn_mất_ngủ"
+    },
+    {
+      "tier": "sentence",
+      "text": "đứng ngồi không yên",
+      "ipa": "ʔɗɨŋ˧˦ ŋoj˨˩ xəwŋ͡m˧˧ ʔiən˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đứng_ngồi_không_yên"
+    },
+    {
+      "tier": "sentence",
+      "text": "như cá gặp nước",
+      "ipa": "ɲɨ˧˧ kaː˧˦ ɣap̚˧˨ʔ nɨək̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/như_cá_gặp_nước"
+    },
+    {
+      "tier": "sentence",
+      "text": "bằng mặt không bằng lòng",
+      "ipa": "ʔɓaŋ˨˩ mat̚˧˨ʔ xəwŋ͡m˧˧ ʔɓaŋ˨˩ lawŋ͡m˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bằng_mặt_không_bằng_lòng"
+    },
+    {
+      "tier": "sentence",
+      "text": "cha mẹ sinh con, trời sinh tính",
+      "ipa": "t͡ɕaː˧˧ mɛ˧˨ʔ sïŋ˧˧ kɔn˧˧ t͡ɕəːj˨˩ sïŋ˧˧ tïŋ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cha_mẹ_sinh_con,_trời_sinh_tính"
+    },
+    {
+      "tier": "sentence",
+      "text": "biết rồi, khổ lắm, nói mãi",
+      "ipa": "ʔɓiət̚˧˦ zoj˨˩ xo˧˩ lam˧˦ nɔj˧˦ maːj˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/biết_rồi,_khổ_lắm,_nói_mãi"
+    },
+    {
+      "tier": "sentence",
+      "text": "an khang thịnh vượng",
+      "ipa": "ʔaːn˧˧ xaːŋ˧˧ tʰïŋ˧˨ʔ vɨəŋ˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/an_khang_thịnh_vượng"
+    },
+    {
+      "tier": "sentence",
+      "text": "một mất một còn",
+      "ipa": "mot̚˧˨ʔ mət̚˧˦ mot̚˧˨ʔ kɔn˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/một_mất_một_còn"
+    },
+    {
+      "tier": "sentence",
+      "text": "tiền nào của đó",
+      "ipa": "tiən˨˩ naːw˨˩ kuə˧˩ ʔɗɔ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tiền_nào_của_đó"
+    },
+    {
+      "tier": "sentence",
+      "text": "bói ra ma, quét nhà ra rác",
+      "ipa": "ʔɓɔj˧˦ zaː˧˧ maː˧˧ kwɛt̚˧˦ ɲaː˨˩ zaː˧˧ zaːk̚˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bói_ra_ma,_quét_nhà_ra_rác"
+    },
+    {
+      "tier": "sentence",
+      "text": "chủ vắng nhà, gà vọc niêu tôm",
+      "ipa": "t͡ɕu˧˩ vaŋ˧˦ ɲaː˨˩ ɣaː˨˩ vawk͡p̚˧˨ʔ niəw˧˧ tom˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chủ_vắng_nhà,_gà_vọc_niêu_tôm"
+    },
+    {
+      "tier": "sentence",
+      "text": "Giáng sinh vui vẻ",
+      "ipa": "zaːŋ˧˦ sïŋ˧˧ vuj˧˧ vɛ˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/Giáng_sinh_vui_vẻ"
+    },
+    {
+      "tier": "sentence",
+      "text": "một đi không trở lại",
+      "ipa": "mot̚˧˨ʔ ʔɗi˧˧ xəwŋ͡m˧˧ t͡ɕəː˧˩ laːj˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/một_đi_không_trở_lại"
+    },
+    {
+      "tier": "sentence",
+      "text": "con dại cái mang",
+      "ipa": "kɔn˧˧ zaːj˧˨ʔ kaːj˧˦ maːŋ˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/con_dại_cái_mang"
+    },
+    {
+      "tier": "sentence",
+      "text": "châu chấu đá xe",
+      "ipa": "t͡ɕəw˧˧ t͡ɕəw˧˦ ʔɗaː˧˦ sɛ˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/châu_chấu_đá_xe"
+    },
+    {
+      "tier": "sentence",
+      "text": "chó ngáp phải ruồi",
+      "ipa": "t͡ɕɔ˧˦ ŋaːp̚˧˦ faːj˧˩ zuəj˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chó_ngáp_phải_ruồi"
+    },
+    {
+      "tier": "sentence",
+      "text": "trông lên thì chẳng bằng ai, trông xuống thì cũng chẳng ai bằng mình",
+      "ipa": "t͡ɕəwŋ͡m˧˧ len˧˧ tʰi˨˩ t͡ɕaŋ˧˩ ʔɓaŋ˨˩ ʔaːj˧˧ t͡ɕəwŋ͡m˧˧ suəŋ˧˦ tʰi˨˩ kʊwŋ͡m˦ˀ˥ t͡ɕaŋ˧˩ ʔaːj˧˧ ʔɓaŋ˨˩ mïŋ˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/trông_lên_thì_chẳng_bằng_ai,_trông_xuống_thì_cũng_chẳng_ai_bằng_mình"
+    },
+    {
+      "tier": "sentence",
+      "text": "bầu ơi thương lấy bí cùng, tuy rằng khác giống nhưng chung một giàn",
+      "ipa": "ʔɓəw˨˩ ʔəːj˧˧ tʰɨəŋ˧˧ ləj˧˦ ʔɓi˧˦ kʊwŋ͡m˨˩ twi˧˧ zaŋ˨˩ xaːk̚˧˦ zəwŋ͡m˧˦ ɲɨŋ˧˧ t͡ɕʊwŋ͡m˧˧ mot̚˧˨ʔ zaːn˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bầu_ơi_thương_lấy_bí_cùng,_tuy_rằng_khác_giống_nhưng_chung_một_giàn"
+    },
+    {
+      "tier": "sentence",
+      "text": "biết thì thưa thốt, không biết thì dựa cột mà nghe",
+      "ipa": "ʔɓiət̚˧˦ tʰi˨˩ tʰɨə˧˧ tʰot̚˧˦ xəwŋ͡m˧˧ ʔɓiət̚˧˦ tʰi˨˩ zɨə˧˨ʔ kot̚˧˨ʔ maː˨˩ ŋɛ˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/biết_thì_thưa_thốt,_không_biết_thì_dựa_cột_mà_nghe"
+    },
+    {
+      "tier": "sentence",
+      "text": "có gì đâu",
+      "ipa": "kɔ˧˦ zi˨˩ ʔɗəw˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/có_gì_đâu"
+    },
+    {
+      "tier": "sentence",
+      "text": "khi và chỉ khi",
+      "ipa": "xi˧˧ vaː˨˩ t͡ɕi˧˩ xi˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/khi_và_chỉ_khi"
+    },
+    {
+      "tier": "sentence",
+      "text": "chuyện đâu còn có đó",
+      "ipa": "t͡ɕwiən˧˨ʔ ʔɗəw˧˧ kɔn˨˩ kɔ˧˦ ʔɗɔ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chuyện_đâu_còn_có_đó"
+    },
+    {
+      "tier": "sentence",
+      "text": "cái gọi là",
+      "ipa": "kaːj˧˦ ɣɔj˧˨ʔ laː˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cái_gọi_là"
+    },
+    {
+      "tier": "sentence",
+      "text": "thay vào đó",
+      "ipa": "tʰaj˧˧ vaːw˨˩ ʔɗɔ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thay_vào_đó"
+    },
+    {
+      "tier": "sentence",
+      "text": "không có chi",
+      "ipa": "xəwŋ͡m˧˧ kɔ˧˦ t͡ɕi˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/không_có_chi"
+    },
+    {
+      "tier": "sentence",
+      "text": "hẹn gặp lại",
+      "ipa": "hɛn˧˨ʔ ɣap̚˧˨ʔ laːj˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/hẹn_gặp_lại"
+    },
+    {
+      "tier": "sentence",
+      "text": "chúc ngủ ngon",
+      "ipa": "t͡ɕʊwk͡p̚˧˦ ŋu˧˩ ŋɔn˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chúc_ngủ_ngon"
+    },
+    {
+      "tier": "sentence",
+      "text": "chúc may mắn",
+      "ipa": "t͡ɕʊwk͡p̚˧˦ maj˧˧ man˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/chúc_may_mắn"
+    },
+    {
+      "tier": "sentence",
+      "text": "sinh nhật vui vẻ",
+      "ipa": "sïŋ˧˧ ɲət̚˧˨ʔ vuj˧˧ vɛ˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/sinh_nhật_vui_vẻ"
+    },
+    {
+      "tier": "sentence",
+      "text": "thượng lộ bình an",
+      "ipa": "tʰɨəŋ˧˨ʔ lo˧˨ʔ ʔɓïŋ˨˩ ʔaːn˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thượng_lộ_bình_an"
+    },
+    {
+      "tier": "sentence",
+      "text": "công cha nghĩa mẹ",
+      "ipa": "kəwŋ͡m˧˧ t͡ɕaː˧˧ ŋiə˦ˀ˥ mɛ˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/công_cha_nghĩa_mẹ"
+    },
+    {
+      "tier": "sentence",
+      "text": "của ít lòng nhiều",
+      "ipa": "kuə˧˩ ʔit̚˧˦ lawŋ͡m˨˩ ɲiəw˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/của_ít_lòng_nhiều"
+    },
+    {
+      "tier": "sentence",
+      "text": "điều phải chứng minh",
+      "ipa": "ʔɗiəw˨˩ faːj˧˩ t͡ɕɨŋ˧˦ mïŋ˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/điều_phải_chứng_minh"
+    },
+    {
+      "tier": "sentence",
+      "text": "ăn to nói lớn",
+      "ipa": "ʔan˧˧ tɔ˧˧ nɔj˧˦ ləːn˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ăn_to_nói_lớn"
+    },
+    {
+      "tier": "sentence",
+      "text": "một công đôi chuyện",
+      "ipa": "mot̚˧˨ʔ kəwŋ͡m˧˧ ʔɗoj˧˧ t͡ɕwiən˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/một_công_đôi_chuyện"
+    },
+    {
+      "tier": "sentence",
+      "text": "đường đường chính chính",
+      "ipa": "ʔɗɨəŋ˨˩ ʔɗɨəŋ˨˩ t͡ɕïŋ˧˦ t͡ɕïŋ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đường_đường_chính_chính"
+    },
+    {
+      "tier": "sentence",
+      "text": "kinh thiên động địa",
+      "ipa": "kïŋ˧˧ tʰiən˧˧ ʔɗəwŋ͡m˧˨ʔ ʔɗiə˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/kinh_thiên_động_địa"
+    },
+    {
+      "tier": "sentence",
+      "text": "nhân định thắng thiên",
+      "ipa": "ɲən˧˧ ʔɗïŋ˧˨ʔ tʰaŋ˧˦ tʰiən˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nhân_định_thắng_thiên"
+    },
+    {
+      "tier": "sentence",
+      "text": "mỗi cây mỗi hoa, mỗi nhà mỗi cảnh",
+      "ipa": "moj˦ˀ˥ kəj˧˧ moj˦ˀ˥ hwaː˧˧ moj˦ˀ˥ ɲaː˨˩ moj˦ˀ˥ kajŋ̟˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/mỗi_cây_mỗi_hoa,_mỗi_nhà_mỗi_cảnh"
+    },
+    {
+      "tier": "sentence",
+      "text": "tức cảnh sinh tình",
+      "ipa": "tɨk̚˧˦ kajŋ̟˧˩ sïŋ˧˧ tïŋ˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tức_cảnh_sinh_tình"
+    },
+    {
+      "tier": "sentence",
+      "text": "đồng bệnh tương liên",
+      "ipa": "ʔɗəwŋ͡m˨˩ ʔɓəjŋ̟˧˨ʔ tɨəŋ˧˧ liən˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/đồng_bệnh_tương_liên"
+    },
+    {
+      "tier": "sentence",
+      "text": "trời đánh tránh bữa ăn",
+      "ipa": "t͡ɕəːj˨˩ ʔɗajŋ̟˧˦ t͡ɕajŋ̟˧˦ ʔɓɨə˦ˀ˥ ʔan˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/trời_đánh_tránh_bữa_ăn"
+    },
+    {
+      "tier": "sentence",
+      "text": "thả cá nhỏ, bắt cá lớn",
+      "ipa": "tʰaː˧˩ kaː˧˦ ɲɔ˧˩ ʔɓat̚˧˦ kaː˧˦ ləːn˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thả_cá_nhỏ,_bắt_cá_lớn"
+    },
+    {
+      "tier": "sentence",
+      "text": "trường sinh bất lão",
+      "ipa": "t͡ɕɨəŋ˨˩ sïŋ˧˧ ʔɓət̚˧˦ laːw˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/trường_sinh_bất_lão"
+    },
+    {
+      "tier": "sentence",
+      "text": "ngựa quen đường cũ",
+      "ipa": "ŋɨə˧˨ʔ kwɛn˧˧ ʔɗɨəŋ˨˩ ku˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ngựa_quen_đường_cũ"
+    },
+    {
+      "tier": "sentence",
+      "text": "hạ hồi phân giải",
+      "ipa": "haː˧˨ʔ hoj˨˩ fən˧˧ zaːj˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/hạ_hồi_phân_giải"
+    },
+    {
+      "tier": "sentence",
+      "text": "tai qua nạn khỏi",
+      "ipa": "taːj˧˧ kwaː˧˧ naːn˧˨ʔ xɔj˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tai_qua_nạn_khỏi"
+    },
+    {
+      "tier": "sentence",
+      "text": "tai to mặt lớn",
+      "ipa": "taːj˧˧ tɔ˧˧ mat̚˧˨ʔ ləːn˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tai_to_mặt_lớn"
+    },
+    {
+      "tier": "sentence",
+      "text": "cầu được ước thấy",
+      "ipa": "kəw˨˩ ʔɗɨək̚˧˨ʔ ʔɨək̚˧˦ tʰəj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cầu_được_ước_thấy"
+    },
+    {
+      "tier": "sentence",
+      "text": "thất bại là mẹ thành công",
+      "ipa": "tʰət̚˧˦ ʔɓaːj˧˨ʔ laː˨˩ mɛ˧˨ʔ tʰajŋ̟˨˩ kəwŋ͡m˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thất_bại_là_mẹ_thành_công"
+    },
+    {
+      "tier": "sentence",
+      "text": "hai bàn tay trắng",
+      "ipa": "haːj˧˧ ʔɓaːn˨˩ taj˧˧ t͡ɕaŋ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/hai_bàn_tay_trắng"
+    },
+    {
+      "tier": "sentence",
+      "text": "từ cổ chí kim",
+      "ipa": "tɨ˨˩ ko˧˩ t͡ɕi˧˦ kim˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/từ_cổ_chí_kim"
+    },
+    {
+      "tier": "sentence",
+      "text": "kẻ hầu người hạ",
+      "ipa": "kɛ˧˩ həw˨˩ ŋɨəj˨˩ haː˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/kẻ_hầu_người_hạ"
+    },
+    {
+      "tier": "sentence",
+      "text": "ác giả ác báo",
+      "ipa": "ʔaːk̚˧˦ zaː˧˩ ʔaːk̚˧˦ ʔɓaːw˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ác_giả_ác_báo"
+    },
+    {
+      "tier": "sentence",
+      "text": "hết thuốc chữa",
+      "ipa": "het̚˧˦ tʰuək̚˧˦ t͡ɕɨə˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/hết_thuốc_chữa"
+    },
+    {
+      "tier": "sentence",
+      "text": "phòng bệnh hơn chữa bệnh",
+      "ipa": "fawŋ͡m˨˩ ʔɓəjŋ̟˧˨ʔ həːn˧˧ t͡ɕɨə˦ˀ˥ ʔɓəjŋ̟˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/phòng_bệnh_hơn_chữa_bệnh"
+    },
+    {
+      "tier": "sentence",
+      "text": "tiên học lễ, hậu học văn",
+      "ipa": "tiən˧˧ hawk͡p̚˧˨ʔ le˦ˀ˥ həw˧˨ʔ hawk͡p̚˧˨ʔ van˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tiên_học_lễ,_hậu_học_văn"
+    },
+    {
+      "tier": "sentence",
+      "text": "thời thế tạo anh hùng",
+      "ipa": "tʰəːj˨˩ tʰe˧˦ taːw˧˨ʔ ʔajŋ̟˧˧ hʊwŋ͡m˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thời_thế_tạo_anh_hùng"
+    },
+    {
+      "tier": "sentence",
+      "text": "tâm phục khẩu phục",
+      "ipa": "təm˧˧ fʊwk͡p̚˧˨ʔ xəw˧˩ fʊwk͡p̚˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tâm_phục_khẩu_phục"
+    },
+    {
+      "tier": "sentence",
+      "text": "tầm sư học đạo",
+      "ipa": "təm˨˩ sɨ˧˧ hawk͡p̚˧˨ʔ ʔɗaːw˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tầm_sư_học_đạo"
+    },
+    {
+      "tier": "sentence",
+      "text": "nội bất xuất, ngoại bất nhập",
+      "ipa": "noj˧˨ʔ ʔɓət̚˧˦ swət̚˧˦ ŋwaːj˧˨ʔ ʔɓət̚˧˦ ɲəp̚˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/nội_bất_xuất,_ngoại_bất_nhập"
+    },
+    {
+      "tier": "sentence",
+      "text": "cáo chết ba năm quay đầu về núi",
+      "ipa": "kaːw˧˦ t͡ɕet̚˧˦ ʔɓaː˧˧ nam˧˧ kwaj˧˧ ʔɗəw˨˩ ve˨˩ nuj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/cáo_chết_ba_năm_quay_đầu_về_núi"
+    },
+    {
+      "tier": "sentence",
+      "text": "núi cao còn có núi cao hơn",
+      "ipa": "nuj˧˦ kaːw˧˧ kɔn˨˩ kɔ˧˦ nuj˧˦ kaːw˧˧ həːn˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/núi_cao_còn_có_núi_cao_hơn"
+    },
+    {
+      "tier": "sentence",
+      "text": "uống nước nhớ nguồn",
+      "ipa": "ʔuəŋ˧˦ nɨək̚˧˦ ɲəː˧˦ ŋuən˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/uống_nước_nhớ_nguồn"
+    },
+    {
+      "tier": "sentence",
+      "text": "tôi suy nghĩ, vậy nên tôi tồn tại",
+      "ipa": "toj˧˧ swi˧˧ ŋi˦ˀ˥ vəj˧˨ʔ nen˧˧ toj˧˧ ton˨˩ taːj˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/tôi_suy_nghĩ,_vậy_nên_tôi_tồn_tại"
+    },
+    {
+      "tier": "sentence",
+      "text": "rừng vàng biển bạc",
+      "ipa": "zɨŋ˨˩ vaːŋ˨˩ ʔɓiən˧˩ ʔɓaːk̚˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/rừng_vàng_biển_bạc"
+    },
+    {
+      "tier": "sentence",
+      "text": "hổ phụ sinh hổ tử",
+      "ipa": "ho˧˩ fu˧˨ʔ sïŋ˧˧ ho˧˩ tɨ˧˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/hổ_phụ_sinh_hổ_tử"
+    },
+    {
+      "tier": "sentence",
+      "text": "thay lòng đổi dạ",
+      "ipa": "tʰaj˧˧ lawŋ͡m˨˩ ʔɗoj˧˩ zaː˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/thay_lòng_đổi_dạ"
+    },
+    {
+      "tier": "sentence",
+      "text": "lương y như từ mẫu",
+      "ipa": "lɨəŋ˧˧ ʔi˧˧ ɲɨ˧˧ tɨ˨˩ məw˦ˀ˥",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/lương_y_như_từ_mẫu"
+    },
+    {
+      "tier": "sentence",
+      "text": "gió chiều nào theo chiều ấy",
+      "ipa": "zɔ˧˦ t͡ɕiəw˨˩ naːw˨˩ tʰɛw˧˧ t͡ɕiəw˨˩ ʔəj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/gió_chiều_nào_theo_chiều_ấy"
+    },
+    {
+      "tier": "sentence",
+      "text": "có đôi có cặp",
+      "ipa": "kɔ˧˦ ʔɗoj˧˧ kɔ˧˦ kap̚˧˨ʔ",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/có_đôi_có_cặp"
+    },
+    {
+      "tier": "sentence",
+      "text": "bé hạt tiêu",
+      "ipa": "ʔɓɛ˧˦ haːt̚˧˨ʔ tiəw˧˧",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/bé_hạt_tiêu"
+    },
+    {
+      "tier": "sentence",
+      "text": "trăm trận trăm thắng",
+      "ipa": "t͡ɕam˧˧ t͡ɕən˧˨ʔ t͡ɕam˧˧ tʰaŋ˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/trăm_trận_trăm_thắng"
+    },
+    {
+      "tier": "sentence",
+      "text": "trăm nghe không bằng mắt thấy",
+      "ipa": "t͡ɕam˧˧ ŋɛ˧˧ xəwŋ͡m˧˧ ʔɓaŋ˨˩ mat̚˧˦ tʰəj˧˦",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/trăm_nghe_không_bằng_mắt_thấy"
+    },
+    {
+      "tier": "sentence",
+      "text": "con hư tại mẹ, cháu hư tại bà",
+      "ipa": "kɔn˧˧ hɨ˧˧ taːj˧˨ʔ mɛ˧˨ʔ t͡ɕaw˧˦ hɨ˧˧ taːj˧˨ʔ ʔɓaː˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/con_hư_tại_mẹ,_cháu_hư_tại_bà"
+    },
+    {
+      "tier": "sentence",
+      "text": "danh bất hư truyền",
+      "ipa": "zajŋ̟˧˧ ʔɓət̚˧˦ hɨ˧˧ t͡ɕwiən˨˩",
+      "romanization": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/danh_bất_hư_truyền"
+    },
+    {
+      "tier": "word",
+      "text": "ra",
+      "ipa": "zaː˧˧",
+      "romanization": null,
+      "ipaAlternatives": [
+        "ɹaː˧˧"
+      ],
+      "romanizationAlternatives": null,
+      "source": "en.wiktionary",
+      "sourceUrl": "https://en.wiktionary.org/wiki/ra"
+    }
+  ]
+}

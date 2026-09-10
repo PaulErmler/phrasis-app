@@ -39,6 +39,11 @@ type PaginationStatus =
  * translations finish generating before revealing the rows anyway.
  */
 const REVEAL_TIMEOUT_MS = 12_000;
+/**
+ * How many extra pages the preview may pull to fill its first screen when the
+ * leading rows are all added or ignored. Each one is a round trip.
+ */
+const MAX_FIRST_PAGE_TOP_UPS = 2;
 
 /**
  * Optimistically flip a row's status across every loaded page of every
@@ -198,6 +203,9 @@ export function useCollectionDetail({
   // honor the stay-visible contract regardless of which side of the anchor
   // they live on.
   const rowSnapshotsRef = useRef<Map<string, BrowseTextRow>>(new Map());
+  // Read by the first-page top-up effect, which must not re-run whenever a
+  // toggle changes the callback's identity.
+  const isRowVisibleRef = useRef<(row: BrowseTextRow) => boolean>(() => true);
   const forwardIdsRef = useRef<Set<string> | null>(null);
   const [resurrectedRows, setResurrectedRows] = useState<
     Map<string, BrowseTextRow>
@@ -403,8 +411,21 @@ export function useCollectionDetail({
             // Complete translations can still lack an annotation line
             // (IPA/romanization); requesting the row runs the server's
             // annotation backfill without touching the translations.
-            row.needsAnnotationBackfill) &&
-          !requestedTranslationsRef.current.has(row._id),
+            row.needsAnnotationBackfill ||
+            // ... or the wording the course's politeness setting asks for.
+            // Same trap as the annotation flag above: these rows have every
+            // canonical translation, so without this they were never sent
+            // and the "updating" chip never cleared.
+            row.needsRenderingRewrite) &&
+          // A rendering rewrite takes TWO server passes: the first asks the
+          // classifier to stamp the canonical row, and only once the stamp
+          // lands can the second ask for the rewrite. The one-shot ref below
+          // would spend the single allowed request on the stamp and leave the
+          // chip up for the rest of the session, so a row still reporting
+          // `needsRenderingRewrite` is let through again. The server's
+          // per-variant claims dedup the actual work.
+          (row.needsRenderingRewrite ||
+            !requestedTranslationsRef.current.has(row._id)),
       )
       .map((row) => row._id);
     if (pending.length === 0) return;
@@ -617,6 +638,33 @@ export function useCollectionDetail({
     [requestAudio],
   );
 
+  // The first page is 5 rows by RANK, and the toggles then hide the added
+  // and ignored ones. On a collection whose leading sentences are all
+  // already added (`browseAnchor` is the progress frontier, which a manual
+  // add does not always advance) that leaves the dialog showing nothing but
+  // "Show more" (2026-09-09, Pre-A1 with 8 added). Top the first page up
+  // until 5 rows are actually VISIBLE, or the feed runs out. Only while the
+  // user has not paged themselves: once they click "Show more" the reveal
+  // boundary owns the feed.
+  const topUpsRef = useRef(0);
+  useEffect(() => {
+    topUpsRef.current = 0;
+  }, [openCollectionId]);
+  useEffect(() => {
+    if (!anchorReady || revealBoundary !== null) return;
+    if (forward.status !== 'CanLoadMore') return;
+    const visible = forwardRowsRaw.filter(isRowVisibleRef.current).length;
+    if (visible >= PREVIEW_FIRST_PAGE_SIZE) return;
+    // Bounded on purpose. Each top-up is a round trip, and a collection the
+    // learner has almost finished can hide hundreds of rows in a row; paging
+    // 5 at a time to the end of it would be dozens of sequential queries on
+    // open. Two pulls of a full page cover ~50 hidden leading rows, which is
+    // every realistic case, and past that the learner clicks "Show more".
+    if (topUpsRef.current >= MAX_FIRST_PAGE_TOP_UPS) return;
+    topUpsRef.current += 1;
+    forward.loadMore(PREVIEW_PAGE_SIZE);
+  }, [anchorReady, revealBoundary, forward, forwardRowsRaw, openCollectionId]);
+
   const isRowVisible = useCallback(
     (row: BrowseTextRow) => {
       if (sessionActedIds.has(row._id)) return true;
@@ -626,6 +674,7 @@ export function useCollectionDetail({
     },
     [sessionActedIds, showAdded, showIgnored],
   );
+  isRowVisibleRef.current = isRowVisible;
 
   const browse: CollectionBrowse = useMemo(() => {
     const visibleForward =

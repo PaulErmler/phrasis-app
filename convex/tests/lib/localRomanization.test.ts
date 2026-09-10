@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   hasLocalRomanization,
+  usesLlmRomanization,
   romanizeLocal,
   getRomanizationSource,
   ROMANIZATION_SOURCES,
@@ -20,20 +21,31 @@ describe('hasLocalRomanization', () => {
     'yue_traditional',
     'el',
     'ko',
-    'he',
+    'fa',
+    'te',
+    'bg',
+  ];
+  // Romanized, but via Google Cloud v3 (not local). Arabic and its dialects
+  // returned here in Sep 2026, off `arabic-transliterate` whose IJMES output
+  // ("shkra jzyal-") was academic rather than a learner reading aid.
+  const GOOGLE_V3 = [
+    'ru',
+    'hi',
+    'bn',
+    'ja',
+    'ta',
+    'uk',
+    'sr',
     'ar',
     'ar_sa',
     'ar_eg',
     'ar_iq',
     'ar_lev',
-    'fa',
-    'te',
-    'bg',
   ];
-  // Romanized, but via Google Cloud v3 (not local).
-  const GOOGLE_V3 = ['ru', 'hi', 'bn', 'ja', 'ta', 'uk', 'sr'];
+  // Romanized by the model: no library and no Google support.
+  const LLM = ['th', 'he'];
   // Not romanized at all.
-  const NONE = ['en', 'de', 'fr', 'es', 'th'];
+  const NONE = ['en', 'de', 'fr', 'es'];
 
   it('returns true for every locally-romanized language', () => {
     for (const code of LOCAL) {
@@ -42,7 +54,7 @@ describe('hasLocalRomanization', () => {
   });
 
   it('returns false for Google-v3 and non-romanized languages', () => {
-    for (const code of [...GOOGLE_V3, ...NONE]) {
+    for (const code of [...GOOGLE_V3, ...LLM, ...NONE]) {
       expect(hasLocalRomanization(code), `code=${code}`).toBe(false);
     }
   });
@@ -333,5 +345,28 @@ describe('romanizeLocal: Bulgarian (bg)', () => {
     const out = romanizeLocal('Тя живее в София от три години.', 'bg');
     expect(out).toBe('Tya zhivee v Sofia ot tri godini.');
     expect(out).not.toMatch(/[Ѐ-ӿ]/);
+  });
+});
+
+describe('LLM-routed languages reach the model, not the Google gate', () => {
+  // Regression: the `usesLlmRomanization` branch was missing from
+  // romanizeText, so Thai and Hebrew fell through to the Google support check
+  // and threw "Romanization not configured" — the feature looked wired up
+  // everywhere else and produced nothing.
+  it('routes th and he away from both the local libraries and Google', () => {
+    for (const code of ['th', 'he']) {
+      expect(usesLlmRomanization(code), `code=${code}`).toBe(true);
+      expect(romanizeLocal('x', code), `code=${code}`).toBeNull();
+    }
+    // One tag per language: a Thai convention change must not re-buy every
+    // Hebrew row.
+    expect(getRomanizationSource('th')).toBe(ROMANIZATION_SOURCES.llmThai);
+    expect(getRomanizationSource('he')).toBe(ROMANIZATION_SOURCES.llmHebrew);
+  });
+
+  it('leaves every other romanized language off the model path', () => {
+    for (const code of ['zh', 'yue', 'ko', 'ar', 'ru', 'el', 'bg']) {
+      expect(usesLlmRomanization(code), `code=${code}`).toBe(false);
+    }
   });
 });

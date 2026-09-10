@@ -2,16 +2,16 @@ import { MutationCtx, QueryCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
 import { internal } from '../_generated/api';
 import {
+  DEFAULT_CONTENT_VERSION,
   getAudioAssetLanguage,
+  getCurrentTtsVersion,
   getTtsProviderForLanguage,
-  isTtsVersionStale,
 } from '../../lib/languages';
 import {
   getVoiceGenderByApiCode,
   getVoiceLocale,
   getVoiceLocalesForLanguage,
 } from '../../lib/voices';
-import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import { sha256Hex } from './sha256';
 import type { Infer } from 'convex/values';
 import {
@@ -19,6 +19,7 @@ import {
   type TtsProvider,
   type VoiceGender,
 } from '../types';
+import { audioPointer } from '../db/translationReads';
 
 export type TtsQuality = Infer<typeof ttsQualityValidator>;
 
@@ -32,6 +33,13 @@ export type TtsQuality = Infer<typeof ttsQualityValidator>;
  * accent-only variants share their text language's cache (`en_gb` → `en`),
  * and the accent rides in `regionVariant` as the voice locale (`en-GB`).
  * Build keys with `buildAudioAssetKey` so no caller keys by a raw course code.
+ *
+ * The TTS SETUP (provider + `ttsVersion`, see `TtsSetup`) is part of asset
+ * identity too, without being part of the index: `findAudioAssetByKey`
+ * filters the key's candidates on it. A prompt or provider change therefore
+ * never overwrites a clip. The next synthesis creates a sibling asset under
+ * the new setup, the old one stays (nothing garbage-collects a pointerless
+ * asset, by design), and rolling the setup back finds the old clip again.
  */
 
 /**
@@ -119,19 +127,65 @@ export interface AudioAssetPayload {
 }
 
 /**
+ * The TTS setup a clip was made under: the provider that synthesized it and
+ * the language's `ttsVersion` at the time (lib/languages.ts, bumped for a
+ * new voice pool or prompt). Together with the key it identifies an asset.
+ */
+export interface TtsSetup {
+  provider: TtsProvider;
+  version: number;
+}
+
+/**
+ * The setup a synthesis for `key` runs under right now. The version is
+ * resolved on the key's accent, the same way `storeAudioRecording` stamps
+ * it (`getCurrentTtsVersion`).
+ */
+export function currentTtsSetup(key: AudioAssetKey): TtsSetup {
+  return {
+    provider: getTtsProviderForLanguage(key.language),
+    version: getCurrentTtsVersion(key.language, key.regionVariant),
+  };
+}
+
+/**
+ * The setup an asset (or a payload about to become one) was made under.
+ * Rows from before the fields existed are legacy Google at version 1, which
+ * is also how the sweep's staleness check reads them.
+ */
+export function ttsSetupOf(
+  asset: Pick<Doc<'audioAssets'>, 'ttsProvider' | 'ttsVersion'>,
+): TtsSetup {
+  return {
+    provider: asset.ttsProvider ?? 'google',
+    version: asset.ttsVersion ?? DEFAULT_CONTENT_VERSION,
+  };
+}
+
+/**
  * Exact-key asset lookup. Takes a handful of candidates from the hash index
- * and filters on the raw string, so a hash collision can only cause a miss.
+ * and filters on the raw string and the TTS setup, so a hash collision can
+ * only cause a miss.
+ *
+ * `setup` selects WHICH clip of the string: by default the current one
+ * (`currentTtsSetup`), so the enqueue and upsert paths see only clips the
+ * current provider and prompt version produced, and clips from an earlier
+ * setup are invisible to them rather than replaced. `'any'` returns the
+ * first clip of the string whatever setup made it (playback of a string
+ * that has no text row: chat proposals, writing alternatives).
  *
  * Deliberately queries the 4-field PREFIX of `by_key` (voiceName, the fifth
  * column, is left unconstrained): asset identity is gender-level, so any
  * voice of the right gender matches and a regeneration replaces the one
  * shared asset whatever voice it picked. A future favorite-voice feature
  * turns per-voice by adding `.eq('voiceName', …)` here and in
- * `upsertAudioAsset`. The index already supports it.
+ * `upsertAudioAsset`. The index already supports it. `take(10)` leaves room
+ * for one clip per setup the string has been through.
  */
 export async function findAudioAssetByKey(
   ctx: QueryCtx,
   key: AudioAssetKey,
+  setup: TtsSetup | 'any' = currentTtsSetup(key),
 ): Promise<Doc<'audioAssets'> | null> {
   const hash = sha256Hex(key.spokenText);
   const candidates = await ctx.db
@@ -143,16 +197,32 @@ export async function findAudioAssetByKey(
         .eq('regionVariant', key.regionVariant)
         .eq('spokenTextHash', hash),
     )
-    .take(5);
-  return candidates.find((a) => a.spokenText === key.spokenText) ?? null;
+    .take(10);
+  const matches = candidates.filter((a) => a.spokenText === key.spokenText);
+  if (setup !== 'any') {
+    return matches.find((a) => sameTtsSetup(ttsSetupOf(a), setup)) ?? null;
+  }
+  // 'any': the current setup's clip when the string has one (the index
+  // lists clips in creation order, so a plain first match would keep
+  // serving the pre-bump clip forever), else whichever setup made one.
+  const current = currentTtsSetup(key);
+  return (
+    matches.find((a) => sameTtsSetup(ttsSetupOf(a), current)) ??
+    matches[0] ??
+    null
+  );
+}
+
+function sameTtsSetup(a: TtsSetup, b: TtsSetup): boolean {
+  return a.provider === b.provider && a.version === b.version;
 }
 
 /**
- * Cache lookup for the enqueue paths: the asset for `key`, but only when it is
- * still servable as-is. A stale asset (ttsVersion below the language's current
- * config, provider superseded per lib/ttsPrecedence.ts, or non-current speed)
- * returns null. The caller proceeds to synthesis, whose completion patches
- * the same asset in place by key. Never deletes anything.
+ * Cache lookup for the enqueue paths: the asset for `key` under the CURRENT
+ * TTS setup, but only when it is still servable as-is (current speed, blob
+ * present). A clip from an earlier provider or prompt version is a miss by
+ * construction (`findAudioAssetByKey`); the synthesis that follows creates
+ * a new asset beside it. Never deletes anything.
  */
 export async function findReusableAudioAsset(
   ctx: QueryCtx,
@@ -160,11 +230,6 @@ export async function findReusableAudioAsset(
 ): Promise<Doc<'audioAssets'> | null> {
   const asset = await findAudioAssetByKey(ctx, key);
   if (!asset) return null;
-  if (isTtsVersionStale(key.language, asset.ttsVersion)) return null;
-  const currentProvider = getTtsProviderForLanguage(key.language);
-  if (shouldOverwriteProvider(currentProvider, asset.ttsProvider ?? 'google')) {
-    return null;
-  }
   if (asset.speed !== 1) return null;
   // A hit is only reusable while its blob still exists. An asset can outlive
   // its blob (observed 2026-08-20: validated assets pointing at deleted
@@ -209,8 +274,8 @@ export async function findReusableAudioAssetForVoice(
  * Exact-key lookup for callers that have no text id and no voice yet, and
  * are happy with a clip in ANY accent of the language (chat proposal
  * playback, writing alternatives): tries every accent the language's active
- * pool produces, then the accent-less legacy key. Not a reusability check
- * (no version/provider/blob gate), matching `findAudioAssetByKey`.
+ * pool produces, then the accent-less legacy key, and accepts a clip from
+ * any TTS setup. Not a reusability check (no blob gate).
  */
 export async function findAudioAssetInAnyAccent(
   ctx: QueryCtx,
@@ -232,12 +297,16 @@ export async function findAudioAssetInAnyAccent(
   for (const regionVariant of accents) {
     if (tried.has(regionVariant)) continue;
     tried.add(regionVariant);
-    const asset = await findAudioAssetByKey(ctx, {
-      language,
-      voiceGender: args.voiceGender,
-      regionVariant,
-      spokenText: args.spokenText,
-    });
+    const asset = await findAudioAssetByKey(
+      ctx,
+      {
+        language,
+        voiceGender: args.voiceGender,
+        regionVariant,
+        spokenText: args.spokenText,
+      },
+      'any',
+    );
     if (asset) return asset;
   }
   return null;
@@ -261,6 +330,13 @@ export interface UpsertAudioAssetResult {
 /**
  * Find-or-create/patch the asset for `key` with freshly synthesized audio.
  *
+ * The asset is looked up under the setup the payload was made in
+ * (`ttsSetupOf(payload)`, the current one for every live caller), so a
+ * synthesis after a version bump or provider switch CREATES a sibling asset
+ * and the earlier setup's clip stays untouched, retained for a roll-back.
+ * Only a same-setup regeneration (validation retries, the regenerate
+ * button) swaps the blob in place.
+ *
  * Replace rules: a COMPLETED synthesis ('validated' or 'unvalidated', a
  * regeneration must land even when its validation failed) always replaces the
  * asset's audio, as does any write while the asset is still mid-flight
@@ -274,7 +350,7 @@ export async function upsertAudioAsset(
   key: AudioAssetKey,
   payload: AudioAssetPayload,
 ): Promise<UpsertAudioAssetResult> {
-  const existing = await findAudioAssetByKey(ctx, key);
+  const existing = await findAudioAssetByKey(ctx, key, ttsSetupOf(payload));
   if (!existing) {
     const assetId = await ctx.db.insert('audioAssets', {
       language: key.language,
@@ -333,15 +409,18 @@ export async function upsertAudioPointer(
   textId: Id<'texts'>,
   language: string,
   assetId: Id<'audioAssets'>,
+  // The rendering variant this pointer speaks (schema.ts); absent =
+  // canonical. Each key is its own pointer row.
+  variantKey?: string,
 ): Promise<void> {
-  const existing = await ctx.db
-    .query('audioRecordings')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', textId).eq('language', language),
-    )
-    .first();
+  const existing = await audioPointer(ctx, textId, language, variantKey);
   if (!existing) {
-    await ctx.db.insert('audioRecordings', { textId, language, assetId });
+    await ctx.db.insert('audioRecordings', {
+      textId,
+      language,
+      assetId,
+      ...(variantKey !== undefined ? { variantKey } : {}),
+    });
     return;
   }
   if (existing.assetId === assetId) return;

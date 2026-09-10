@@ -22,48 +22,18 @@ import {
   openrouterCostUsd,
   openrouterGenerationId,
 } from '../lib/posthogAi';
-import {
-  getLanguageByCode,
-  resolveAudioSpeakerGender,
-} from '../../lib/languages';
+import { resolveAudioSpeakerGender } from '../../lib/languages';
 import { isUserCreatedText } from '../../lib/translationProvenance';
 import { retrier } from '../retrier';
 import { stripJsonFences } from '../lib/llmJson';
 
-const METADATA_SYSTEM_PROMPT = `You analyze a sentence and return strict linguistic metadata as JSON.
-
-You will receive one or more renderings of the SAME sentence in different languages. Use cross-lingual signals — gendered morphology in any one of the supplied translations is enough to fix the sentence's gender. Treat the renderings as semantically identical: do not invent extra meaning that no rendering supports.
-
-Return ONLY a valid JSON object with EXACTLY these five keys and no others, no markdown, no explanation:
-
-{
-  "register": "formal" | "informal" | "neutral",
-  "addresseeNumber": "singular" | "plural" | "not_applicable",
-  "speakerGender": "male" | "female" | "neutral",
-  "addresseeGender": "male" | "female" | "neutral" | "not_applicable",
-  "addressesSomeone": true | false
-}
-
-FIELD DEFINITIONS:
-
-- register: The formality level of the sentence. "formal" for polite/respectful forms (Spanish "usted", French "vous", German "Sie", Japanese です/ます, Korean 해요체/합쇼체, Hindi आप). "informal" for casual/familiar forms (Spanish "tú/vosotros", French "tu", German "du", Japanese plain form, Korean 반말, Hindi तुम). "neutral" only when there is no addressee or no formality marking at all.
-
-- addresseeNumber: How many people are being addressed. "singular" if the sentence speaks to one person. "plural" if it speaks to more than one. "not_applicable" if the sentence has no addressee (e.g. "It is raining.", "The book is on the table.", a first-person statement with no "you"). This field NEVER takes "neutral" — its no-addressee value is "not_applicable".
-
-- speakerGender: The grammatical gender of the speaker. Return "male" or "female" ONLY when at least one supplied translation contains gender-marked morphology referring to the speaker. Examples that fix the gender:
-  * Spanish/Italian/Portuguese/French past participles or adjectives agreeing with a first-person subject ("estoy cansada" = female, "sono andato" = male).
-  * Russian past-tense verbs with first-person subject ("я пошёл" = male, "я пошла" = female).
-  * Arabic verb conjugations and pronoun suffixes referring to the speaker.
-  * Hebrew verb forms in first person.
-  * Hindi verb agreement with first-person subject.
-  * Polish/Czech past tense gendered forms.
-  Otherwise return "neutral". Do NOT guess based on topic or stereotype.
-
-- addresseeGender: Same rule, but for the person being addressed. "not_applicable" if there is no addressee. "neutral" if there is an addressee but no rendering grammatically marks their gender.
-
-- addressesSomeone: Boolean. true if the sentence speaks to a 2nd-person addressee (imperatives, direct questions, vocatives, sentences containing "you"/"your", commands, requests, greetings). false otherwise (descriptive/narrative sentences like "It is raining.", "The Pacific Ocean is the largest body of water on Earth.", first-person statements with no second-person reference). When addressesSomeone is false, addresseeNumber should be "not_applicable" and addresseeGender should be "not_applicable".
-
-Be strict: if no rendering forces a value, return "neutral" / "not_applicable". Do not invent gender information.`;
+// The classifier prompt lives in convex/lib/sentenceMetadataPrompt.ts
+// (Convex-runtime-free) so `pnpm eval:metadata` grades the exact production
+// prompt; change it there.
+import {
+  buildMetadataSystemPrompt,
+  buildMetadataUserPrompt,
+} from '../lib/sentenceMetadataPrompt';
 
 // Value sets, `Metadata`, and the strict validator live in
 // lib/sentenceMetadataShape.ts (Convex-runtime-free, so the autofill prompt
@@ -74,6 +44,7 @@ export {
   ALLOWED_ADDRESSEE_NUMBER,
   ALLOWED_SPEAKER_GENDER,
   ALLOWED_ADDRESSEE_GENDER,
+  ALLOWED_REFERENT_GENDER,
   validateSentenceMetadata,
   type Metadata,
 } from '../lib/sentenceMetadataShape';
@@ -82,6 +53,8 @@ import {
   ALLOWED_ADDRESSEE_NUMBER,
   ALLOWED_SPEAKER_GENDER,
   ALLOWED_ADDRESSEE_GENDER,
+  ALLOWED_REFERENT_GENDER,
+  CURRENT_SENTENCE_METADATA_SOURCE,
   type Metadata,
 } from '../lib/sentenceMetadataShape';
 
@@ -135,6 +108,7 @@ function safeExtractMetadata(raw: string): Partial<Metadata> {
   pickField(stringOut, obj, 'addresseeNumber', ALLOWED_ADDRESSEE_NUMBER);
   pickField(stringOut, obj, 'speakerGender', ALLOWED_SPEAKER_GENDER);
   pickField(stringOut, obj, 'addresseeGender', ALLOWED_ADDRESSEE_GENDER);
+  pickField(stringOut, obj, 'referentGender', ALLOWED_REFERENT_GENDER);
   Object.assign(out, stringOut);
   // addressesSomeone is the only boolean field. Handle separately.
   if (typeof obj.addressesSomeone === 'boolean') {
@@ -259,21 +233,14 @@ export const fetchSentenceMetadata = internalAction({
         return null;
       }
 
-      const renderings = args.translations
-        .map((t) => {
-          const lang = getLanguageByCode(t.language);
-          return `[${lang?.name ?? t.language}]: ${t.text}`;
-        })
-        .join('\n');
-
-      const userPrompt = `Renderings of the same sentence:\n${renderings}\n\nReturn the metadata JSON now.`;
+      const userPrompt = buildMetadataUserPrompt(args.translations);
 
       const openrouter = getOpenRouter();
 
       const startedAt = Date.now();
       const { text, usage, providerMetadata } = await generateText({
         model: openrouter(OPENROUTER_MODELS.sentenceMetadata),
-        system: METADATA_SYSTEM_PROMPT,
+        system: buildMetadataSystemPrompt(),
         prompt: userPrompt,
       });
 
@@ -348,6 +315,7 @@ export async function applyTextMetadata(
       speakerGender?: string;
       addresseeGender?: string;
       addressesSomeone?: boolean;
+      referentGender?: string;
     };
     schedulePrepareCard: boolean;
     baseLanguages: string[];
@@ -398,6 +366,14 @@ export async function applyTextMetadata(
   if (args.metadata?.addressesSomeone !== undefined) {
     metadataPatch.addressesSomeone = args.metadata.addressesSomeone;
   }
+  // A definitive third-party gender ("my sister", "her husband") replaces
+  // whatever coin flip stood there; "neutral" leaves the flip below to it.
+  if (
+    args.metadata?.referentGender === 'male' ||
+    args.metadata?.referentGender === 'female'
+  ) {
+    metadataPatch.referentGender = args.metadata.referentGender;
+  }
 
   // ── addresseeGender coin-flip ──
   // When the sentence addresses someone but the LLM didn't commit to a
@@ -427,16 +403,34 @@ export async function applyTextMetadata(
   }
 
   // ── referentGender coin-flip ──
-  // Always pick a gender for the third-party referent, so gendered nouns
-  // (translator → Übersetzer/-in, doctor → Arzt/Ärztin) get a consistent
-  // assignment that's stable across target languages. Once set, never re-roll.
-  if (text.referentGender !== 'male' && text.referentGender !== 'female') {
+  // When the classifier fixed no third party's gender, pick one so gendered
+  // nouns (translator → Übersetzer/-in, doctor → Arzt/Ärztin) get a
+  // consistent assignment that's stable across target languages. Once set,
+  // never re-roll; only a definitive verdict above replaces it.
+  if (
+    metadataPatch.referentGender === undefined &&
+    text.referentGender !== 'male' &&
+    text.referentGender !== 'female'
+  ) {
     metadataPatch.referentGender = Math.random() < 0.5 ? 'male' : 'female';
   }
+
+  // The source stamp says "these fields are the current classifier's
+  // verdict". Only a verdict that reached the speaker gender earns it: the
+  // unblock call (`metadata: undefined`) and a degraded partial patch leave
+  // the row unstamped, so a curriculum text's coin flip is never mistaken
+  // for evidence and the sweep asks again after the cooldown.
+  const classified = args.metadata?.speakerGender !== undefined;
 
   await ctx.db.patch(args.textId, {
     audioSpeakerGender,
     ...metadataPatch,
+    ...(classified
+      ? {
+          metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
+          metadataRequestedAt: undefined,
+        }
+      : {}),
   });
 
   // Finish the record this step owns: stamp the resolved gender onto the
@@ -507,6 +501,7 @@ export const applyMetadataAndPrepareCard = internalMutation({
         speakerGender: v.optional(v.string()),
         addresseeGender: v.optional(v.string()),
         addressesSomeone: v.optional(v.boolean()),
+        referentGender: v.optional(v.string()),
       }),
     ),
     schedulePrepareCard: v.boolean(),

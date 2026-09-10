@@ -1,6 +1,12 @@
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
 import { isAudioAssetReferenced, resolveAudioPayload } from './audioAssets';
+import {
+  audioPointer,
+  audioPointersForTextLanguage,
+} from '../db/translationReads';
+import { AUTO, parseVariantKey } from '../../lib/preferenceResolution';
+import { languageMarksFirstPerson } from '../../lib/languageForms';
 
 /**
  * Delete an `audioRecordings` pointer row; when it was the LAST pointer at
@@ -14,12 +20,14 @@ import { isAudioAssetReferenced, resolveAudioPayload } from './audioAssets';
  *
  * `opts.keepAsset` detaches the pointer but PRESERVES the asset + blob even
  * when this was the last pointer. Use it whenever the audio itself is still
- * correct and only this text stops needing it. Card edits, retranslations,
- * and speaker-gender re-voicing, so the content-addressed `audioAssets`
- * cache keeps serving the string for other texts and future re-creation.
- * Full garbage collection (the default) is reserved for audio that is
- * OBSOLETE as audio: the manual regenerate button and TTS-system migrations
- * (provider/ttsVersion changes).
+ * correct and only this text stops needing it: card edits, retranslations,
+ * speaker-gender re-voicing, accent drift, and provider or ttsVersion
+ * changes, which are a new TTS setup rather than obsolescence (every clip
+ * is kept per text + gender + accent + provider + version so a setup change
+ * can be rolled forward or back cheaply, see convex/lib/audioAssets.ts).
+ * The content-addressed `audioAssets` cache keeps serving the string for
+ * other texts and for a roll-back. Full garbage collection (the default) is
+ * reserved for the manual regenerate button and the orphan cascades.
  *
  * `opts.blobAlreadyGone` skips the storage delete when the blob is already
  * known to be missing (`storage.getUrl` returned null), as in
@@ -55,13 +63,20 @@ export async function deleteAudioRowsForTextLanguage(
   language: string,
   opts?: { keepAsset?: boolean },
 ): Promise<void> {
-  const rows = await ctx.db
-    .query('audioRecordings')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', textId).eq('language', language),
-    )
-    .take(10);
+  // The canonical pointer and every AUDIO-ONLY variant: all of them speak
+  // the wording that just changed. A variant with its own wording keeps its
+  // clip: any politeness form, and on a language whose wording marks the
+  // speaker's gender also the `<gender>|auto` key, which there voices a
+  // rewritten sentence rather than the canonical one
+  // (docs/architecture/translation-variants.md, Keys).
+  const rows = await audioPointersForTextLanguage(ctx, textId, language);
+  const genderRewrites = languageMarksFirstPerson(language);
   for (const row of rows) {
+    if (row.variantKey !== undefined) {
+      const { gender, formId } = parseVariantKey(row.variantKey);
+      if (formId !== AUTO) continue;
+      if (gender !== AUTO && genderRewrites) continue;
+    }
     await deleteAudioRow(ctx, row, opts);
   }
 }
@@ -119,14 +134,7 @@ export async function getAudioForText(
   languages: string[],
 ): Promise<AudioResult[]> {
   const records = await Promise.all(
-    languages.map((lang) =>
-      ctx.db
-        .query('audioRecordings')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', textId).eq('language', lang),
-        )
-        .first(),
-    ),
+    languages.map((lang) => audioPointer(ctx, textId, lang)),
   );
 
   const payloads = await Promise.all(

@@ -22,6 +22,10 @@ import {
 import { COLLECTION_PREVIEW_SIZE } from '../lib/collections';
 import { getPremadeLevelCollections } from '../db/collections';
 import { scheduleMissingTranslationsForText } from './collections';
+import {
+  flushRenderingStamps,
+  newRenderingStampCollector,
+} from '../lib/contentScheduling';
 import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 import {
   DAILY_TIME_CUSTOM_MIN,
@@ -543,6 +547,9 @@ export const warmupTranslationsBatch = internalMutation({
   returns: v.object({ translationsScheduled: v.number() }),
   handler: async (ctx, { textIds, languages, attempt = 0 }) => {
     try {
+      // One rendering-stamp collector for the batch, so the classifier is
+      // asked once per language per 25 rows, not once per text.
+      const stamps = newRenderingStampCollector();
       let translationsScheduled = 0;
       for (const textId of textIds) {
         const text = await ctx.db.get(textId);
@@ -554,9 +561,10 @@ export const warmupTranslationsBatch = internalMutation({
           // Nobody is waiting on a warmup run, and it enqueues thousands of
           // jobs at once. Route them to llmWarmPool so they can't queue ahead
           // of a user's own translations.
-          { llmPriority: 'background' },
+          { llmPriority: 'background', stamps },
         );
       }
+      await flushRenderingStamps(ctx, stamps);
       return { translationsScheduled };
     } catch (error) {
       if (attempt + 1 < PLACEMENT_BATCH_MAX_ATTEMPTS) {
@@ -691,6 +699,19 @@ export const finalizeOnboarding = mutation({
             if (courseSettings.writingInputMode !== desired) {
               patch.writingInputMode = desired;
             }
+          }
+
+          // The politeness answer, same no-op-in-the-normal-flow rule.
+          // A set: {polite, casual} and {casual, polite} are the same answer.
+          const sortedLevels = (levels: readonly string[] | undefined) =>
+            [...(levels ?? [])].sort().join(',');
+          if (
+            progress.politenessLevels !== undefined &&
+            progress.politenessLevels.length > 0 &&
+            sortedLevels(courseSettings.politenessLevels) !==
+              sortedLevels(progress.politenessLevels)
+          ) {
+            patch.politenessLevels = progress.politenessLevels;
           }
 
           if (Object.keys(patch).length > 0) {

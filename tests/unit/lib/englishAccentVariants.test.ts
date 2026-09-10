@@ -13,6 +13,7 @@ import {
   pickAccentVariantForText,
   getTtsPromptNameForLocale,
   isAccentSiblingOf,
+  isTtsVersionStale,
   resolveMixedVariant,
   usesSourceTextVerbatim,
 } from '@/lib/languages';
@@ -252,10 +253,40 @@ describe('one audio cache for every English accent', () => {
     expect(getAudioAssetLanguage('es_mixed')).toBe('es_mixed');
   });
 
-  it('checks variant audio against en’s ttsVersion, not a version of its own', () => {
+  it('without an accent, variant audio is checked against en’s ttsVersion', () => {
     for (const code of ENGLISH_VARIANTS) {
-      expect(getLanguageByCode(code)?.ttsVersion).toBeUndefined();
       expect(getCurrentTtsVersion(code)).toBe(getCurrentTtsVersion('en'));
     }
+  });
+
+  it('a variant’s own ttsVersion applies to clips in its locale only, whichever course made them', () => {
+    // en_au v2 (2026-09-07): the General-accent prompt note.
+    expect(getLanguageByCode('en_au')?.ttsVersion).toBe(2);
+    expect(getLanguageByCode('en_gb')?.ttsVersion).toBeUndefined();
+    expect(getLanguageByCode('en_us')?.ttsVersion).toBeUndefined();
+    for (const code of ['en', ...ENGLISH_VARIANTS]) {
+      expect(getCurrentTtsVersion(code, 'en-AU')).toBe(2);
+      expect(getCurrentTtsVersion(code, 'en-GB')).toBe(
+        getCurrentTtsVersion('en'),
+      );
+      expect(getCurrentTtsVersion(code, 'en-US')).toBe(
+        getCurrentTtsVersion('en'),
+      );
+    }
+    expect(isTtsVersionStale('en', 1, 'en-AU')).toBe(true);
+    expect(isTtsVersionStale('en_au', 1, 'en-AU')).toBe(true);
+    expect(isTtsVersionStale('en', 1, 'en-GB')).toBe(false);
+    expect(isTtsVersionStale('en', 1, 'en-US')).toBe(false);
+    expect(isTtsVersionStale('en', 1, undefined)).toBe(false);
+    // Unstamped rows never storm, accent or not.
+    expect(isTtsVersionStale('en', undefined, 'en-AU')).toBe(false);
+  });
+
+  it('a mixed pool outside the English family does not pick up its dialects’ versions', () => {
+    // Castilian Spanish carries ttsVersion 2 for its own pool; es_mixed's
+    // 'es-ES' clips are not accent siblings and keep es_mixed's version.
+    expect(getCurrentTtsVersion('es_mixed', 'es-ES')).toBe(
+      getCurrentTtsVersion('es_mixed'),
+    );
   });
 });

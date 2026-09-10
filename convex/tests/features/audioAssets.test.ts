@@ -7,7 +7,16 @@ import { internal } from '../../_generated/api';
 import type { Id } from '../../_generated/dataModel';
 import { scheduleAudioForLanguage } from '../../features/decks';
 import { deleteAudioRowsForTextLanguage } from '../../lib/audio';
-import { getCurrentTtsVersion } from '../../../lib/languages';
+import { findAudioAssetByKey } from '../../lib/audioAssets';
+import { scheduleMissingContent } from '../../lib/contentScheduling';
+import { audioPointer } from '../../db/translationReads';
+import {
+  getCurrentTranslationVersion,
+  getCurrentTtsVersion,
+  getTtsProviderForLanguage,
+} from '../../../lib/languages';
+import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
+import { insertAudioFixture } from '../lib/audioFixtures';
 // The workpools are module-mocked globally (tests/convexTestSetup.ts):
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds, so tests can
 // assert the enqueue payload directly.
@@ -202,7 +211,7 @@ describe('audioAssets content-addressed cache', () => {
       expect(await getClaim(t, textB)).not.toBeNull();
     });
 
-    it('a version-stale asset is not reused, and the re-synthesis patches it in place for every sharer', async () => {
+    it('a version bump creates a sibling asset: the old asset and blob stay, and the old setup still finds it', async () => {
       const t = convexTest(schema, modules);
       const textA = await seedText(t, 'Hola');
       const oldBlob = await storeBlob(t, 1);
@@ -211,10 +220,12 @@ describe('audioAssets content-addressed cache', () => {
         spokenText: 'Hola',
         storageId: oldBlob,
       });
-      // Age the asset below the language's current ttsVersion.
-      await t.run(async (ctx) => {
+      // Age the asset below the language's current ttsVersion: the clip of
+      // the previous prompt version.
+      const oldAssetId = await t.run(async (ctx) => {
         const asset = (await ctx.db.query('audioAssets').collect())[0];
         await ctx.db.patch(asset._id, { ttsVersion: 0 });
+        return asset._id;
       });
 
       const textB = await seedText(t, 'Hola');
@@ -222,7 +233,7 @@ describe('audioAssets content-addressed cache', () => {
         const text = await ctx.db.get(textB);
         return scheduleAudioForLanguage(ctx, text!, 'es', 'female', null);
       });
-      // Stale → miss → real job enqueued.
+      // A clip of another setup is invisible → miss → real job enqueued.
       expect(mockEnqueueTts).toHaveBeenCalledTimes(1);
 
       // Simulate that job's final write: same key, new blob.
@@ -234,14 +245,145 @@ describe('audioAssets content-addressed cache', () => {
       });
 
       const assets = await getAllAssets(t);
-      expect(assets.length).toBe(1);
-      expect(assets[0].storageId).toBe(newBlob);
-      expect(assets[0].ttsVersion).toBe(getCurrentTtsVersion('es'));
-      // Text A shares the healed asset, no sweep needed on its side.
-      const rowA = await getRow(t, textA);
-      expect(rowA?.assetId).toBe(assets[0]._id);
-      // The replaced blob is deleted on a delay, not immediately.
+      expect(assets.length).toBe(2);
+      const old = assets.find((a) => a._id === oldAssetId)!;
+      const fresh = assets.find((a) => a._id !== oldAssetId)!;
+      expect(old.storageId).toBe(oldBlob);
+      expect(old.ttsVersion).toBe(0);
+      expect(fresh.storageId).toBe(newBlob);
+      expect(fresh.ttsVersion).toBe(getCurrentTtsVersion('es'));
+      // Retained: the old asset still owns its blob, so even the delayed
+      // reference-checked delete leaves it alone.
       expect(await blobExists(t, oldBlob)).toBe(true);
+      await t.mutation(
+        internal.features.ttsProcessing.deleteBlobIfUnreferencedJob,
+        { storageId: oldBlob },
+      );
+      expect(await blobExists(t, oldBlob)).toBe(true);
+      // Text A keeps its pointer until the validity sweep re-points it; B
+      // got the new asset.
+      expect((await getRow(t, textA))?.assetId).toBe(oldAssetId);
+      expect((await getRow(t, textB))?.assetId).toBe(fresh._id);
+
+      // Each setup finds its own clip; 'any' finds one.
+      const key = {
+        language: 'es',
+        voiceGender: 'female' as const,
+        regionVariant: old.regionVariant,
+        spokenText: 'Hola',
+      };
+      const found = await t.run(async (ctx) => ({
+        current: await findAudioAssetByKey(ctx, key),
+        previous: await findAudioAssetByKey(ctx, key, {
+          provider: 'gemini',
+          version: 0,
+        }),
+        any: await findAudioAssetByKey(ctx, key, 'any'),
+      }));
+      expect(found.current?._id).toBe(fresh._id);
+      expect(found.previous?._id).toBe(oldAssetId);
+      expect(found.any).not.toBeNull();
+    });
+  });
+
+  describe('TTS setup retention in the validity sweep', () => {
+    /**
+     * A German text with a complete Spanish translation whose clip was made
+     * under `ttsVersion`. The German clip is current, so only the Spanish
+     * pointer is up for the sweep.
+     */
+    async function seedSpanishClip(
+      t: TestConvex<typeof schema>,
+      opts: { ttsVersion: number },
+    ) {
+      return t.run(async (ctx) => {
+        const collectionId = await ctx.db.insert('collections', {
+          name: 'A1',
+          textCount: 0,
+        });
+        const textId = await ctx.db.insert('texts', {
+          text: 'Hallo',
+          language: 'de',
+          userCreated: false,
+          collectionId,
+          collectionRank: 1,
+          speakerGender: 'female',
+          audioSpeakerGender: 'female',
+          metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
+          ipaText: 'haˈloː',
+        });
+        await ctx.db.insert('translations', {
+          textId,
+          targetLanguage: 'es',
+          translatedText: 'Hola',
+          speakerGender: 'female',
+          translationVersion: getCurrentTranslationVersion('es'),
+          ipaText: 'ˈola',
+        });
+        await insertAudioFixture(ctx, {
+          textId,
+          language: 'de',
+          storageId: await ctx.storage.store(new Blob([new Uint8Array([1])])),
+          ttsQuality: 'validated',
+          ttsProvider: getTtsProviderForLanguage('de'),
+          voiceGender: 'female',
+          ttsVersion: getCurrentTtsVersion('de'),
+          spokenText: 'Hallo',
+        });
+        const esBlob = await ctx.storage.store(new Blob([new Uint8Array([2])]));
+        const { assetId } = await insertAudioFixture(ctx, {
+          textId,
+          language: 'es',
+          storageId: esBlob,
+          ttsQuality: 'validated',
+          ttsProvider: getTtsProviderForLanguage('es'),
+          voiceGender: 'female',
+          ttsVersion: opts.ttsVersion,
+          spokenText: 'Hola',
+        });
+        return { textId, esAssetId: assetId, esBlob };
+      });
+    }
+
+    it('a version-stale canonical pointer is detached, the asset and blob stay, and TTS is re-enqueued', async () => {
+      const t = convexTest(schema, modules);
+      const { textId, esAssetId, esBlob } = await seedSpanishClip(t, {
+        ttsVersion: 0,
+      });
+
+      const scheduled = await t.run(async (ctx) => {
+        const text = (await ctx.db.get(textId))!;
+        return scheduleMissingContent(ctx, textId, text, ['de'], ['es']);
+      });
+
+      expect(scheduled.audioScheduled).toBe(1);
+      expect(mockEnqueueTts).toHaveBeenCalledTimes(1);
+      expect(mockEnqueueTts.mock.calls[0][2]).toMatchObject({
+        textId,
+        language: 'es',
+        text: 'Hola',
+      });
+      expect(await t.run((ctx) => audioPointer(ctx, textId, 'es'))).toBeNull();
+      expect(await t.run((ctx) => ctx.db.get(esAssetId))).not.toBeNull();
+      expect(await blobExists(t, esBlob)).toBe(true);
+    });
+
+    it('a current canonical pointer is left alone', async () => {
+      const t = convexTest(schema, modules);
+      const { textId, esAssetId } = await seedSpanishClip(t, {
+        ttsVersion: getCurrentTtsVersion('es'),
+      });
+
+      const scheduled = await t.run(async (ctx) => {
+        const text = (await ctx.db.get(textId))!;
+        return scheduleMissingContent(ctx, textId, text, ['de'], ['es']);
+      });
+
+      expect(scheduled.audioScheduled).toBe(0);
+      expect(mockEnqueueTts).not.toHaveBeenCalled();
+      expect(
+        (await t.run((ctx) => audioPointer(ctx, textId, 'es')))?.assetId,
+      ).toBe(esAssetId);
     });
   });
 

@@ -33,8 +33,14 @@ import {
   newCardsByOriginValidator,
   cardEditKindValidator,
   cardEditPathValidator,
+  flagReasonValidator,
+  politenessLevelValidator,
   cardEditLanguageRoleValidator,
   retranslationStatusValidator,
+  firstPersonFormsValidator,
+  politenessLevelsValidator,
+  renderedGenderValidator,
+  renderedPolitenessValidator,
 } from './types';
 
 // Field validators for the `courseSettings` table. Extracted so that queries
@@ -270,6 +276,17 @@ export const courseSettingsFields = {
   reconciledDatasetId: v.optional(v.id('datasets')), // Dataset version this course's progress has been cutover to (idempotency gate for datasetMigration_cutoverUser)
   // Source-of-content filter. See studyContentFilterValidator in types.ts.
   studyContentFilter: v.optional(studyContentFilterValidator),
+  // The politeness preference (lib/languageForms.ts). Undefined on every
+  // course from before the feature = the canonical renderings; never
+  // backfilled. New courses get an explicit value from onboarding or the
+  // create-course dialog. Only curriculum cards created after the feature
+  // (`cards.followsCoursePreferences`) follow it; user-written sentences
+  // never do. Resolution: lib/preferenceResolution.ts.
+  // `firstPersonForms` is retired: the course gender choice was withdrawn
+  // on 2026-09-08 (one gender per curriculum sentence, its voice). Rows
+  // written before keep the value; nothing reads or writes it.
+  firstPersonForms: v.optional(firstPersonFormsValidator),
+  politenessLevels: v.optional(politenessLevelsValidator),
   // Current "between celebrations" bucket id. Rotated by the client on
   // celebration dismiss (via `setCurrentSessionId`). Stored server-side so
   // the bucket survives the user closing the learn view OR moving to a
@@ -327,6 +344,12 @@ export const onboardingProgressFields = {
   currentLevel: v.optional(currentLevelValidator),
   targetLanguages: v.optional(v.array(v.string())),
   baseLanguages: v.optional(v.array(v.string())),
+  // The politeness step; copied onto courseSettings by `completeOnboarding`.
+  // Skipped (left undefined) when no target language marks politeness
+  // (`courseAsksPoliteness`). `firstPersonForms` is the retired gender step
+  // (withdrawn 2026-09-08): no longer asked, written or read.
+  firstPersonForms: v.optional(firstPersonFormsValidator),
+  politenessLevels: v.optional(politenessLevelsValidator),
   // Survey answers.
   acquisitionSource: v.optional(v.string()),
   acquisitionSourceFreeText: v.optional(v.string()),
@@ -494,6 +517,27 @@ export default defineSchema({
     tenseAspect: v.optional(v.string()), // simple_present / past_continuous / etc.
     sentenceType: v.optional(v.string()), // declarative / interrogative / imperative / exclamatory
     literalFigurative: v.optional(v.string()), // literal / figurative
+    // Which sentence-metadata classifier build produced the linguistic
+    // metadata above (`SENTENCE_METADATA_SOURCES` in
+    // convex/lib/sentenceMetadataShape.ts). Same invalidate-by-source
+    // contract as `romanizationSource`, with one more meaning: on a
+    // curriculum text, undefined means the row was never classified and
+    // `speakerGender` / `referentGender` are the coin flips the sweep and
+    // the offline curation wrote; only a row at the CURRENT source carries
+    // verdicts the resolver may treat as evidence. Stamped by
+    // `applyTextMetadata`; the content sweep classifies curriculum texts
+    // lazily (`needsSentenceMetadata` in convex/lib/contentScheduling.ts).
+    metadataSource: v.optional(v.string()),
+    // When a sweep last asked the classifier for this text, so the repeated
+    // sweeps of one card do not double the call while it is in flight, and
+    // a blank answer is retried after a cooldown. Same shape as
+    // `translations.renderingStampRequestedAt`.
+    metadataRequestedAt: v.optional(v.number()),
+    /**
+     * When a sweep last asked for this text's missing source annotations;
+     * see `translations.annotationRequestedAt` for the contract.
+     */
+    annotationRequestedAt: v.optional(v.number()),
     // OGTE arc grouping (curation manifest). Sentences sharing the same
     // (collectionId, arcId) form a thematic sequence; the translation worker
     // pulls a sliding window of arc siblings into the LLM prompt so pronouns,
@@ -593,6 +637,65 @@ export default defineSchema({
     // Every row on a userCreated text, plus user-provided / curated-manual
     // rows anywhere. Are skipped by the sweep regardless of their stamp.
     translationVersion: v.optional(v.number()),
+    // Rendering variants. A row with `variantKey` set is a second rendering
+    // of the same (text, language) in a specific first-person gender and/or
+    // politeness form, `"<male|female|auto>|<formId|auto>"` as built by
+    // lib/preferenceResolution.ts (`textVariantKey`). Canonical rows, every
+    // row from before the feature included, have no key: absence is what
+    // makes them canonical, so nothing was migrated. Variants are ordinary
+    // rows to every walk (annotations, superseded revisions, cascades) and
+    // are never deleted because another rendering was requested. Point
+    // reads pin all four index columns through convex/db/translationReads.ts.
+    variantKey: v.optional(v.string()),
+    // True on a variant whose wording came out identical to the canonical
+    // row's. Stored so the ensure path stops re-requesting it; served as
+    // the canonical text with audio in the card's voice.
+    sameAsCanonical: v.optional(v.literal(true)),
+    // How many times the gender-correction sweep has regenerated this row
+    // AFTER it was already produced under the text's definitive speaker
+    // gender (contentScheduling.ts, `MAX_GENDER_CORRECTION_RETRIES`). Such a
+    // row is not stale: the model ignored `<speaker_gender>`, so a second
+    // sample is worth one call, and the count is what stops a sentence the
+    // model will not render in the requested gender from regenerating on
+    // every sweep. Absent = never retried.
+    genderCorrectionAttempts: v.optional(v.number()),
+    // What the wording actually is, stamped by the rendering classifier
+    // (convex/lib/renderingClassifier.ts) after generation and lazily by
+    // `flushRenderingStamps` (convex/lib/contentScheduling.ts) on rows
+    // from before the feature, as the content sweep meets them. Drives the
+    // chips on the card and the "canonical already satisfies the
+    // preference" shortcut. Undefined = not classified yet (no chip).
+    renderedGender: v.optional(renderedGenderValidator),
+    renderedPoliteness: v.optional(renderedPolitenessValidator),
+    /**
+     * When a content sweep last asked the rendering classifier to stamp
+     * this row (contentScheduling.ts `flushRenderingStamps`). Rows from
+     * before the sentence-form settings are stamped lazily, by the sweep
+     * of whichever learner meets them first; this claim keeps the repeated
+     * sweeps of one card from asking again while the call is in flight,
+     * and retries a row the classifier left blank after a cooldown.
+     */
+    renderingStampRequestedAt: v.optional(v.number()),
+    /**
+     * How many times the rendering classifier has been asked for this row.
+     * Capped at `MAX_RENDERING_STAMP_ATTEMPTS` (contentScheduling.ts): the
+     * request claim above only holds for a cooldown, so a row the model
+     * keeps returning nothing usable for was otherwise re-bought every 15
+     * minutes for good. Every other LLM path on the variant side has a cap
+     * (`variantFailedAt`, `MAX_GENDER_CORRECTION_RETRIES`); this is that
+     * cap. Absent means never asked.
+     */
+    renderingStampAttempts: v.optional(v.number()),
+    /**
+     * When a sweep last asked for this row's missing annotations
+     * (romanization, IPA, furigana). A transient failure leaves the value
+     * undefined so the row is retried, and this claim keeps the retry to
+     * once per `ANNOTATION_REQUEST_COOLDOWN_MS` (convex/lib/textAnnotations.ts)
+     * instead of once per view for the length of an outage. Cleared with
+     * the annotation fields when the wording changes. Same shape as
+     * `renderingStampRequestedAt`.
+     */
+    annotationRequestedAt: v.optional(v.number()),
     // Superseded-revision fields. A version-bump regeneration that produced
     // a different wording while cards referenced the text AND the wording
     // had audio copies the old wording into a second row of THIS table with
@@ -655,6 +758,19 @@ export default defineSchema({
       'targetLanguage',
       'supersededAt',
     ])
+    // Successor of the index above with the rendering variant pinned:
+    // canonical reads use `.eq('variantKey', undefined)`. NOT staged, and no
+    // deployment has it yet: the branch that declared it `staged: true`
+    // (`gender-choice`) was never pushed, so the first deploy carrying this
+    // schema backfills it inline and takes as long as that needs (~300k
+    // rows). Re-add `staged: true` and split the deploy if that wait is a
+    // problem. A later flagged deploy drops `by_text_language_supersededAt`.
+    .index('by_text_language_variant_supersededAt', [
+      'textId',
+      'targetLanguage',
+      'variantKey',
+      'supersededAt',
+    ])
     .index('by_audioAssetId', ['audioAssetId'])
     // Every LIVE row of a text (`.eq('supersededAt', undefined)`), for the
     // readers that list a text's translations without naming a language.
@@ -663,13 +779,22 @@ export default defineSchema({
     .index('by_textId_supersededAt', ['textId', 'supersededAt']),
 
   // Content-addressed audio store. One row per unique
-  // (language, voiceGender, regionVariant, spoken string), every text whose
-  // audio speaks that exact string points at the same asset via
-  // `audioRecordings.assetId`, so identical sentences are synthesized once and
-  // the blob is stored once. The asset OWNS its storage blob: regenerating
-  // audio patches the asset in place (new `storageId`), upgrading every
-  // pointing text at once; the asset (and blob) is deleted when the last
-  // pointer goes. See convex/lib/audioAssets.ts for the key/lookup helpers.
+  // (language, voiceGender, regionVariant, spoken string) AND TTS setup
+  // (`ttsProvider` + `ttsVersion`; the setup is not indexed, the lookup
+  // filters the key's candidates on it). Every text whose audio speaks that
+  // exact string under the current setup points at the same asset via
+  // `audioRecordings.assetId`, so identical sentences are synthesized once
+  // and the blob is stored once. The asset OWNS its storage blob: a
+  // same-setup regeneration patches the asset in place (new `storageId`),
+  // upgrading every pointing text at once.
+  // Retention rule: an asset is never deleted because the setup changed. A
+  // provider switch or a `ttsVersion` bump detaches pointers (the sweep) and
+  // the next synthesis creates a sibling row under the new setup, so a
+  // prompt or provider change can be rolled forward or back without
+  // re-synthesizing; nothing garbage-collects a pointerless asset. Only the
+  // manual regenerate button and the orphan cascades delete an asset (with
+  // its blob) when its last pointer goes.
+  // See convex/lib/audioAssets.ts for the key/lookup helpers.
   audioAssets: defineTable({
     // ---- content-address key ----
     // Cache language (`getAudioAssetLanguage` in lib/languages.ts): a base
@@ -761,9 +886,24 @@ export default defineSchema({
     textId: v.id('texts'),
     language: v.string(), // Base language code (e.g., "en", "es", "de")
     assetId: v.id('audioAssets'),
+    // Rendering variant this pointer speaks, `"<male|female>|<formId|auto>"`
+    // (lib/preferenceResolution.ts `audioVariantKey`): the concrete voice
+    // and the politeness form of the wording. Absent = the canonical
+    // pointer, spoken in the text's coin-flipped voice. A card in a chosen
+    // voice on a language whose wording does not change reads an
+    // audio-only variant whose text is the canonical wording. Never
+    // deleted because another voice was requested.
+    variantKey: v.optional(v.string()),
   })
     .index('by_textId', ['textId'])
+    // Legacy two-column index, kept unqueried until a flagged deploy drops
+    // it (same rule as translations.by_text_and_language); the invariant
+    // test forbids querying it.
     .index('by_text_and_language', ['textId', 'language'])
+    // Every pointer read pins all three columns through
+    // convex/db/translationReads.ts (`audioPointer`); a two-column prefix
+    // plus `.first()` would return whichever voice was stored first.
+    .index('by_text_language_variant', ['textId', 'language', 'variantKey'])
     // Reference counting for shared assets: an asset (and its blob) is deleted
     // only when no row points at it any more.
     .index('by_assetId', ['assetId']),
@@ -952,6 +1092,24 @@ export default defineSchema({
     // not user-created. Cleared when an edit forks the text into a
     // user-owned copy. Never indexed.
     accentLanguage: v.optional(v.string()),
+    // Set on curriculum cards created after the sentence-form settings
+    // shipped. Such a card is served the rendering the course's CURRENT
+    // `politenessLevels` resolve to (lib/preferenceResolution.ts), so a
+    // later settings change re-renders
+    // it. Cards without the field (from before, or created from a
+    // user-written text) read the canonical rows for good. Never
+    // backfilled, never indexed. Cleared when an edit forks the text into a
+    // user-owned copy.
+    followsCoursePreferences: v.optional(v.literal(true)),
+    // Per-card corrections written by the Flag dialog ("wrong speaker
+    // gender" / "wrong politeness" with a pick). The resolver
+    // (lib/preferenceResolution.ts) reads them above the course settings
+    // and below a definitive `texts.speakerGender`, and they apply even to
+    // a card from before the sentence-form settings (an explicit gesture on
+    // one card, unlike a course-wide setting). Inert on user-written texts.
+    // Never indexed. Cleared when an edit forks the text.
+    renderingGenderOverride: v.optional(voiceGenderValidator),
+    renderingPolitenessOverride: v.optional(politenessLevelValidator),
   })
     // INDEX BUDGET — read before adding an index here. This table carries 23
     // database indexes (limit 32) and EVERY card write pays for updating all
@@ -1599,10 +1757,18 @@ export default defineSchema({
         soundsSame: v.optional(v.boolean()),
       }),
     ),
+    // What the user said was wrong, `kind: 'flag'` only. One gesture, one
+    // reason set, so it lives on the parent rather than per language.
+    flagReasons: v.optional(v.array(flagReasonValidator)),
+    // Free text typed under the "other" reason, trimmed and capped.
+    flagNote: v.optional(v.string()),
   })
     .index('by_userId', ['userId'])
     // Convex appends _creationTime, so this also orders within a kind.
-    .index('by_kind', ['kind']),
+    .index('by_kind', ['kind'])
+    // The flag reward is paid once per card per user: a point read for
+    // "has this user flagged this card before" (features/scheduling.ts).
+    .index('by_userId_and_cardIdBefore', ['userId', 'cardIdBefore']),
 
   // One row per retranslation a `cardEdits` gesture triggered, from enqueue to
   // resolution. A child table rather than an array on the parent: the outcome
@@ -1639,6 +1805,16 @@ export default defineSchema({
     .index('by_userId', ['userId'])
     .index('by_status', ['status']),
 
+  // Credits paid out for flagging, counted per user per calendar month so
+  // the monthly cap (`FLAG_REWARDS_PER_MONTH` in lib/languages.ts) is one
+  // point read instead of a scan of `cardEdits`. A flag over the cap still
+  // works; it just stops paying.
+  flagRewards: defineTable({
+    userId: v.string(),
+    period: v.string(), // 'YYYY-MM', UTC
+    count: v.number(),
+  }).index('by_user_and_period', ['userId', 'period']),
+
   // TTS mismatches. Stores audio that failed validation for later analysis
   ttsMismatches: defineTable({
     textId: v.id('texts'),
@@ -1670,7 +1846,12 @@ export default defineSchema({
     // background-held claim over to interactive demand instead of making a
     // visible card wait out the warm pool's patient backoff.
     priority: v.optional(ttsPriorityValidator),
-  }).index('by_text_and_language', ['textId', 'language']),
+    // Rendering variant the claimed job produces (audioVariantKey); absent
+    // = canonical. Two learners with the same preference share one job.
+    variantKey: v.optional(v.string()),
+  })
+    .index('by_text_and_language', ['textId', 'language'])
+    .index('by_text_language_variant', ['textId', 'language', 'variantKey']),
 
   // Per-(textId, language) dedup claim. Atomically check-and-insert before
   // scheduling so two mutations can't enqueue the same translation twice.
@@ -1689,7 +1870,23 @@ export default defineSchema({
     // user wait out the warm pool's queue. Matters most during onboarding:
     // the warmup translates exactly the texts a new user hits first.
     priority: v.optional(llmPriorityValidator),
-  }).index('by_text_and_language', ['textId', 'targetLanguage']),
+    // Rendering variant the claimed job produces (textVariantKey); absent
+    // = canonical.
+    variantKey: v.optional(v.string()),
+    // Variant claims only: when the rewrite's pool attempts were exhausted
+    // (`onLlmTranslationComplete`). The claim is kept, workId cleared, and
+    // blocks a new attempt for VARIANT_RETRY_COOLDOWN_MS
+    // (llmTranslationQueue.ts), so a refused sentence is not re-bought on
+    // every card view. Released early by `retireVariantRenderings` when the
+    // canonical wording changes.
+    variantFailedAt: v.optional(v.number()),
+  })
+    .index('by_text_and_language', ['textId', 'targetLanguage'])
+    .index('by_text_language_variant', [
+      'textId',
+      'targetLanguage',
+      'variantKey',
+    ]),
 
   // Daily per-language stats
   dailyLanguageStats: defineTable({

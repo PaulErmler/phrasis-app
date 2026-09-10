@@ -86,6 +86,33 @@ export type LanguageCategory =
   | 'african'
   | 'other';
 
+/** The order the pickers list the categories in. The
+ *  `LanguageSelector.categories.*` i18n keys map to these slugs. */
+export const LANGUAGE_CATEGORY_ORDER = [
+  'germanic',
+  'romance',
+  'slavic',
+  'baltic',
+  'asian-east',
+  'asian-southeast',
+  'south-asian',
+  'semitic',
+  'african',
+  'other',
+] as const satisfies readonly LanguageCategory[];
+
+// Compile-time exhaustiveness: a new LanguageCategory value errors here
+// until LANGUAGE_CATEGORY_ORDER lists it.
+type _CategoryOrderIsExhaustive =
+  Exclude<
+    LanguageCategory,
+    (typeof LANGUAGE_CATEGORY_ORDER)[number]
+  > extends never
+    ? true
+    : never;
+const _categoryOrderExhaustive: _CategoryOrderIsExhaustive = true;
+void _categoryOrderExhaustive;
+
 /** Whether tier-1 LLMs reliably handle this language for translation/teaching. */
 export type LlmSupportTier = 'tier1' | 'tier2';
 
@@ -222,7 +249,8 @@ export interface Language {
    * how strong the accent should be. Resolved like `ttsPromptName`: the
    * language's own field first, then the language pinning the voice's
    * `@locale` for mixed pools. Prompt-only, so changing it regenerates
-   * nothing without a `ttsVersion` bump on the audio-cache language.
+   * nothing without a `ttsVersion` bump: on the audio-cache language, or on
+   * the accent variant whose locale the clips carry (`getCurrentTtsVersion`).
    */
   ttsPromptNotes?: string;
   /**
@@ -261,6 +289,10 @@ export interface Language {
    * existing audio regenerates lazily. Needed for prompt-only changes on an
    * already-Gemini language where the provider-mismatch regen wouldn't fire
    * (e.g. pt_pt). See `audioRecordings.ttsVersion` in convex/schema.ts.
+   * On an accent-only variant (`en_au`) the bump applies to the clips in
+   * that variant's locale only (`regionVariant` 'en-AU', whichever English
+   * course made them); a bump on the cache language (`en`) regenerates
+   * every accent. See `getCurrentTtsVersion`.
    */
   ttsVersion?: number;
   /**
@@ -355,18 +387,39 @@ export interface Language {
    */
   hasWordBoundaries?: boolean;
   /**
-   * How this language romanizes when `needsRomanization` is true: 'local'
-   * (in-process library, see convex/lib/localRomanization.ts) or 'google-v3'
-   * (Google Cloud romanizeText). Omit when the language needs no romanization.
+   * How this language romanizes when `needsRomanization` is true:
+   * - 'local'     in-process library, see convex/lib/localRomanization.ts
+   * - 'google-v3' Google Cloud romanizeText
+   * - 'llm'       the model, see convex/lib/romanizationPrompt.ts
+   *
+   * Omit when the language needs no romanization. The three are tried in
+   * that order by `romanizeText`, and this field records which one is
+   * expected to answer so `getRomanizationSource` can tag the row without
+   * re-deriving the routing.
+   *
+   * 'llm' is a last resort, for a language with no library and no Google
+   * support. It costs money per sentence and is not deterministic, so a
+   * language only moves onto it when measured against
+   * data_preparation/romanization_eval: Hebrew's local library scored 38% and Thai
+   * had no romanizer at all, while the model scores 96% and 98%.
    */
-  romanizationBackend?: 'local' | 'google-v3';
+  romanizationBackend?: 'local' | 'google-v3' | 'llm';
   /**
    * espeak-ng voice identifier used to derive an IPA transcription
    * (`convex/features/ipa.ts`). Presence doubles as the opt-in flag: a
    * language without `ipaVoice` never gets IPA scheduled, stored rows stop
    * being served, and the UI hides the toggle (mirrors `needsRomanization`).
-   * Omitted only for `ja` (espeak reads kana, garbles kanji) and `fil`
-   * (no espeak voice).
+   * Omitted for `ja` (espeak reads kana, garbles kanji), `fil` (no espeak
+   * voice), and the languages whose voice was found to produce wrong
+   * transcriptions in Sep 2026 (th, he, ar + dialects, zh, yue, vi, ko); each
+   * of those entries says which failure retired it.
+   *
+   * Adding one here also requires probe sentences in
+   * tests/node/fixtures/ipaProbeSentences.ts. The real-engine audit in
+   * tests/node/espeak-ipa.test.ts runs them and fails on ASCII tone digits,
+   * stray markers or vowel-less tokens — look at what the voice actually
+   * emits before trusting it, because every retired voice above passed the
+   * older 'non-empty output' check.
    */
   ipaVoice?: string;
   /**
@@ -393,7 +446,38 @@ export interface Language {
    * language as mixed (`isMixedLanguage`).
    */
   variants?: ReadonlyArray<{ subCode: string; voiceLocalePrefix: string }>;
+  /**
+   * How the language marks politeness, which decides whether the course
+   * politeness setting applies to it and which sentences it can change:
+   * 'predicate' (every full sentence, ja/ko), 'particle' (any sentence in
+   * dialogue, th/fil), 'pronoun' (sentences with a pronoun, vi/id/ms),
+   * 'address' (only sentences with a "you", the T-V languages). Unset = no
+   * learner-relevant politeness grammar; the setting is hidden for a course
+   * whose targets are all unset. The forms, copy and prompt text live in
+   * lib/languageForms.ts under the same code; tests/unit/lib/
+   * languageForms.test.ts fails when the two disagree. Mixed dialects
+   * (es_mixed) and accent variants (en_gb) leave this unset and resolve
+   * through their sub-variants / shared text language.
+   */
+  politenessMarking?: PolitenessMarking;
+  /**
+   * Whether the wording of a first-person sentence changes with the
+   * speaker's gender (Russian past tense, Romance adjectives, Hebrew and
+   * Arabic verbs, Thai and Japanese pronouns, Korean kinship words). Such a
+   * language gets a rewritten rendering when a card is corrected to the
+   * other voice (there is no course gender choice); every language follows
+   * the card's voice for the AUDIO regardless. Example copy in
+   * lib/languageForms.ts.
+   */
+  firstPersonMarking?: true;
 }
+
+/** See `Language.politenessMarking`. */
+export type PolitenessMarking =
+  | 'predicate'
+  | 'particle'
+  | 'pronoun'
+  | 'address';
 
 export const SUPPORTED_LANGUAGES: Language[] = [
   {
@@ -443,9 +527,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     // Pin the accent in the prompt too. `geminiBcp47: 'en-GB'` alone can drift
-    // toward Gemini's default American English. No `ttsVersion` here: audio
-    // for accent variants is cached under `en` (`getAudioAssetLanguage`), so
-    // `en`'s version is the one that counts.
+    // toward Gemini's default American English. Audio for accent variants is
+    // cached under `en` (`getAudioAssetLanguage`); a `ttsVersion` here would
+    // apply to the `en-GB` clips only (see en_au), `en`'s to every accent.
     ttsPromptName: 'British English',
     needsRomanization: false,
     ipaVoice: 'en-gb',
@@ -514,14 +598,19 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     // Pin the accent in the prompt too. `geminiBcp47: 'en-AU'` alone can drift
-    // toward Gemini's default American English. No `ttsVersion`: cached under
-    // `en`, see en_gb.
+    // toward Gemini's default American English.
     ttsPromptName: 'Australian English',
-    // Sep 2026 listening test (three sets of ten clips, side by side): the
-    // bare instruction came out broader than wanted, and this five-word
-    // clause tones it down as well as a longer "newsreader" description did.
-    // Gemini has no other accent-strength control.
-    ttsPromptNotes: 'Keep the Australian accent mild.',
+    // Gemini has no accent-strength control besides the prose. The bare
+    // instruction came out Broad (the drawn-out, nasal "ocker" end of the
+    // continuum). A Sep 2026 listening test found "Keep the Australian
+    // accent mild." tones it down; this names the target outright: General
+    // Australian, the middle of the continuum most Australians speak today.
+    ttsPromptNotes:
+      'Use a General Australian accent, the everyday accent of a Sydney or Melbourne newsreader: not Broad (no drawn-out or exaggerated vowels, no nasal twang) and not Cultivated.',
+    // v2 (2026-09-07): the General-accent note above. Applies to the `en-AU`
+    // clips only (Australian courses and the Australian share of the mixed
+    // pool); other English audio stays, see `getCurrentTtsVersion`.
+    ttsVersion: 2,
     needsRomanization: false,
     ipaVoice: 'en',
     supportsKaraoke: true,
@@ -543,6 +632,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'es',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'es-ES',
     regionLabel: 'Spain',
     geminiBcp47: 'es-ES',
@@ -566,6 +657,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'es_latam',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'es-419',
     regionLabel: 'Latin America',
     // Gemini TTS locale: `es-US` is Gemini's American-Spanish locale (it has no
@@ -629,6 +722,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'fr',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'fr',
     regionLabel: 'France',
     geminiBcp47: 'fr-FR',
@@ -646,6 +741,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'de',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'de',
     regionLabel: 'Germany',
     geminiBcp47: 'de-DE',
@@ -663,6 +760,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'it',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'it',
     regionLabel: 'Italy',
     geminiBcp47: 'it-IT',
@@ -680,6 +779,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'pt',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'pt',
     regionLabel: 'Brazil',
     geminiBcp47: 'pt-BR',
@@ -698,6 +799,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'pt_pt',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'pt-PT',
     regionLabel: 'Portugal',
     geminiBcp47: 'pt-PT',
@@ -726,6 +829,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ro',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'ro',
     regionLabel: 'Romania',
     geminiBcp47: 'ro-RO',
@@ -743,6 +848,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ca',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'ca',
     regionLabel: 'Catalonia',
     geminiBcp47: 'ca-ES',
@@ -763,6 +870,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ru',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'ru',
     regionLabel: 'Russia',
     geminiBcp47: 'ru-RU',
@@ -782,6 +891,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'pl',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'pl',
     regionLabel: 'Poland',
     geminiBcp47: 'pl-PL',
@@ -799,6 +910,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'sk',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'sk',
     regionLabel: 'Slovakia',
     geminiBcp47: 'sk-SK',
@@ -816,6 +929,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'cs',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'cs',
     regionLabel: 'Czechia',
     geminiBcp47: 'cs-CZ',
@@ -833,6 +948,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'hr',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'hr',
     regionLabel: 'Croatia',
     geminiBcp47: 'hr-HR',
@@ -851,6 +968,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'sl',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'sl',
     regionLabel: 'Slovenia',
     geminiBcp47: 'sl-SI',
@@ -869,6 +988,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'uk',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'uk',
     regionLabel: 'Ukraine',
     geminiBcp47: 'uk-UA',
@@ -889,6 +1010,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'sr',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'sr',
     regionLabel: 'Serbia',
     geminiBcp47: 'sr-RS',
@@ -920,6 +1043,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'bg',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'bg',
     regionLabel: 'Bulgaria',
     geminiBcp47: 'bg-BG',
@@ -943,6 +1068,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'lt',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'lt',
     regionLabel: 'Lithuania',
     geminiBcp47: 'lt-LT',
@@ -961,6 +1088,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'lv',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'lv',
     regionLabel: 'Latvia',
     geminiBcp47: 'lv-LV',
@@ -979,6 +1108,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'et',
+    politenessMarking: 'address',
     displayCode: 'et',
     regionLabel: 'Estonia',
     geminiBcp47: 'et-EE',
@@ -999,6 +1129,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'nl',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'nl',
     regionLabel: 'Netherlands',
     geminiBcp47: 'nl-NL',
@@ -1053,6 +1185,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'da',
+    firstPersonMarking: true,
     displayCode: 'da',
     regionLabel: 'Denmark',
     geminiBcp47: 'da-DK',
@@ -1070,6 +1203,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'is',
+    firstPersonMarking: true,
     displayCode: 'is',
     regionLabel: 'Iceland',
     // `is-IS` is a documented Gemini TTS locale (Preview stage as of Jul 2026).
@@ -1114,6 +1248,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'el',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'el',
     regionLabel: 'Greece',
     geminiBcp47: 'el-GR',
@@ -1137,6 +1273,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'hi',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     displayCode: 'hi',
     regionLabel: 'India',
     geminiBcp47: 'hi-IN',
@@ -1157,6 +1295,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'bn',
+    politenessMarking: 'address',
     displayCode: 'bn',
     regionLabel: 'Bangladesh',
     geminiBcp47: 'bn-BD',
@@ -1182,6 +1321,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ta',
+    politenessMarking: 'address',
     displayCode: 'ta',
     regionLabel: 'India',
     geminiBcp47: 'ta-IN',
@@ -1202,6 +1342,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'te',
+    politenessMarking: 'address',
     displayCode: 'te',
     regionLabel: 'India',
     geminiBcp47: 'te-IN',
@@ -1225,6 +1366,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'tr',
+    politenessMarking: 'address',
     displayCode: 'tr',
     regionLabel: 'Turkey',
     geminiBcp47: 'tr-TR',
@@ -1242,6 +1384,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'uz',
+    politenessMarking: 'address',
     displayCode: 'uz',
     regionLabel: 'Uzbekistan',
     // Not on Gemini TTS's documented list (Sep 2026), but the locale is
@@ -1279,6 +1422,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'hu',
+    politenessMarking: 'address',
     displayCode: 'hu',
     regionLabel: 'Hungary',
     geminiBcp47: 'hu-HU',
@@ -1298,6 +1442,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'zh',
+    politenessMarking: 'address',
     displayCode: 'zh-CN',
     regionLabel: 'Mainland China',
     geminiBcp47: 'cmn-CN',
@@ -1311,7 +1456,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
-    ipaVoice: 'cmn',
+    // No ipaVoice: the espeak-ng `cmn` voice writes tones as ASCII digits and
+    // collapses them. 妈 (tone 1) and 骂 (tone 4) both come out "mˈɑ5", so the
+    // transcription cannot separate the words it exists to disambiguate.
+    // Pinyin (needsRomanization above) already carries tone correctly.
     // Disabled along with other CJK + Thai languages: word-level segmentation
     // produces per-character tokens that flicker too fast to read. Revisit
     // when we have a learner-grade segmenter.
@@ -1323,6 +1471,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'zh_traditional',
+    politenessMarking: 'address',
     displayCode: 'zh-TW',
     regionLabel: 'Taiwan',
     geminiBcp47: 'cmn-TW',
@@ -1346,7 +1495,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Taiwanese Mandarin',
     needsRomanization: true,
-    ipaVoice: 'cmn',
+    // No ipaVoice: see the `zh` entry — the `cmn` voice collapses tones.
     supportsKaraoke: false,
     supportsStt: true,
     // Traditional script is also Hong Kong's. Name Taiwanese Mandarin
@@ -1382,7 +1531,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // Jyutping via to-jyutping (rime-cantonese data), which covers simplified
     // script as well as traditional. See convex/lib/localRomanization.ts.
     needsRomanization: true,
-    ipaVoice: 'yue',
+    // No ipaVoice: the espeak-ng `yue` voice emits Jyutping spellings with
+    // ASCII tone digits rather than IPA (廣東 → "ɡwˈonɡ2"), which duplicates the
+    // romanization line instead of transcribing pronunciation.
     supportsKaraoke: false,
     supportsStt: true,
     // Pins BOTH the register (spoken vernacular, 係/唔/嘅, not Standard
@@ -1422,7 +1573,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // (the asset cache key contains neither provider nor voice).
     ttsVersion: 2,
     needsRomanization: true,
-    ipaVoice: 'yue',
+    // No ipaVoice: see the `yue` entry — the voice emits Jyutping, not IPA.
     supportsKaraoke: false,
     supportsStt: true,
     // Pins BOTH the register (spoken vernacular, 係/唔/嘅, not Standard
@@ -1437,6 +1588,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ja',
+    politenessMarking: 'predicate',
+    firstPersonMarking: true,
     displayCode: 'ja',
     regionLabel: 'Japan',
     geminiBcp47: 'ja-JP',
@@ -1465,6 +1618,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ko',
+    politenessMarking: 'predicate',
+    firstPersonMarking: true,
     displayCode: 'ko',
     regionLabel: 'South Korea',
     geminiBcp47: 'ko-KR',
@@ -1476,7 +1631,10 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     llmSupportTier: 'tier1',
     ttsProvider: 'gemini',
     needsRomanization: true,
-    ipaVoice: 'ko',
+    // No ipaVoice: the espeak-ng `ko` voice writes ㄱ as `q` (a uvular stop)
+    // and skips Korean's obligatory assimilation, so 한국말 /haːnɡuŋmal/ comes
+    // out "hɐnquqmɐɫ", with stray `-` boundary markers on top. Revised
+    // Romanization via es-hangul covers the same need correctly.
     // Hangul. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
@@ -1486,6 +1644,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'vi',
+    politenessMarking: 'pronoun',
+    firstPersonMarking: true,
     displayCode: 'vi',
     regionLabel: 'Vietnam',
     geminiBcp47: 'vi-VN',
@@ -1501,7 +1661,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     // `name` and would fall back to unpinned "Vietnamese".
     ttsPromptName: 'Northern Vietnamese',
     needsRomanization: false,
-    ipaVoice: 'vi',
+    // No ipaVoice: the espeak-ng `vi` voice appends tone digits that are absent
+    // from its own phoneme output, including an impossible `7` (Vietnamese has
+    // six tones). The diacritics on the text already mark tone.
     supportsKaraoke: true,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1513,6 +1675,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'vi_south',
+    politenessMarking: 'pronoun',
+    firstPersonMarking: true,
     displayCode: 'vi-VN',
     regionLabel: 'Southern Vietnam',
     // Gemini has no southern-specific locale. `vi-VN` is the only Vietnamese
@@ -1535,7 +1699,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Southern Vietnamese',
     needsRomanization: false,
-    ipaVoice: 'vi-vn-x-south',
+    // No ipaVoice: see the `vi` entry — the `vi-vn-x-south` voice invents the
+    // same bogus tone digits.
     supportsKaraoke: true,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1546,6 +1711,8 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'th',
+    politenessMarking: 'particle',
+    firstPersonMarking: true,
     displayCode: 'th',
     regionLabel: 'Thailand',
     geminiBcp47: 'th-TH',
@@ -1556,11 +1723,22 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     category: 'asian-southeast',
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
-    // Romanization disabled. Google v3 doesn't support Thai, and the
-    // available pure-JS Thai libraries have not yet been evaluated for
-    // learner-grade quality. Re-enable once a good lib is wired up.
-    needsRomanization: false,
-    ipaVoice: 'th',
+    // RTGS (Royal Thai General System of Transcription) from the model, the
+    // Royal Institute standard a learner meets on road signs. Google v3 has
+    // no Thai, and the pure-JS libraries are not learner-grade
+    // (@pcampus/thai-romanization loses whole syllables and self-reports low
+    // confidence on ordinary sentences).
+    //
+    // RTGS records neither tone nor vowel length by design, so เขา, ขาว and
+    // ข้าว all read "khao". That is the standard's documented limitation
+    // rather than an engine failure, and it is why the settings row calls
+    // this an approximate spelling rather than a pronunciation.
+    needsRomanization: true,
+    romanizationBackend: 'llm',
+    // No ipaVoice: espeak-ng's `th` voice is a stub. Its dictionary is 2.3 kB
+    // against Mandarin's 1.5 MB, and Thai cannot be read without one, so the
+    // voice invents phonemes: สวัสดี /sà.wàt.diː/ came out "sˈa5wmsaɜds" and
+    // น้ำ /náam/ as "n s". Replacement under evaluation in scripts/eval-ipa.ts.
     // No spaces between words; per-character karaoke flickers. Disabled
     // alongside CJK; revisit with a learner-grade Thai segmenter.
     supportsKaraoke: false,
@@ -1573,6 +1751,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'id',
+    politenessMarking: 'pronoun',
     displayCode: 'id',
     regionLabel: 'Indonesia',
     geminiBcp47: 'id-ID',
@@ -1590,6 +1769,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ms',
+    politenessMarking: 'pronoun',
     displayCode: 'ms',
     regionLabel: 'Malaysia',
     geminiBcp47: 'ms-MY',
@@ -1608,6 +1788,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'fil',
+    politenessMarking: 'particle',
     displayCode: 'fil',
     regionLabel: 'the Philippines',
     geminiBcp47: 'fil-PH',
@@ -1634,11 +1815,12 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar',
+    firstPersonMarking: true,
     direction: 'rtl',
     displayCode: 'ar',
     regionLabel: 'the Arab world',
     geminiBcp47: 'ar-001',
-    romanizationBackend: 'local',
+    romanizationBackend: 'google-v3',
     displayNameOverrides: { de: 'Arabisch (Hocharabisch)' },
     name: 'Arabic (Modern Standard)',
     nativeName: 'العربية (الفصحى)',
@@ -1651,7 +1833,9 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Modern Standard Arabic',
     needsRomanization: true,
-    ipaVoice: 'ar',
+    // No ipaVoice: the espeak-ng `ar` voice cannot vowel unpointed Arabic, so
+    // every word outside its dictionary loses its vowels (ذهبت → "ðhbt", about
+    // 15% of tokens), and it misreads كم as "kilometre".
     // Karaoke disabled for Arabic: ligatures + clitics don't align to STT
     // word timings, producing flickery/mis-positioned per-word highlights.
     supportsKaraoke: false,
@@ -1665,13 +1849,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar_sa',
+    firstPersonMarking: true,
     direction: 'rtl',
     displayCode: 'ar-SA',
     regionLabel: 'Saudi Arabia',
     geminiBcp47: 'ar-001',
     googleTranslateCode: 'ar',
     compareLocale: 'ar-SA',
-    romanizationBackend: 'local',
+    romanizationBackend: 'google-v3',
     displayNameOverrides: { de: 'Arabisch (Saudisch)' },
     name: 'Arabic (Saudi)',
     nativeName: 'العربية (السعودية)',
@@ -1682,7 +1867,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Saudi Arabic',
     needsRomanization: true,
-    ipaVoice: 'ar',
+    // No ipaVoice: see the `ar` entry — espeak cannot vowel unpointed Arabic.
     supportsKaraoke: false,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1694,13 +1879,15 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar_eg',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     direction: 'rtl',
     displayCode: 'ar-EG',
     regionLabel: 'Egypt',
     geminiBcp47: 'ar-EG',
     googleTranslateCode: 'ar',
     compareLocale: 'ar-EG',
-    romanizationBackend: 'local',
+    romanizationBackend: 'google-v3',
     displayNameOverrides: { de: 'Arabisch (Ägyptisch)' },
     name: 'Arabic (Egyptian)',
     nativeName: 'العربية (المصرية)',
@@ -1713,7 +1900,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Egyptian Arabic',
     needsRomanization: true,
-    ipaVoice: 'ar',
+    // No ipaVoice: see the `ar` entry — espeak cannot vowel unpointed Arabic.
     supportsKaraoke: false,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1724,13 +1911,15 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar_iq',
+    politenessMarking: 'address',
+    firstPersonMarking: true,
     direction: 'rtl',
     displayCode: 'ar-IQ',
     regionLabel: 'Iraq',
     geminiBcp47: 'ar-001',
     googleTranslateCode: 'ar',
     compareLocale: 'ar-IQ',
-    romanizationBackend: 'local',
+    romanizationBackend: 'google-v3',
     displayNameOverrides: { de: 'Arabisch (Irakisch)' },
     name: 'Arabic (Iraqi)',
     nativeName: 'العربية (العراقية)',
@@ -1741,7 +1930,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Iraqi Arabic',
     needsRomanization: true,
-    ipaVoice: 'ar',
+    // No ipaVoice: see the `ar` entry — espeak cannot vowel unpointed Arabic.
     supportsKaraoke: false,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1752,13 +1941,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'ar_lev',
+    firstPersonMarking: true,
     direction: 'rtl',
     displayCode: 'ar-LB',
     regionLabel: 'the Levant (Lebanon, Syria, Palestine, Jordan)',
     geminiBcp47: 'ar-001',
     googleTranslateCode: 'ar',
     compareLocale: 'ar-LB',
-    romanizationBackend: 'local',
+    romanizationBackend: 'google-v3',
     displayNameOverrides: { de: 'Arabisch (Levantinisch)' },
     name: 'Arabic (Levantine)',
     nativeName: 'العربية (الشامية)',
@@ -1772,7 +1962,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
     ttsProvider: 'gemini',
     ttsPromptName: 'Levantine Arabic',
     needsRomanization: true,
-    ipaVoice: 'ar',
+    // No ipaVoice: see the `ar` entry — espeak cannot vowel unpointed Arabic.
     supportsKaraoke: false,
     supportsStt: true,
     // Canonical dialect name for the translation prompt (mirrors ttsPromptName)
@@ -1783,21 +1973,28 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'he',
+    firstPersonMarking: true,
     direction: 'rtl',
     displayCode: 'he',
     regionLabel: 'Israel',
     geminiBcp47: 'he-IL',
-    romanizationBackend: 'local',
     name: 'Hebrew',
     nativeName: 'עברית',
     flag: '🌎',
     category: 'semitic',
     llmSupportTier: 'tier2',
     ttsProvider: 'gemini',
-    // Romanization via the `hebrew-transliteration` package (SBL Academic
-    // style), wired in convex/lib/localRomanization.ts.
+    // Romanization from the model. The `hebrew-transliteration` package is
+    // SBL Academic style, which transliterates the CONSONANTS of unpointed
+    // Hebrew and so drops the vowels a learner needs: שלום לכולם came out
+    // "šlwm lkwlm". It scored 38% against data_preparation/romanization_eval where
+    // the model scores 96%.
     needsRomanization: true,
-    ipaVoice: 'he',
+    romanizationBackend: 'llm',
+    // No ipaVoice: the espeak-ng `he` voice cannot vowel unpointed Hebrew,
+    // so 62% of tokens come out with no vowel at all (תודה רבה → "todˈa rvh").
+    // The romanization above has the same gap; both are in the eval-ipa gold
+    // set (scripts/eval-ipa.ts).
     // Hebrew script. Karaoke off (non-Latin script policy).
     supportsKaraoke: false,
     supportsStt: true,
@@ -1808,6 +2005,7 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   },
   {
     code: 'fa',
+    politenessMarking: 'address',
     direction: 'rtl',
     displayCode: 'fa',
     regionLabel: 'Iran',
@@ -2064,17 +2262,35 @@ export function getAudioAssetLanguage(code: string): string {
 }
 
 /**
- * Current TTS-setup version for a language (1 when unset). Resolved on the
- * audio-cache language (`getAudioAssetLanguage`): an accent variant's
- * assets are `en` assets, so they carry and are checked against `en`'s
- * version. A `ttsVersion` on `en_gb` itself would be ignored; bump `en` to
- * regenerate English audio in every accent.
+ * Current TTS-setup version for a clip of `code` in the accent
+ * `regionVariant` (the asset's key field: the voice locale, 'en-AU').
+ * Resolved on the audio-cache language (`getAudioAssetLanguage`): an accent
+ * variant's assets are `en` assets, so `en`'s version applies to all of
+ * them. On top of that, the accent variant pinning the clip's locale
+ * (`geminiBcp47`, `en_au` for 'en-AU') can carry a version of its own that
+ * applies to its locale only, so an Australian prompt change regenerates the
+ * Australian clips and nothing else. The higher of the two counts. Only an
+ * accent sibling of the cache language qualifies: `es_mixed`'s 'es-ES' clips
+ * do not pick up Castilian Spanish's version.
+ *
+ * Stamp and check with the same `regionVariant`, or a clip stamped without
+ * it is stale against its own locale's version on the next look and loops.
+ * Without a `regionVariant` (legacy rows from before the locale was keyed,
+ * bare voices) only the cache language's version applies.
  */
-export function getCurrentTtsVersion(code: string): number {
-  return (
-    getLanguageByCode(getAudioAssetLanguage(code))?.ttsVersion ??
-    DEFAULT_CONTENT_VERSION
+export function getCurrentTtsVersion(
+  code: string,
+  regionVariant?: string,
+): number {
+  const cacheLanguage = getAudioAssetLanguage(code);
+  const base =
+    getLanguageByCode(cacheLanguage)?.ttsVersion ?? DEFAULT_CONTENT_VERSION;
+  if (regionVariant === undefined) return base;
+  const accent = SUPPORTED_LANGUAGES.find(
+    (l) =>
+      l.sharesTextWith === cacheLanguage && l.geminiBcp47 === regionVariant,
   );
+  return Math.max(base, accent?.ttsVersion ?? DEFAULT_CONTENT_VERSION);
 }
 
 /**
@@ -2095,13 +2311,18 @@ export function isContentVersionStale(
   return stamped !== undefined && stamped < current;
 }
 
-/** True iff this language's stored audio at `stampedVersion` is below the
- * current `ttsVersion` config and should be re-synthesized. */
+/** True iff this language's stored audio at `stampedVersion`, in the accent
+ * `regionVariant`, is below the current `ttsVersion` config and should be
+ * re-synthesized. See `getCurrentTtsVersion` for the accent rule. */
 export function isTtsVersionStale(
   code: string,
   stampedVersion: number | undefined,
+  regionVariant?: string,
 ): boolean {
-  return isContentVersionStale(stampedVersion, getCurrentTtsVersion(code));
+  return isContentVersionStale(
+    stampedVersion,
+    getCurrentTtsVersion(code, regionVariant),
+  );
 }
 
 /** True iff this language's stored translation at `stampedVersion` is below the
@@ -2439,6 +2660,22 @@ export const SOL_MINIMAL_STANDARD: ModelStage = {
  * check the post-increment count against this constant.
  */
 export const FLAG_AUTO_RETRANSLATION_MAX = 2;
+
+/**
+ * Credits a learner earns for one accepted flag gesture
+ * (`flagTranslation` in convex/features/scheduling.ts). One gesture, not
+ * one per language; never for the learner's own custom sentences, never
+ * twice for the same card.
+ */
+export const FLAG_REWARD_CREDITS = 5;
+
+/**
+ * Rewarded flags per learner per calendar month. Flags past the cap still
+ * work and still retranslate; they stop paying. Bounds the reward at 100
+ * credits a month on every plan, which is what keeps it from being farmed on
+ * the paid plans' 500-flag allowance.
+ */
+export const FLAG_REWARDS_PER_MONTH = 20;
 
 export const TRANSLATION_RULES = {
   /**
@@ -3045,7 +3282,7 @@ export function getTtsPromptNameForLocale(
   return ttsPromptFieldForLocale(locale, 'ttsPromptName');
 }
 
-/** `ttsPromptNotes` of the language pinning a voice locale (`en-AU` → the mild-accent note). */
+/** `ttsPromptNotes` of the language pinning a voice locale (`en-AU` → the General-accent note). */
 export function getTtsPromptNotesForLocale(
   locale: string | undefined,
 ): string | undefined {
@@ -3068,15 +3305,53 @@ export function fnv1a(str: string): number {
 }
 
 /**
- * Resolve the concrete regional sub-variant for a mixed-dialect language.
- * Returns `null` when `code` is not a mixed language. Callers should fall
- * back to the non-mixed translation path in that case.
+ * A well-mixed index in `[0, n)` from a seed string. Use this, never
+ * `fnv1a(seed) % n`, for any pick that must be independent of another pick
+ * on the SAME seed.
  *
- * `seed` should be the textId (or any stable per-sentence identifier) so the
- * choice survives retries and re-translations. The returned `subCode` is the
- * language code to feed `getTranslationConfigForLanguage` (so the LLM gets
- * regionally accurate prompt context), and `regionVariant` is the locale
- * prefix the audio player needs to pick a matching voice.
+ * FNV-1a's finalisation is weak in the low bits: the prime is odd, so
+ * multiplying never carries into bit 0, and bit 0 of the digest is only the
+ * parity of the seed's odd-valued character codes. Two `% 2` picks on one
+ * textId therefore agree on every input, whatever salt each uses, unless the
+ * salt itself has odd parity, which merely flips agreement to perfect
+ * disagreement. That is how the politeness form came to be a copy of the
+ * speaker-gender coin flip (2026-09-08 review): `du` for every male-voiced
+ * card, `Sie` for every female-voiced one, never mixed.
+ *
+ * The xorshift-multiply finalizer below (the murmur3 avalanche) spreads every
+ * input bit across all 32 output bits, so a modulo of 2 or 3 is independent
+ * of any other pick on the same seed.
+ */
+export function seededIndex(seed: string, n: number): number {
+  if (n <= 1) return 0;
+  let h = fnv1a(seed);
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b) >>> 0;
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35) >>> 0;
+  h ^= h >>> 16;
+  return (h >>> 0) % n;
+}
+
+/**
+ * The dialect a mixed-language row from BEFORE `translations.regionVariant`
+ * existed was generated under. Legacy reconstruction only: two call sites
+ * are allowed to use it, `getVoiceForText`'s fallback for an unpinned row
+ * (lib/voices.ts) and `backfillMixedDialectPin` (convex/migrations.ts),
+ * which stamps that row with this answer so nothing has to guess again.
+ *
+ * NOT for choosing the dialect of a NEW row: use
+ * `pickMixedVariantForNewRow`. This pick reads bit 0 of the FNV-1a digest,
+ * which is only the parity of the seed's odd-valued character codes, so it
+ * is permutation-invariant (every anagram of a seed collides) and, worse,
+ * identical to every other `% 2` or `& 1` on the same seed. That is why
+ * every Spain-dialect sentence in a Mixed Spanish course was spoken by a man
+ * and every Latin-American one by a woman: `resolveAudioSpeakerGender` reads
+ * the same bit (2026-09-08 review).
+ *
+ * Returns `null` when `code` is not a mixed language. `subCode` feeds
+ * `getTranslationConfigForLanguage`; `regionVariant` is the locale prefix
+ * the audio player needs to pick a matching voice.
  */
 export function resolveMixedVariant(
   code: string,
@@ -3086,6 +3361,28 @@ export function resolveMixedVariant(
   if (!variants) return null;
   const idx = fnv1a(seed) % variants.length;
   const pick = variants[idx];
+  return { subCode: pick.subCode, regionVariant: pick.voiceLocalePrefix };
+}
+
+/**
+ * The dialect to translate a NEW mixed-language row into, decorrelated from
+ * every other pick seeded on the same id (`seededIndex`). Once the row is
+ * written its `regionVariant` pins the answer for good, so this function is
+ * consulted exactly once per (text, language) and a later change of hash
+ * cannot move an existing sentence.
+ *
+ * Callers must reach for this only when no row and no preferred variant
+ * exist. A row that predates the pin column keeps `resolveMixedVariant`,
+ * because that is the coin its wording was actually written under and its
+ * clip has to agree with it.
+ */
+export function pickMixedVariantForNewRow(
+  code: string,
+  seed: string,
+): { subCode: string; regionVariant: string } | null {
+  const variants = MIXED_LANGUAGE_VARIANTS[code];
+  if (!variants) return null;
+  const pick = variants[seededIndex(`${seed}|dialect`, variants.length)];
   return { subCode: pick.subCode, regionVariant: pick.voiceLocalePrefix };
 }
 
@@ -3116,6 +3413,23 @@ export function getMixedVariantByRegion(
  */
 export function normalizeLanguageCode(code: string): string {
   return code.replace(VARIANT_SUFFIX_RE, '');
+}
+
+/**
+ * What a language picker's search matches against: the English name, the
+ * native name, the user-locale name and the code, joined so a substring
+ * test hits any of them. Shared by every picker so they find the same
+ * languages for the same query.
+ */
+export function languageSearchText(lang: Language, locale: string): string {
+  return [
+    lang.name,
+    lang.nativeName,
+    getLocalizedLanguageNameByCode(lang.code, locale),
+    lang.code,
+  ]
+    .filter(Boolean)
+    .join(' • ');
 }
 
 // ---------------------------------------------------------------------------

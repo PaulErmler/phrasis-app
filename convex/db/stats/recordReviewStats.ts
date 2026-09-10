@@ -1,9 +1,11 @@
 import {
-  cardPinAt,
+  renderingSettingsOf,
+  renderingTextOf,
+  resolveServedRendering,
   servedSourceText,
-  servedTranslatedText,
   viewOfCard,
 } from '../translationReads';
+import { getCourseSettings } from '../courseSettings';
 import { MutationCtx } from '../../_generated/server';
 import { Doc } from '../../_generated/dataModel';
 import { ConvexError } from 'convex/values';
@@ -295,15 +297,28 @@ export async function recordReviewStats(
         const source = await servedSourceText(ctx, text, viewOfCard(card));
         langTexts.push({ language: text.language, text: source.text });
       }
+      // Count the words the learner actually reviewed: the served revision
+      // (a pinned card may be on a superseded one) in the rendering the
+      // card shows (a politeness variant, or a Flag-dialog correction).
+      // `getWordSentences` renders the same links with the variant, so
+      // counting the canonical wording here listed "te" and "llamas" under
+      // a card showing "¿Cómo se llama usted?". One settings read, and only
+      // on a card's first review (untracked languages).
+      const view = viewOfCard(
+        card,
+        renderingSettingsOf(await getCourseSettings(ctx, deck.courseId)),
+      );
+      const renderingText = renderingTextOf(text);
       for (const lang of untrackedLanguages) {
         if (lang === text.language) continue;
-        // Count the words the learner actually reviewed: the served revision.
-        const translated = await servedTranslatedText(ctx, {
+        const rendering = await resolveServedRendering(ctx, {
           textId: card.textId,
           targetLanguage: lang,
-          pinAt: cardPinAt(card),
+          text: renderingText,
+          view,
         });
-        if (translated !== null) {
+        const translated = rendering.served?.row.translatedText;
+        if (translated !== undefined) {
           langTexts.push({ language: lang, text: translated });
         }
       }

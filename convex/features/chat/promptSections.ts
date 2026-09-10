@@ -1,4 +1,9 @@
 import { languageName } from '../../../lib/languages';
+import type { RenderingSettings } from '../../../lib/preferenceResolution';
+import {
+  concreteLanguageCodes,
+  selectedPolitenessForms,
+} from '../../../lib/languageForms';
 
 /**
  * Dynamic prompt sections injected (uncached) after the agent's static
@@ -131,6 +136,39 @@ RULES:
 createCard order (one entry per code, exactly this order): ${allLangs.join(', ')}
 Each entry's "text" must be written in the language named above — ${perCodeTextRule}. Never copy one entry's text into another slot.
 Schematic: [${schematic}]`;
+}
+
+/**
+ * The course's sentence-form settings (lib/languageForms.ts), so the tutor
+ * writes its examples and cards in the forms the learner studies. Empty when
+ * the course has none (every course from before the feature).
+ */
+export function buildFormsSection(
+  settings: RenderingSettings | null | undefined,
+  languages: { baseLanguages: string[]; targetLanguages: string[] },
+): string | undefined {
+  if (!settings) return undefined;
+  const lines: string[] = [];
+  const levels = settings.politenessLevels;
+  if (levels && levels.length > 0) {
+    const codes = [
+      ...new Set([...languages.baseLanguages, ...languages.targetLanguages]),
+    ];
+    for (const code of codes) {
+      for (const concrete of concreteLanguageCodes(code)) {
+        const forms = selectedPolitenessForms(concrete, levels);
+        if (forms.length === 0) continue;
+        const named = forms.map((form) => form.promptLabel).join(' or ');
+        lines.push(
+          forms.length === 1
+            ? `- ${languageName(concrete)} politeness: the learner studies the ${named}. ${forms[0].prompt} Use it in your examples and createCard entries unless the user asks for another form.`
+            : `- ${languageName(concrete)} politeness: the learner studies ${named} and sees them mixed. Use either in examples, and say which one a sentence is in when it matters.`,
+        );
+      }
+    }
+  }
+  if (lines.length === 0) return undefined;
+  return `Sentence-form settings of this course:\n${lines.join('\n')}`;
 }
 
 export type LearnerDifficulty = {

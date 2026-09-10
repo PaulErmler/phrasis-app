@@ -259,6 +259,7 @@ describe('features/cardEditAudit', () => {
 
       await asUser.mutation(api.features.scheduling.flagTranslation, {
         cardId,
+        reasons: ['wrong_translation'],
       });
 
       const [edit] = await listEdits(t);
@@ -293,6 +294,7 @@ describe('features/cardEditAudit', () => {
 
       await asUser.mutation(api.features.scheduling.flagTranslation, {
         cardId,
+        reasons: ['wrong_translation'],
       });
 
       const rows = await listRetranslations(t);
@@ -310,6 +312,7 @@ describe('features/cardEditAudit', () => {
 
       await asUser.mutation(api.features.scheduling.flagTranslation, {
         cardId,
+        reasons: ['wrong_translation'],
       });
 
       // The gesture is recorded — `textWasUserCreated` is what explains why no

@@ -25,9 +25,11 @@
  */
 
 import { v } from 'convex/values';
+import { getRomanizationSource } from './localRomanization';
 import type { FunctionReference, Scheduler } from 'convex/server';
 import { internal } from '../_generated/api';
 import type { Doc, Id } from '../_generated/dataModel';
+import type { MutationCtx } from '../_generated/server';
 import {
   FURIGANA_LANGUAGES,
   IPA_LANGUAGES,
@@ -89,6 +91,13 @@ export interface TextAnnotationSpec {
   sourceField: 'romanizationSource' | 'ipaSource' | 'furiganaSource';
   /** Whether this language gets the annotation at all. */
   supports: (language: string) => boolean;
+  /**
+   * The engine tag a row written today would carry. Read by
+   * `missingAnnotationKinds`, so a row produced by an older engine is
+   * refreshed the next time the card is viewed rather than waiting for a
+   * migration.
+   */
+  currentSource: (language: string) => string;
   /** Action that annotates a source text (writes via storeSourceAnnotation). */
   sourceTextAction: AnnotationAction;
   /** Action that annotates a translation (writes via storeTranslationAnnotation). */
@@ -116,6 +125,7 @@ export const TEXT_ANNOTATIONS: Record<AnnotationKind, TextAnnotationSpec> = {
     textField: 'romanizedText',
     sourceField: 'romanizationSource',
     supports: (language) => ROMANIZATION_LANGUAGES.has(language),
+    currentSource: getRomanizationSource,
     sourceTextAction: internal.features.decks.processRomanizationForSourceText,
     translationAction:
       internal.features.decks.processRomanizationForTranslation,
@@ -126,6 +136,7 @@ export const TEXT_ANNOTATIONS: Record<AnnotationKind, TextAnnotationSpec> = {
     textField: 'ipaText',
     sourceField: 'ipaSource',
     supports: (language) => IPA_LANGUAGES.has(language),
+    currentSource: getIpaSource,
     sourceTextAction: internal.features.ipa.processIpaForSourceText,
     translationAction: internal.features.ipa.processIpaForTranslation,
     approvalAction: internal.features.ipa.processIpaForApproval,
@@ -137,6 +148,7 @@ export const TEXT_ANNOTATIONS: Record<AnnotationKind, TextAnnotationSpec> = {
     textField: 'furiganaText',
     sourceField: 'furiganaSource',
     supports: (language) => FURIGANA_LANGUAGES.has(language),
+    currentSource: getFuriganaSource,
     sourceTextAction: internal.features.furigana.processFuriganaForSourceText,
     translationAction: internal.features.furigana.processFuriganaForTranslation,
     approvalAction: internal.features.furigana.processFuriganaForApproval,
@@ -152,21 +164,105 @@ export const TEXT_ANNOTATIONS: Record<AnnotationKind, TextAnnotationSpec> = {
 /** Row shape the helpers below need: just the annotation value/source fields. */
 export type AnnotationFields = Partial<Record<AnnotationField, string>>;
 
+const ANNOTATION_FIELDS: AnnotationField[] = ANNOTATION_KINDS.flatMap(
+  (kind) => [
+    TEXT_ANNOTATIONS[kind].textField,
+    TEXT_ANNOTATIONS[kind].sourceField,
+  ],
+);
+
 /**
- * Kinds this row still needs for `language`: supported, and never attempted
- * (`=== undefined`; the `''` failure sentinel is deliberately not "missing",
- * see the schema note). Callers throw ProbeNeedsWork / schedule the kind's
- * action per entry.
+ * The annotation values and engine tags of a `texts` / `translations` row,
+ * as the spread the probes and the store mutations read. The one place a
+ * projection spells the six fields out: a reader that copied them by hand
+ * and forgot a tag could only see "a value is present", so a row produced by
+ * a retired engine looked complete and a stale transcription survived a
+ * version bump until someone ran the migration.
  */
+export function annotationFieldsOf(row: AnnotationFields): AnnotationFields {
+  const out: AnnotationFields = {};
+  for (const field of ANNOTATION_FIELDS) {
+    const value = row[field];
+    if (value !== undefined) out[field] = value;
+  }
+  return out;
+}
+
+/**
+ * Kinds this row still needs for `language`: supported, and either never
+ * attempted (`=== undefined`) or produced by an engine we no longer ship.
+ *
+ * The stale-engine half is what makes a version bump self-healing. Without
+ * it, bumping IPA_SOURCES only changed the tag on FUTURE writes, and existing
+ * rows kept their old value until someone remembered to run the reset
+ * migration — so a user looking at their library went on seeing the broken
+ * transcription the bump was meant to replace. The migration is still there
+ * for a bulk sweep; this is what fixes a row the moment it is looked at.
+ *
+ * The `''` failure sentinel is deliberately not "missing" for the CURRENT
+ * engine (see the schema note): that engine already tried and failed, and
+ * retrying it on every view would be a per-view call that always fails, and
+ * a paid one on the two model-routed languages. A stale sentinel IS
+ * retried, because a new engine deserves its own attempt. A failure that
+ * says nothing about the text (a missing key, a rate limit, an outage)
+ * never becomes a sentinel at all: the runners re-throw
+ * TransientAnnotationError and the field stays undefined for the next view.
+ *
+ * Callers throw ProbeNeedsWork / schedule the kind's action per entry.
+ */
+/**
+ * How long an annotation request is honoured before a sweep asks again. A
+ * transient failure (`TransientAnnotationError`) leaves the value undefined
+ * so the row is retried, and this claim keeps the retry to once per window
+ * instead of once per view: during an OpenRouter or Google outage every
+ * review's 20-card probe would otherwise schedule the failing action again
+ * for every affected row. Same shape as `renderingStampRequestedAt`.
+ */
+export const ANNOTATION_REQUEST_COOLDOWN_MS = 15 * 60 * 1000;
+
+/** Whether a recent request for this row's annotations is still honoured. */
+export function annotationRequestInFlight(row: {
+  annotationRequestedAt?: number;
+}): boolean {
+  return (
+    row.annotationRequestedAt !== undefined &&
+    Date.now() - row.annotationRequestedAt < ANNOTATION_REQUEST_COOLDOWN_MS
+  );
+}
+
+/**
+ * Whether a sweep would schedule annotations for this row now: something is
+ * missing AND no recent request is in flight. The probe-mode test of the
+ * sweeps, so a probe reports no work for a row in cooldown.
+ */
+export function annotationsDue(
+  language: string,
+  row: AnnotationFields & { annotationRequestedAt?: number },
+): boolean {
+  return (
+    missingAnnotationKinds(language, row).length > 0 &&
+    !annotationRequestInFlight(row)
+  );
+}
+
 export function missingAnnotationKinds(
   language: string,
   row: AnnotationFields,
 ): AnnotationKind[] {
-  return ANNOTATION_KINDS.filter(
-    (kind) =>
-      TEXT_ANNOTATIONS[kind].supports(language) &&
-      row[TEXT_ANNOTATIONS[kind].textField] === undefined,
-  );
+  return ANNOTATION_KINDS.filter((kind) => {
+    const spec = TEXT_ANNOTATIONS[kind];
+    if (!spec.supports(language)) return false;
+    const value = row[spec.textField];
+    if (value === undefined) return true;
+    const source = row[spec.sourceField];
+    // An UNTAGGED row is left alone. Its value predates the source field, so
+    // there is nothing to compare and no way to tell a good row from a stale
+    // one — and treating it as stale would re-attempt every `''` sentinel on
+    // every view, which is a call that already failed. The reset migration
+    // clears those in bulk instead.
+    if (source === undefined) return false;
+    return source !== spec.currentSource(language);
+  });
 }
 
 /**
@@ -174,8 +270,13 @@ export function missingAnnotationKinds(
  * Used when the underlying text changes and derived annotations no longer
  * match (`ctx.db.patch` treats `undefined` as "unset the field").
  */
-export function clearedAnnotationFields(): Record<AnnotationField, undefined> {
+export function clearedAnnotationFields(): Record<
+  AnnotationField | 'annotationRequestedAt',
+  undefined
+> {
   return {
+    // A new wording is requested at once, whatever the old one's claim.
+    annotationRequestedAt: undefined,
     romanizedText: undefined,
     romanizationSource: undefined,
     ipaText: undefined,
@@ -207,6 +308,28 @@ export function carriedAnnotationFields(
 }
 
 /**
+ * Drop entries whose language the kind no longer supports, from a
+ * language-keyed annotation record (`cardApprovals.entryIpa` and friends).
+ *
+ * The record equivalent of the per-language `spec.supports` gate in
+ * lib/cardContent.ts, and it exists for the same reason: a language that
+ * loses support keeps its stored rows, but they stop being served. Approvals
+ * predate the Sep 2026 espeak removals, so without this an old proposal
+ * would still render the mangled Thai or Hebrew line the removal was meant
+ * to retire.
+ */
+export function supportedAnnotationEntries(
+  kind: AnnotationKind,
+  byLanguage: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  if (byLanguage === undefined) return undefined;
+  const spec = TEXT_ANNOTATIONS[kind];
+  return Object.fromEntries(
+    Object.entries(byLanguage).filter(([language]) => spec.supports(language)),
+  );
+}
+
+/**
  * Stable identifiers for the IPA engine, persisted as `ipaSource` alongside
  * `ipaText` (including the `''` failure sentinel). Same invalidate-by-source
  * migration pattern as ROMANIZATION_SOURCES in localRomanization.ts: bump the
@@ -215,7 +338,23 @@ export function carriedAnnotationFields(
  * modules can read it without touching the Node-only espeak import.
  */
 export const IPA_SOURCES = {
-  espeakNg: 'espeak-ng-emscripten-0.3.5-v1',
+  // v2 (Sep 2026) covers three changes at once, since none of them shipped
+  // separately:
+  //   - cleanEspeakIpa folds the Danish `?` glottal stop to `ʔ` and drops the
+  //     stray Icelandic `#`.
+  //   - ipaForText rejects a transcription where espeak switched language
+  //     mid-sentence, which left the switched word as raw text ("And you?" on
+  //     a French card rendered as "(en)and(fr) jˈu"). Those rows land on the
+  //     `''` sentinel and are not retried: the failure is deterministic, so a
+  //     second attempt would produce the same broken line.
+  //   - the languages that lost their `ipaVoice` (th, he, ar + dialects, zh,
+  //     yue, vi, ko) have their rows cleared and never refilled, because they
+  //     left IPA_LANGUAGES.
+  // A bump refreshes a stale row lazily the next time its card is viewed
+  // (missingAnnotationKinds). The reset pair in convex/migrations.ts is the
+  // bulk sweep, and the only path for the third change: a language that left
+  // IPA_LANGUAGES is never probed, so nothing but the sweep clears its rows.
+  espeakNg: 'espeak-ng-emscripten-0.3.5-v2',
 } as const;
 
 export type IpaSource = (typeof IPA_SOURCES)[keyof typeof IPA_SOURCES];
@@ -267,6 +406,53 @@ type AnnotationActionCtx = {
 };
 
 /** Generate + store for a source text row; failures persist the '' sentinel. */
+/**
+ * A failure that says nothing about the TEXT — a missing API key, a rate
+ * limit, a provider outage. The runners re-throw it instead of persisting the
+ * `''` sentinel.
+ *
+ * The sentinel means "this engine cannot transcribe this input", and it is
+ * permanent by design: nothing re-enqueues a row that has one. That is right
+ * for espeak, which is deterministic local compute where the first failure is
+ * as good as the third. It is badly wrong for a network engine, where the
+ * usual failure is that the deployment has no `OPENROUTER_API_KEY` — running
+ * a language through that once would stamp every row as untranscribable and
+ * the language would stay blank forever, long after the key was set.
+ */
+export class TransientAnnotationError extends Error {
+  // No `cause` option: the two-argument Error constructor is ES2022 and the
+  // Convex runtime typechecks against ES2021 (see convex/tsconfig.json), so
+  // it does not compile there. Callers put the detail in the message instead.
+  constructor(message: string) {
+    super(message);
+    this.name = 'TransientAnnotationError';
+  }
+}
+
+/**
+ * What to store for a romanization that failed while the TRANSLATION was
+ * being written (the inline sites in llmTranslationQueue.ts and
+ * translationPipeline.ts romanize before the row exists). A transient
+ * failure (rate limit, missing key, 5xx) is not a fact about the text: the
+ * field stays undefined and the annotation sweep asks again on the next
+ * view, the rule `runTranslationAnnotation` applies. Anything else persists
+ * the `''` sentinel so the failing input is not re-bought on every view.
+ */
+export function romanizationAfterFailure(
+  err: unknown,
+  context: string,
+): string | undefined {
+  if (err instanceof TransientAnnotationError) {
+    console.warn(`${context}: romanization deferred (transient):`, err.message);
+    return undefined;
+  }
+  console.error(
+    `${context}: romanization failed (persisting sentinel):`,
+    err instanceof Error ? err.message : err,
+  );
+  return '';
+}
+
 export async function runSourceAnnotation(
   ctx: AnnotationActionCtx,
   kind: AnnotationKind,
@@ -278,6 +464,10 @@ export async function runSourceAnnotation(
   try {
     value = await generate(args.text, args.language);
   } catch (err) {
+    // A configuration or transport failure is not a fact about this text, so
+    // it must not be recorded as one. Leaving the field undefined means the
+    // row is picked up again on the next view.
+    if (err instanceof TransientAnnotationError) throw err;
     // Persist the empty-string sentinel so scheduleMissingContent doesn't
     // re-enqueue the same failing input on every ensureContent call.
     console.error(`Source ${kind} error (persisting sentinel):`, err);
@@ -307,6 +497,7 @@ export async function runTranslationAnnotation(
   try {
     value = await generate(args.text, args.language);
   } catch (err) {
+    if (err instanceof TransientAnnotationError) throw err;
     console.error(`Translation ${kind} error (persisting sentinel):`, err);
     value = '';
   }
@@ -345,6 +536,9 @@ export async function runApprovalAnnotation(
     try {
       value = await generate(entry.text, entry.language);
     } catch (err) {
+      // Same rule as the source/translation runners: a configuration or
+      // transport failure is not a fact about this text.
+      if (err instanceof TransientAnnotationError) throw err;
       console.error(
         `Approval ${kind} error for ${entry.language} (persisting sentinel):`,
         err,
@@ -371,20 +565,37 @@ export async function runApprovalAnnotation(
  * resolves itself. Returns the kinds it scheduled.
  */
 export async function scheduleTranslationAnnotations(
-  ctx: { scheduler: Scheduler },
+  ctx: { scheduler: Scheduler; db: Pick<MutationCtx['db'], 'patch'> },
   row: Pick<
     Doc<'translations'>,
-    'textId' | 'targetLanguage' | 'translatedText' | AnnotationField
+    | '_id'
+    | 'textId'
+    | 'targetLanguage'
+    | 'translatedText'
+    | 'annotationRequestedAt'
+    | AnnotationField
   >,
   translationId: Id<'translations'> | undefined,
 ): Promise<AnnotationKind[]> {
   const kinds = missingAnnotationKinds(row.targetLanguage, row);
+  // Nothing missing, or a request inside the cooldown is still in flight
+  // (`annotationRequestInFlight`): the action is not scheduled twice.
+  if (kinds.length === 0 || annotationRequestInFlight(row)) return [];
+  // Always name the row. Falling back to "the store will find it by
+  // (text, language)" silently targeted the WRONG row whenever a text
+  // had sentence-form variants: liveTranslation matches
+  // `variantKey === undefined`, so a variant's romanization was written
+  // onto its base sibling and the variant stayed blank forever. That is
+  // why "And you?" showed แล้วเธอล่ะ with no romanization while its base
+  // แล้วคุณล่ะครับ had one.
+  const target = translationId ?? row._id;
+  await ctx.db.patch(target, { annotationRequestedAt: Date.now() });
   for (const kind of kinds) {
     await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].translationAction, {
       textId: row.textId,
       text: row.translatedText,
       language: row.targetLanguage,
-      translationId,
+      translationId: target,
     });
   }
   return kinds;

@@ -1,13 +1,34 @@
 'use client';
+import { FLAG_REWARDS_PER_MONTH } from '@/lib/languages';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation } from 'convex/react';
+import { toast } from 'sonner';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { getUserTimezone } from '@/lib/timezone';
 import { reportError } from '@/lib/report-error';
 import { ConfirmDialog } from '@/components/app/ConfirmDialog';
+import { ConfettiBurst } from '@/components/effects/ConfettiBurst';
+import { useAppData } from '@/components/app/AppDataProvider';
+import {
+  FlagTranslationDialog,
+  type FlagSubmission,
+} from './FlagTranslationDialog';
+
+/** How long the reward confetti stays mounted after a paid flag. */
+const FLAG_CELEBRATION_MS = 1600;
+
+/** What `requestFlag` needs to know about the card to shape the dialog. */
+export interface FlagTarget {
+  cardId: Id<'cards'>;
+  /**
+   * A learner's own sentence has no shared rendering to correct, so the
+   * gender and politeness picks are hidden for it. Defaults to false.
+   */
+  userCreated?: boolean;
+}
 
 export interface UseCardActionsOptions {
   /**
@@ -26,14 +47,20 @@ export interface UseCardActionsOptions {
 export interface CardActions {
   /** Open the delete confirmation for a card. */
   requestDelete: (cardId: Id<'cards'>) => void;
-  /** Open the flag confirmation for a card. */
-  requestFlag: (cardId: Id<'cards'>) => void;
+  /** Open the flag dialog for a card. */
+  requestFlag: (
+    cardId: Id<'cards'>,
+    target?: Omit<FlagTarget, 'cardId'>,
+  ) => void;
   deleteConfirmOpen: boolean;
   flagConfirmOpen: boolean;
+  /** The card the flag dialog is open for, or null. */
+  flagTarget: FlagTarget | null;
   closeDeleteConfirm: () => void;
   closeFlagConfirm: () => void;
   confirmDelete: () => void;
-  confirmFlag: () => void;
+  /** Submit the open flag dialog with what the learner ticked. */
+  confirmFlag: (submission: FlagSubmission) => void;
   /** Raw `deleteCardPermanently` call; rejections propagate to the caller. */
   deleteCard: (cardId: Id<'cards'>) => Promise<void>;
   /**
@@ -44,7 +71,12 @@ export interface CardActions {
    * or claim-contested); with a retranslation in flight the server-driven
    * "Retranslating" pill is the right signal instead.
    */
-  flagCard: (cardId: Id<'cards'>) => void;
+  flagCard: (cardId: Id<'cards'>, submission: FlagSubmission) => void;
+  /**
+   * Credits the last flag paid out, or null. Set for `FLAG_CELEBRATION_MS`
+   * after a rewarded flag; `CardActionConfirmDialogs` renders the burst.
+   */
+  flagCelebration: number | null;
   /** Resolves true when the regeneration mutation was accepted. */
   regenerateAudio: (cardId: Id<'cards'>) => Promise<boolean>;
   updatePinnedActions: (actions: readonly string[]) => Promise<void>;
@@ -96,8 +128,9 @@ export function useCardActions(options: UseCardActionsOptions): CardActions {
 
   const [deleteConfirmCardId, setDeleteConfirmCardId] =
     useState<Id<'cards'> | null>(null);
-  const [flagConfirmCardId, setFlagConfirmCardId] =
-    useState<Id<'cards'> | null>(null);
+  const [flagTarget, setFlagTarget] = useState<FlagTarget | null>(null);
+  const [flagCelebration, setFlagCelebration] = useState<number | null>(null);
+  const t = useTranslations('LearningMode.actions');
   const [flaggedCardIds, setFlaggedCardIds] = useState<Set<Id<'cards'>>>(
     () => new Set(),
   );
@@ -105,15 +138,27 @@ export function useCardActions(options: UseCardActionsOptions): CardActions {
   const requestDelete = useCallback((cardId: Id<'cards'>) => {
     setDeleteConfirmCardId(cardId);
   }, []);
-  const requestFlag = useCallback((cardId: Id<'cards'>) => {
-    setFlagConfirmCardId(cardId);
-  }, []);
+  const requestFlag = useCallback(
+    (cardId: Id<'cards'>, target?: Omit<FlagTarget, 'cardId'>) => {
+      setFlagTarget({ cardId, ...target });
+    },
+    [],
+  );
   const closeDeleteConfirm = useCallback(() => {
     setDeleteConfirmCardId(null);
   }, []);
   const closeFlagConfirm = useCallback(() => {
-    setFlagConfirmCardId(null);
+    setFlagTarget(null);
   }, []);
+
+  useEffect(() => {
+    if (flagCelebration === null) return;
+    const timer = setTimeout(
+      () => setFlagCelebration(null),
+      FLAG_CELEBRATION_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [flagCelebration]);
 
   const deleteCard = useCallback(
     async (cardId: Id<'cards'>) => {
@@ -123,16 +168,13 @@ export function useCardActions(options: UseCardActionsOptions): CardActions {
   );
 
   const flagCard = useCallback(
-    (cardId: Id<'cards'>) => {
-      flagTranslationMutation({ cardId })
+    (cardId: Id<'cards'>, submission: FlagSubmission) => {
+      flagTranslationMutation({ cardId, ...submission })
         .then((result) => {
+          if (!result) return;
           // A pinned card that was moved to the latest curriculum wording
           // is not "flagged": its content updates reactively instead.
-          if (
-            result &&
-            result.retranslated === false &&
-            !result.updatedToLatest
-          ) {
+          if (result.retranslated === false && !result.updatedToLatest) {
             setFlaggedCardIds((prev) => {
               if (prev.has(cardId)) return prev;
               const next = new Set(prev);
@@ -140,12 +182,29 @@ export function useCardActions(options: UseCardActionsOptions): CardActions {
               return next;
             });
           }
+          // The thanks always, the credits and the confetti only for what
+          // actually landed (capped months, repeat flags and own sentences
+          // pay nothing).
+          if (result.creditsAwarded > 0) {
+            setFlagCelebration(result.creditsAwarded);
+            toast.success(t('flagRewardTitle'), {
+              description: t('flagRewardBody', {
+                credits: result.creditsAwarded,
+                max: FLAG_REWARDS_PER_MONTH,
+              }),
+              duration: 6000,
+            });
+          } else {
+            toast.success(t('flagRewardTitle'), {
+              description: t('flagThanksBody'),
+            });
+          }
         })
         .catch((error) => {
           reportError(error, { op: 'flagTranslation', cardId });
         });
     },
-    [flagTranslationMutation],
+    [flagTranslationMutation, t],
   );
 
   const confirmDelete = useCallback(() => {
@@ -155,12 +214,15 @@ export function useCardActions(options: UseCardActionsOptions): CardActions {
     optionsRef.current.onConfirmDelete(cardId, { deleteCard });
   }, [deleteConfirmCardId, deleteCard]);
 
-  const confirmFlag = useCallback(() => {
-    const cardId = flagConfirmCardId;
-    if (cardId === null) return;
-    setFlagConfirmCardId(null);
-    flagCard(cardId);
-  }, [flagConfirmCardId, flagCard]);
+  const confirmFlag = useCallback(
+    (submission: FlagSubmission) => {
+      const target = flagTarget;
+      if (target === null) return;
+      setFlagTarget(null);
+      flagCard(target.cardId, submission);
+    },
+    [flagTarget, flagCard],
+  );
 
   const regenerateAudio = useCallback(
     async (cardId: Id<'cards'>) => {
@@ -193,13 +255,15 @@ export function useCardActions(options: UseCardActionsOptions): CardActions {
     requestDelete,
     requestFlag,
     deleteConfirmOpen: deleteConfirmCardId !== null,
-    flagConfirmOpen: flagConfirmCardId !== null,
+    flagConfirmOpen: flagTarget !== null,
+    flagTarget,
     closeDeleteConfirm,
     closeFlagConfirm,
     confirmDelete,
     confirmFlag,
     deleteCard,
     flagCard,
+    flagCelebration,
     regenerateAudio,
     updatePinnedActions,
     flaggedCardIds,
@@ -217,6 +281,10 @@ export function CardActionConfirmDialogs({
   actions: CardActions;
 }) {
   const t = useTranslations('LearningMode');
+  const { activeCourse } = useAppData();
+  const courseLanguages = activeCourse
+    ? [...activeCourse.baseLanguages, ...activeCourse.targetLanguages]
+    : [];
   return (
     <>
       <ConfirmDialog
@@ -232,17 +300,24 @@ export function CardActionConfirmDialogs({
         onConfirm={actions.confirmDelete}
         destructive
       />
-      <ConfirmDialog
+      <FlagTranslationDialog
         open={actions.flagConfirmOpen}
         onOpenChange={(open) => {
           if (!open) actions.closeFlagConfirm();
         }}
-        title={t('actions.flagConfirmTitle')}
-        description={t('actions.flagConfirmDescription')}
-        cancelLabel={t('actions.flagConfirmCancel')}
-        confirmLabel={t('actions.flagConfirmConfirm')}
-        onConfirm={actions.confirmFlag}
+        onSubmit={actions.confirmFlag}
+        courseLanguages={courseLanguages}
+        allowCorrections={actions.flagTarget?.userCreated !== true}
       />
+      {actions.flagCelebration !== null && (
+        <div
+          className="pointer-events-none fixed inset-x-0 top-1/3 z-[100] flex justify-center"
+          aria-hidden
+          data-testid="flag-celebration"
+        >
+          <ConfettiBurst count={40} />
+        </div>
+      )}
     </>
   );
 }

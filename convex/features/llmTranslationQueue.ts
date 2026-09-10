@@ -28,6 +28,7 @@ import {
   getTranslationSourceFromStage,
   getVoiceForText,
   isMixedLanguage,
+  pickMixedVariantForNewRow,
   resolveMixedVariant,
   resolveTranslationStages,
   ROMANIZATION_LANGUAGES,
@@ -36,12 +37,15 @@ import {
   type TranslationRuleId,
 } from '../../lib/languages';
 import { SOURCE_VERBATIM_TRANSLATION_SOURCE } from '../../lib/translationProvenance';
+import { getPolitenessConfig } from '../../lib/languageForms';
+import type { TranslationPromptArgs } from './translationLLM';
 import {
   storeTranslationAndScheduleTTSHandler,
   verbatimTranslationArgs,
 } from './translationPipeline';
 import { romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
+import { romanizationAfterFailure } from '../lib/textAnnotations';
 import { llmPool, llmWarmPool, type PoolRunResult } from '../lib/workpools';
 import {
   asVoiceGender,
@@ -89,16 +93,26 @@ import { captureGeneration } from '../lib/posthogAi';
  */
 export const CLAIM_STALE_MS = 10 * 60 * 1000;
 
-/** Point-read the (textId, targetLanguage) LLM translation claim, if any. */
+/**
+ * Point-read the (textId, targetLanguage, variant) LLM translation claim,
+ * if any. `variantKey` undefined is the canonical job; a rendering variant
+ * (docs/architecture/translation-variants.md) holds its own claim, so two
+ * learners with the same preference share one job and a variant never
+ * blocks the canonical fill.
+ */
 export async function getLlmClaim(
   ctx: QueryCtx | MutationCtx,
   textId: Id<'texts'>,
   targetLanguage: string,
+  variantKey?: string,
 ): Promise<Doc<'llmTranslationClaims'> | null> {
   return await ctx.db
     .query('llmTranslationClaims')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', textId).eq('targetLanguage', targetLanguage),
+    .withIndex('by_text_language_variant', (q) =>
+      q
+        .eq('textId', textId)
+        .eq('targetLanguage', targetLanguage)
+        .eq('variantKey', variantKey),
     )
     .first();
 }
@@ -106,6 +120,43 @@ export async function getLlmClaim(
 /** True while the claim is inside its CLAIM_STALE_MS freshness window. */
 export function isClaimFresh(claim: { claimedAt: number }): boolean {
   return Date.now() - claim.claimedAt < CLAIM_STALE_MS;
+}
+
+/**
+ * How long a rendering variant whose rewrite attempts were exhausted holds
+ * its claim (`variantFailedAt`) before the ensure path may buy another
+ * attempt. A sentence the model refuses is otherwise re-bought on every
+ * card view, since the card keeps reporting the variant as missing.
+ */
+export const VARIANT_RETRY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+/** True while an exhausted variant claim is still inside its cooldown. */
+function variantFailureHolds(claim: { variantFailedAt?: number }): boolean {
+  return (
+    claim.variantFailedAt !== undefined &&
+    Date.now() - claim.variantFailedAt < VARIANT_RETRY_COOLDOWN_MS
+  );
+}
+
+/**
+ * Every VARIANT claim of (text, language), whatever the key: the index
+ * range past the canonical claim. For `retireVariantRenderings`, which
+ * releases them with the variant rows.
+ */
+export async function variantLlmClaims(
+  ctx: QueryCtx | MutationCtx,
+  textId: Id<'texts'>,
+  targetLanguage: string,
+): Promise<Doc<'llmTranslationClaims'>[]> {
+  return await ctx.db
+    .query('llmTranslationClaims')
+    .withIndex('by_text_language_variant', (q) =>
+      q
+        .eq('textId', textId)
+        .eq('targetLanguage', targetLanguage)
+        .gt('variantKey', ''),
+    )
+    .take(64);
 }
 
 /**
@@ -129,6 +180,10 @@ function llmClaimBlocksPriority(
   claim: Doc<'llmTranslationClaims'>,
   priority: LlmPriority | undefined,
 ): boolean {
+  // An exhausted variant rewrite blocks every caller for its cooldown and
+  // nobody after it: the job is over, there is nothing to take over, and
+  // asking again inside the cooldown would buy the same refusal.
+  if (claim.variantFailedAt !== undefined) return variantFailureHolds(claim);
   const fresh = isClaimFresh(claim);
   const takeover =
     fresh && claim.priority === 'background' && priority !== 'background';
@@ -149,8 +204,9 @@ export async function hasBlockingLlmClaim(
   textId: Id<'texts'>,
   targetLanguage: string,
   priority: LlmPriority | undefined,
+  variantKey?: string,
 ): Promise<boolean> {
-  const existing = await getLlmClaim(ctx, textId, targetLanguage);
+  const existing = await getLlmClaim(ctx, textId, targetLanguage, variantKey);
   return existing !== null && llmClaimBlocksPriority(existing, priority);
 }
 
@@ -175,8 +231,9 @@ export async function claimLlmTranslationIfAvailable(
   textId: Id<'texts'>,
   targetLanguage: string,
   priority?: LlmPriority,
+  variantKey?: string,
 ): Promise<Id<'llmTranslationClaims'> | null> {
-  const existing = await getLlmClaim(ctx, textId, targetLanguage);
+  const existing = await getLlmClaim(ctx, textId, targetLanguage, variantKey);
 
   if (existing) {
     if (llmClaimBlocksPriority(existing, priority)) {
@@ -195,6 +252,7 @@ export async function claimLlmTranslationIfAvailable(
     targetLanguage,
     claimedAt: Date.now(),
     priority,
+    ...(variantKey !== undefined ? { variantKey } : {}),
   });
 }
 
@@ -269,6 +327,20 @@ const llmJobArgsValidator = v.object({
   // each queue an attempt against the same (text, language) and only one wins
   // the claim. Absent on every ordinary fill.
   retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
+  // Rendering VARIANT job (docs/architecture/translation-variants.md): the
+  // `translations` row this job produces, keyed `textVariantKey`, with the
+  // form and gender the wording must take and the canonical wording it is
+  // a REWRITE of (`buildRenderingRewritePrompt`). Such a job never falls
+  // back to Google Translate. Absent on canonical jobs.
+  variantKey: v.optional(v.string()),
+  requestedGender: v.optional(v.union(v.literal('male'), v.literal('female'))),
+  requestedForm: v.optional(
+    v.object({ id: v.string(), label: v.string(), prompt: v.string() }),
+  ),
+  rewriteOf: v.optional(v.string()),
+  // The audio pointer the landing wording is voiced under
+  // (`audioVariantKey`); absent = the canonical pointer.
+  audioVariantKey: v.optional(v.string()),
 });
 
 /**
@@ -313,7 +385,12 @@ export const enqueueLlmTranslation = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx: MutationCtx, { args }: { args: LlmJobArgs }) => {
-    const claim = await getLlmClaim(ctx, args.textId, args.targetLanguage);
+    const claim = await getLlmClaim(
+      ctx,
+      args.textId,
+      args.targetLanguage,
+      args.variantKey,
+    );
     // A fresh claim already stamped with another job's workId means a live
     // pool job owns this (textId, language): enqueueing again would run the
     // translation twice and hijack that job's claim. Unreachable from the
@@ -367,6 +444,8 @@ type TextRowForTranslation = {
   addressesSomeone?: boolean;
   addresseeNumber?: string;
   speakerGender?: string;
+  /** The voice the card is spoken in; the prompt's fallback speaker gender. */
+  audioSpeakerGender?: string;
   addresseeGender?: string;
   register?: string;
   referentGender?: string;
@@ -434,7 +513,18 @@ async function resolveMixedVariantPin(
       );
     }
     if (!mixed) {
-      mixed = resolveMixedVariant(args.targetLanguage, args.textId as string);
+      // A row that exists but carries no pin predates the column: its
+      // wording was written under the legacy coin, so reconstruct that one
+      // and never re-roll it. Only a (text, language) with no row at all is
+      // a genuinely new pick, and that one is decorrelated from the speaker
+      // gender (2026-09-08 review).
+      mixed =
+        existingRow === null
+          ? pickMixedVariantForNewRow(
+              args.targetLanguage,
+              args.textId as string,
+            )
+          : resolveMixedVariant(args.targetLanguage, args.textId as string);
     }
   }
   return {
@@ -469,12 +559,21 @@ async function resolvePromptMetadata(
       ? text.referentGender
       : legacyReferentGenderFallback(text.externalId, text._id as string);
 
-  const speakerGender =
-    text.speakerGender === 'male' ||
-    text.speakerGender === 'female' ||
-    text.speakerGender === 'neutral'
-      ? (text.speakerGender as 'male' | 'female' | 'neutral')
-      : undefined;
+  // A definitive verdict is the sentence's own gender. Otherwise the voice
+  // the card is spoken in guides the wording, so a neutral first-person
+  // sentence in a marked language agrees with its clip instead of drifting
+  // to the masculine default. On an unclassified curriculum text both
+  // fields hold the same coin flip; once the classifier has stamped the
+  // row they separate, and this is where the fallback matters.
+  const speakerGender: 'male' | 'female' | 'neutral' | undefined =
+    text.speakerGender === 'male' || text.speakerGender === 'female'
+      ? text.speakerGender
+      : text.audioSpeakerGender === 'male' ||
+          text.audioSpeakerGender === 'female'
+        ? text.audioSpeakerGender
+        : text.speakerGender === 'neutral'
+          ? 'neutral'
+          : undefined;
 
   const addresseeGender =
     addressesSomeone &&
@@ -561,6 +660,67 @@ async function resolvePromptMetadata(
     // so a stale `sourceLanguage` can never turn a rewrite into a
     // translation.
     accentRewrite: getAccentRewriteConfig(args.targetLanguage, text.language),
+    ...requestedRendering(args, text, cfgLanguageCode),
+  };
+}
+
+/**
+ * The sentence-form request a job carries (docs/architecture/
+ * translation-variants.md). A VARIANT job (`variantKey`) rewrites the
+ * canonical wording for its gender and form. A CANONICAL job of a
+ * predicate- or particle-marking language (ja, ko, th, fil) ALWAYS requests
+ * a form, because the prompt's addressee gate would otherwise starve it:
+ * the level its register metadata names ('informal' = casual, 'formal' =
+ * polite), else the language's `defaultLevel`. That is how new shared
+ * Japanese rows stop leaning casual (Paul, 2026-09-06). Every other
+ * canonical job is unchanged.
+ */
+function requestedRendering(
+  args: LlmJobArgs,
+  text: TextRowForTranslation,
+  cfgLanguageCode: string,
+): Partial<
+  Pick<
+    TranslationPromptArgs,
+    'requestedGender' | 'requestedForm' | 'rewriteOf' | 'promptWording'
+  >
+> {
+  if (args.variantKey !== undefined) {
+    return {
+      requestedGender: args.requestedGender,
+      requestedForm: args.requestedForm,
+      rewriteOf: args.rewriteOf,
+      promptWording: 'literature',
+    };
+  }
+  // Languages whose politeness lives on the predicate or a particle mark
+  // every sentence, so the prompt's addressee gate (no <register> without
+  // a "you") starves them. Their canonical jobs always request a form: the
+  // metadata's level when the classifier gave one ('informal' = casual,
+  // 'formal' = the safe polite level, as the metadata prompt defines it),
+  // else the language's default.
+  const config = getPolitenessConfig(cfgLanguageCode);
+  if (
+    !config ||
+    (config.marking !== 'predicate' && config.marking !== 'particle') ||
+    config.defaultLevel === undefined
+  ) {
+    return {};
+  }
+  const level =
+    text.register === 'informal'
+      ? 'casual'
+      : text.register === 'formal'
+        ? 'polite'
+        : config.defaultLevel;
+  const form = config.forms[level];
+  return {
+    requestedForm: {
+      id: form.id,
+      label: form.promptLabel,
+      prompt: form.prompt,
+    },
+    promptWording: 'literature',
   };
 }
 
@@ -736,17 +896,18 @@ async function storeLlmTranslationResult(
 ): Promise<void> {
   // `romanizeText` already retries up to 3 times internally; on full
   // exhaustion we persist an empty-string sentinel so ensureContent
-  // doesn't reschedule another burst on every call.
+  // doesn't reschedule another burst on every call. A TRANSIENT failure
+  // (rate limit, missing key) leaves the field undefined instead, so the
+  // annotation sweep asks again later (`romanizationAfterFailure`).
   let romanizedText: string | undefined;
   if (ROMANIZATION_LANGUAGES.has(args.targetLanguage)) {
     try {
       romanizedText = await romanizeText(translatedText, args.targetLanguage);
     } catch (err) {
-      console.error(
-        `[llmTranslationQueue] Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
-        err instanceof Error ? err.message : err,
+      romanizedText = romanizationAfterFailure(
+        err,
+        `[llmTranslationQueue] ${args.targetLanguage}`,
       );
-      romanizedText = '';
     }
   }
 
@@ -795,6 +956,11 @@ async function storeLlmTranslationResult(
       expectedClaimId: args.claimId,
       skipTts: args.skipTts,
       priority: args.priority,
+      variantKey: args.variantKey,
+      audioVariantKey: args.audioVariantKey,
+      // The wording this rewrite was made from; the store drops the result
+      // when the canonical row has moved on since.
+      rewriteOf: args.rewriteOf,
       // Resolved at the write choke point, which is the only place that
       // knows which of its several outcomes this attempt actually reached.
       retranslationAuditId: args.retranslationAuditId,
@@ -933,6 +1099,7 @@ export const onLlmTranslationComplete = internalMutation({
       ctx,
       context.textId,
       context.targetLanguage,
+      context.variantKey,
     );
     const ownsClaim =
       claim !== null && (claim.workId === undefined || claim.workId === workId);
@@ -979,6 +1146,29 @@ export const onLlmTranslationComplete = internalMutation({
         context.retranslationAuditId,
         'dropped_superseded',
       );
+      return null;
+    }
+
+    if (context.variantKey !== undefined) {
+      // A rendering variant has no Google fallback: a machine translation
+      // cannot take a requested gender or form, and the canonical row keeps
+      // serving the card meanwhile. The claim stays, marked failed, so the
+      // ensure path does not buy the same refusal again on every view
+      // until VARIANT_RETRY_COOLDOWN_MS has passed (a canonical wording
+      // change releases it earlier, `retireVariantRenderings`).
+      console.warn(
+        '[llmTranslationQueue] variant rewrite attempts exhausted — canonical keeps serving',
+        {
+          textId: context.textId,
+          targetLanguage: context.targetLanguage,
+          variantKey: context.variantKey,
+          error: result.error,
+        },
+      );
+      await ctx.db.patch(claim._id, {
+        workId: undefined,
+        variantFailedAt: Date.now(),
+      });
       return null;
     }
 
@@ -1174,6 +1364,7 @@ export const getTextRowForTranslation = internalQuery({
       addressesSomeone: v.optional(v.boolean()),
       addresseeNumber: v.optional(v.string()),
       speakerGender: v.optional(v.string()),
+      audioSpeakerGender: v.optional(v.string()),
       addresseeGender: v.optional(v.string()),
       register: v.optional(v.string()),
       referentGender: v.optional(v.string()),
@@ -1196,6 +1387,7 @@ export const getTextRowForTranslation = internalQuery({
       addressesSomeone: row.addressesSomeone,
       addresseeNumber: row.addresseeNumber,
       speakerGender: row.speakerGender,
+      audioSpeakerGender: row.audioSpeakerGender,
       addresseeGender: row.addresseeGender,
       register: row.register,
       referentGender: row.referentGender,

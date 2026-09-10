@@ -2,6 +2,8 @@
 import { convexTest, type TestConvex } from 'convex-test';
 import { describe, it, expect, vi } from 'vitest';
 import schema from '../../schema';
+import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
+import { getCurrentTranslationVersion } from '../../../lib/languages';
 import { api } from '../../_generated/api';
 import { MARK_READ_LIMIT } from '../../db/collectionTextMarks';
 import type { Doc, Id } from '../../_generated/dataModel';
@@ -203,6 +205,82 @@ describe('features/collections', () => {
         },
       );
       expect(res.page).toEqual([]);
+    });
+
+    // 2026-09-09, the Thai pre-A1 rows sitting on "updating" for good. The
+    // client batches `requestPreviewTranslations` off
+    // `missingTranslationLanguages` (plus `needsAnnotationBackfill`), so a
+    // row whose canonical translations are all present was never sent and
+    // the rewrite the politeness setting wants was never asked for. The row
+    // has to say it needs one.
+    it('a fully translated row still reports a wanted rendering rewrite', async () => {
+      const t = convexTest(schema, modules);
+      const { collId } = await t.run(async (ctx) => {
+        const collId = await ctx.db.insert('collections', {
+          name: 'A1',
+          textCount: 1,
+        });
+        const courseId = await ctx.db.insert('courses', {
+          userId: 'user_A',
+          baseLanguages: ['en'],
+          targetLanguages: ['es'],
+        });
+        await ctx.db.insert('userSettings', {
+          userId: 'user_A',
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        await ctx.db.insert('decks', { courseId, name: 'd', cardCount: 0 });
+        await ctx.db.insert('courseSettings', {
+          courseId,
+          initialReviewCount: 5,
+          // Spain Spanish is a familiar split, so "formal" is usted (form v)
+          // while the stored wording below is tú (form t).
+          politenessLevels: ['formal'],
+        });
+        const textId = await ctx.db.insert('texts', {
+          text: 'Are you coming?',
+          language: 'en',
+          userCreated: false,
+          collectionId: collId,
+          collectionRank: 1,
+          addressesSomeone: true,
+          audioSpeakerGender: 'male',
+          metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
+          ipaText: '',
+          romanizedText: '',
+        });
+        await ctx.db.insert('translations', {
+          textId,
+          targetLanguage: 'es',
+          translatedText: '¿Vienes?',
+          romanizedText: '',
+          ipaText: '',
+          translationSource: 'openai/gpt-5.6-sol:floor-minimal',
+          speakerGender: 'male',
+          translationVersion: getCurrentTranslationVersion('es'),
+          renderedGender: 'unmarked',
+          renderedPoliteness: 'casual',
+        });
+        return { collId };
+      });
+
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      const res = await asUser.query(
+        api.features.collections.browseCollectionTexts,
+        {
+          collectionId: collId,
+          anchorRank: 0,
+          direction: 'after',
+          paginationOpts: firstPage,
+        },
+      );
+      const row = res.page[0];
+      // The Spanish row is complete, which is exactly the trap: the client
+      // batches off this list, so the row was never sent. ('en' can appear
+      // here for its own reason, the Mixed English accent row.)
+      expect(row.missingTranslationLanguages).not.toContain('es');
+      expect(row.needsRenderingRewrite).toBe(true);
     });
 
     it('lists texts in rank order with status + missingTranslationLanguages', async () => {

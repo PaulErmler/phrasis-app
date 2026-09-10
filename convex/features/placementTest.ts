@@ -3,7 +3,11 @@ import { query } from '../_generated/server';
 import type { Doc } from '../_generated/dataModel';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { PLACEMENT_SENTENCES_QUERY_CAP } from '../../lib/constants/onboarding';
-import { liveTranslation, servedSourceText } from '../db/translationReads';
+import {
+  liveTranslation,
+  servedSourceText,
+  audioPointer,
+} from '../db/translationReads';
 
 /**
  * Placement-test backend.
@@ -93,12 +97,7 @@ export const getPlacementSentence = query({
       sourceAudioLanguage = source.language;
     }
 
-    const sourceAudio = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', text._id).eq('language', sourceAudioLanguage),
-      )
-      .first();
+    const sourceAudio = await audioPointer(ctx, text._id, sourceAudioLanguage);
     const sourcePayload = sourceAudio
       ? await resolveAudioPayload(ctx, sourceAudio)
       : null;
@@ -113,12 +112,7 @@ export const getPlacementSentence = query({
       const translation = await liveTranslation(ctx, text._id, targetLanguage);
       targetText = translation?.translatedText;
       targetRomanization = translation?.romanizedText;
-      targetAudio = await ctx.db
-        .query('audioRecordings')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', text._id).eq('language', targetLanguage),
-        )
-        .first();
+      targetAudio = await audioPointer(ctx, text._id, targetLanguage);
     } else if (targetLanguage === text.language) {
       // Learning the text's own language (English on an English course):
       // the target side is the served source wording, accent row included,
@@ -126,12 +120,7 @@ export const getPlacementSentence = query({
       const source = await servedSourceText(ctx, text, null);
       targetText = source.text;
       targetRomanization = source.romanizedText;
-      targetAudio = await ctx.db
-        .query('audioRecordings')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', text._id).eq('language', source.language),
-        )
-        .first();
+      targetAudio = await audioPointer(ctx, text._id, source.language);
     }
     const targetPayload = targetAudio
       ? await resolveAudioPayload(ctx, targetAudio)

@@ -16,7 +16,15 @@
  * under vitest; global-teardown.ts runs only under Playwright's transformer.
  */
 export function extractJsonResult(out: string): unknown {
-  const lines = out.trim().split('\n');
+  const trimmed = out.trim();
+  // Empty output is a RESULT, not a parse failure: `convex run` prints
+  // nothing at all when the function returned null. Callers skip on
+  // `=== null`, so handing them `undefined` here turned a deliberate
+  // "nothing to probe" into a TypeError one line later
+  // (curriculum-edit-flag.spec.ts, 2026-09-09). `execFileSync` throws on a
+  // non-zero exit, so a clean exit with no output can only mean this.
+  if (!trimmed) return null;
+  const lines = trimmed.split('\n');
   for (let i = 0; i < lines.length; i++) {
     const first = lines[i].trim();
     // A JSON result's first line starts a value; skip prose lines outright.

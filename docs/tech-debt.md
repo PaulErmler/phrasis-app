@@ -15,229 +15,273 @@ correctness/cost/velocity noted per item.
 ## Correctness & robustness
 
 - [ ] **A32 — Drop the optional-`now` back-compat on `getCardCounts`.** The query keeps
-  `now` optional (falling back to the server clock via `resolveClientNow`) for
-  already-shipped bundles that call with `{}`; the live client passes a minute-quantized
-  `now` (`components/app/learning/ProgressDisplay.tsx`). Once pre-2026-08 bundles have
-  cycled out, make `now` required and drop the fallback so the no-wall-clock query
-  guideline holds unconditionally. Anchor: `getCardCounts` in `convex/features/stats.ts`.
-  Effort S. Impact: query cacheability guaranteed instead of usual-case.
+      `now` optional (falling back to the server clock via `resolveClientNow`) for
+      already-shipped bundles that call with `{}`; the live client passes a minute-quantized
+      `now` (`components/app/learning/ProgressDisplay.tsx`). Once pre-2026-08 bundles have
+      cycled out, make `now` required and drop the fallback so the no-wall-clock query
+      guideline holds unconditionally. Anchor: `getCardCounts` in `convex/features/stats.ts`.
+      Effort S. Impact: query cacheability guaranteed instead of usual-case.
 
 - [ ] **A30 — Dataset seed `.unique()` crash on second dataset version.**
-  `convex/db/seed.ts` looks up collections via `.withIndex('by_name', …).unique()`, but
-  `convex/admin/uploadDataset.ts` writes the same `name` for every dataset version. The
-  moment a second version exists, every seed lookup throws. Fix: query by name+version or
-  `.first()` with deterministic order; also index the one unindexed `.filter()` in
-  `convex/features/authEmailTesting.ts` (`kind`). Effort S. Impact: blocks future dataset
-  uploads.
+      `convex/db/seed.ts` looks up collections via `.withIndex('by_name', …).unique()`, but
+      `convex/admin/uploadDataset.ts` writes the same `name` for every dataset version. The
+      moment a second version exists, every seed lookup throws. Fix: query by name+version or
+      `.first()` with deterministic order; also index the one unindexed `.filter()` in
+      `convex/features/authEmailTesting.ts` (`kind`). Effort S. Impact: blocks future dataset
+      uploads.
 - [ ] **A10 — Clamp caller-supplied limits on public queries.** `getDeckCards`-style
-  query in `convex/features/decks.ts` takes any `limit` into `.take()` plus a per-card
-  content fan-out (docstring claims "(paginated)"; it isn't), and the onboarding
-  sample query's `sampleSize` drives a documented N+1. Admin queries clamp; these don't.
-  Fix: server-side max or `paginationOptsValidator`. Effort S. Impact: read-amplification
-  and abuse headroom.
+      query in `convex/features/decks.ts` takes any `limit` into `.take()` plus a per-card
+      content fan-out (docstring claims "(paginated)"; it isn't), and the onboarding
+      sample query's `sampleSize` drives a documented N+1. Admin queries clamp; these don't.
+      Fix: server-side max or `paginationOptsValidator`. Effort S. Impact: read-amplification
+      and abuse headroom.
 - [ ] **A12 — Replace `v.any()` on the public surface.** Chat `streamArgs`
-  (`convex/features/chat/messages.ts`), Autumn `entityData` forwarded verbatim to the
-  billing provider (`convex/autumn.ts`), `convex/admin/userContent.ts`. Also: use
-  `paginationResultValidator` instead of the hand-rolled shape in `listMessages`.
-  Effort M. Impact: unvalidated input into billing/chat components.
+      (`convex/features/chat/messages.ts`), Autumn `entityData` forwarded verbatim to the
+      billing provider (`convex/autumn.ts`), `convex/admin/userContent.ts`. Also: use
+      `paginationResultValidator` instead of the hand-rolled shape in `listMessages`.
+      Effort M. Impact: unvalidated input into billing/chat components.
 - [ ] **B24 — Bound the unbounded list subscriptions.** Full chat-thread history
-  (`app/app/(main)/layout.tsx` `listThreads`), `getUserCourses` (CourseMenu),
-  `getRecentWords` (WordCloudCard) grow with account age and re-render consumers on
-  every mutation. Effort M. Impact: perf on old accounts.
+      (`app/app/(main)/layout.tsx` `listThreads`), `getUserCourses` (CourseMenu),
+      `getRecentWords` (WordCloudCard) grow with account age and re-render consumers on
+      every mutation. Effort M. Impact: perf on old accounts.
 - [ ] **A31 — Document the `userId` FK model.** `userId` is an unenforced `v.string()`
-  across ~25 tables, derived from `identity.subject` (Convex guidelines prefer
-  `tokenIdentifier`); integrity rests on the hand-maintained `USER_TABLES` list in
-  `convex/admin/deleteUser.ts` guarded by one schema-coverage test. Write the deviation
-  down (ADR) and strengthen the test. Effort M (doc S; any migration L). Impact:
-  correctness-by-convention made explicit.
+      across ~25 tables, derived from `identity.subject` (Convex guidelines prefer
+      `tokenIdentifier`); integrity rests on the hand-maintained `USER_TABLES` list in
+      `convex/admin/deleteUser.ts` guarded by one schema-coverage test. Write the deviation
+      down (ADR) and strengthen the test. Effort M (doc S; any migration L). Impact:
+      correctness-by-convention made explicit.
 
 - [ ] **A33 — `startOfDayMs` DST convergence only walks forward.** The gap walk in
-  `lib/dateStrings.ts` (`startOfDayMs`) steps forward while the candidate timestamp's
-  local date is still before the target date. A fall-back transition sitting at or near
-  local midnight could make the two-iteration convergence overshoot into the next local
-  day, and the forward-only loop cannot come back — shifting one day's due bucket in
-  the forecast query. Fix: add a backward step, or first pin the behavior with unit
-  tests for the known-tricky zones (e.g. America/Santiago, Lord Howe). Effort S.
-  Impact: at worst one shifted forecast day, twice a year, in midnight-transition zones.
+      `lib/dateStrings.ts` (`startOfDayMs`) steps forward while the candidate timestamp's
+      local date is still before the target date. A fall-back transition sitting at or near
+      local midnight could make the two-iteration convergence overshoot into the next local
+      day, and the forward-only loop cannot come back — shifting one day's due bucket in
+      the forecast query. Fix: add a backward step, or first pin the behavior with unit
+      tests for the known-tricky zones (e.g. America/Santiago, Lord Howe). Effort S.
+      Impact: at worst one shifted forecast day, twice a year, in midnight-transition zones.
 
 ## Backend architecture & scale
 
 - [ ] **A16 — Admin dashboard off whole-table scans.** `convex/admin/dashboard.ts` is
-  built on `.take(4000)` scans with its own header math showing `listUsers` peaks at
-  16,000 of Convex's 16,384-doc scan ceiling, plus up to 200 sequential per-user course
-  queries. Crossing the ceiling hard-fails the dashboard. Fix: back counts with
-  `@convex-dev/aggregate` (installed), paginate per-user detail. Effort L.
+      built on `.take(4000)` scans with its own header math showing `listUsers` peaks at
+      16,000 of Convex's 16,384-doc scan ceiling, plus up to 200 sequential per-user course
+      queries. Crossing the ceiling hard-fails the dashboard. Fix: back counts with
+      `@convex-dev/aggregate` (installed), paginate per-user detail. Effort L.
 - [ ] **A15 — Replace `.take(N).length` row counts.** Dashboard reads 8,000
-  `userProfiles` docs to render one number; `convex/db/courses.ts`
-  (`getActiveCourseCount`/`getTotalCourseCount`) same pattern. Aggregate-backed counters.
-  Effort S–M.
+      `userProfiles` docs to render one number; `convex/db/courses.ts`
+      (`getActiveCourseCount`/`getTotalCourseCount`) same pattern. Aggregate-backed counters.
+      Effort S–M.
 - [ ] **A22 — Split `courseSettings`.** ~78 near-all-optional fields mixing stable
-  preferences with high-churn operational state (`currentSessionId` rewritten on every
-  celebration dismiss; `writingSeed*`), all subscribed whole via
-  `getActiveCourseSettings`; the audio family is triplicated as `X`/`XFull`/`XTranscribe`.
-  Move churn state to its own table; consider a per-mode record for the triplets
-  (migration). Effort L.
+      preferences with high-churn operational state (`currentSessionId` rewritten on every
+      celebration dismiss; `writingSeed*`), all subscribed whole via
+      `getActiveCourseSettings`; the audio family is triplicated as `X`/`XFull`/`XTranscribe`.
+      Move churn state to its own table; consider a per-mode record for the triplets
+      (migration). Effort L.
 - [ ] **A24 — Enum the linguistic metadata columns.** `texts` stores register/genders/
-  sentenceType/tenseAspect… as loose `v.string()` while `convex/types.ts` already defines
-  the literal unions for the same fields. Verify rows conform, then narrow (migration).
-  Effort M.
+      sentenceType/tenseAspect… as loose `v.string()` while `convex/types.ts` already defines
+      the literal unions for the same fields. Verify rows conform, then narrow (migration).
+      Effort M.
 - [ ] **A27 — Add crons for sweeps.** No crons exist; stale
-  `ttsGenerationClaims`/`llmTranslationClaims` are reclaimed only opportunistically,
-  `testAuthEmails` accumulate, interrupted `accountDeletions` resume manually, the
-  writing-track seeder gives up after 5 attempts. One `crons.ts` with stale-claim GC +
-  purge + stalled-job recovery. Effort M.
+      `ttsGenerationClaims`/`llmTranslationClaims` are reclaimed only opportunistically,
+      `testAuthEmails` accumulate, interrupted `accountDeletions` resume manually, the
+      writing-track seeder gives up after 5 attempts. One `crons.ts` with stale-claim GC +
+      purge + stalled-job recovery. Effort M.
 - [ ] **A28 — Retire completed migrations from `runAll`.** 17 chained migrations incl.
-  long-complete one-shots; two furigana backfills schedule one Node action per row;
-  an orphaned docstring sits above the wrong function (`convex/migrations.ts`).
-  Effort M.
+      long-complete one-shots; two furigana backfills schedule one Node action per row;
+      an orphaned docstring sits above the wrong function (`convex/migrations.ts`).
+      Effort M.
 - [ ] **A29 — Retire the stale warmup scripts.** Three near-identical admin warmup
-  one-shots all document a TTS priority-queue that no longer exists (replaced by
-  pool-choice in `convex/lib/workpools.ts`); `warmupSingleLanguage` subsumes the other
-  two. Effort S.
+      one-shots all document a TTS priority-queue that no longer exists (replaced by
+      pool-choice in `convex/lib/workpools.ts`); `warmupSingleLanguage` subsumes the other
+      two. Effort S.
 
 - [ ] **B30 — Per-card deck-count writes widen the OCC surface.** `adjustDeckCardCount`
-  (`convex/db/stats/cardAggregates.ts`) does a read-modify-write on the deck document
-  for every card insert/delete, so bulk paths (`createCardsFromTexts`, `purgeCards`) do
-  N writes to one row per transaction and any two concurrent card mutations on a deck
-  now conflict where previously only the four explicit count sites did. Related trade
-  made at the same time: the untouched-field skip removed the incidental aggregate
-  self-heal, so a drifted `cardsByStateAndDueDate` now stays wrong (presenting as
-  silently low due counts) until `recalcUserCardAggregates` runs. Watch conflict
-  telemetry before engineering around it; if it fires, batch the per-transaction delta
-  into one write and add a scheduled recount. Effort M. Impact: OCC retries on busy
-  decks; silent drift persistence.
+      (`convex/db/stats/cardAggregates.ts`) does a read-modify-write on the deck document
+      for every card insert/delete, so bulk paths (`createCardsFromTexts`, `purgeCards`) do
+      N writes to one row per transaction and any two concurrent card mutations on a deck
+      now conflict where previously only the four explicit count sites did. Related trade
+      made at the same time: the untouched-field skip removed the incidental aggregate
+      self-heal, so a drifted `cardsByStateAndDueDate` now stays wrong (presenting as
+      silently low due counts) until `recalcUserCardAggregates` runs. Watch conflict
+      telemetry before engineering around it; if it fires, batch the per-transaction delta
+      into one write and add a scheduled recount. Effort M. Impact: OCC retries on busy
+      decks; silent drift persistence.
+
+- [ ] **C36 — Stranded rendering-variant rows.** A course that switches its
+      first-person or politeness setting keeps the previous variant rows and clips
+      (docs/architecture/translation-variants.md: nothing is deleted on a switch, so
+      switching back is free). Nothing collects a variant no card reads any more.
+      Small and shared; revisit with a usage-aware sweep if volume warrants. Effort M.
+- [ ] **C37 — Collection previews stay canonical for preference users.** The
+      collection preview and `requestPreviewTranslations` read the rendering a new card
+      would get (`previewView`) but only the review ensure path generates variants, so a
+      preview shows canonical wording until the text becomes a card and is reviewed.
+      Paul's 2026-08-28 rule (browse surfaces trigger variant translations, never TTS)
+      is not wired for previews yet. Effort S.
+- [ ] **C38 — Per-language sentence-form copy is English only.** The row labels,
+      descriptions and examples in `lib/languageForms.ts` (43 languages) reach the German
+      UI untranslated; the wizard and settings chrome around them is bilingual. Either
+      translate the config copy or key it into messages/\*.json. Effort M.
+- [ ] **C41 — Sentence-metadata calls are one per text.** The curriculum
+      reclassification (`requestSentenceMetadataIfNeeded`) sends one classifier
+      call per text, capped at five per many-text pass. Batching several source
+      sentences into one call would cut the per-row overhead but needs a prompt
+      change and its own `pnpm eval:metadata` run. Effort S.
+- [ ] **C42 — No way to clear a per-card rendering override.** The Flag dialog
+      writes `cards.renderingGenderOverride` / `renderingPolitenessOverride`; nothing
+      lets the learner undo one short of a card edit (which forks the text and clears
+      both). The edit dialog is the natural home. Effort S.
+- [ ] **C43 — Gender/politeness pipeline cleanups (2026-09-09 review).** Twenty-odd
+      simplifications found in the pre-push review of `gender-choice-live`, none a
+      bug: one entry point for the paired content sweeps, one batched served-rendering
+      accessor, the coin flip written into `texts.speakerGender`, the ad hoc
+      "marks politeness without a you" rule, duplicated constants and prompt strings,
+      small read savings. Each with a proposed shape and effort in
+      `.scratch/speaker-gender-politeness/cleanups.md`. Effort M in total; A1 and A2
+      there are the ones worth doing first.
+- [ ] **C40 — Sentence-form evals still owed.** The politeness corpus covers ten
+      languages (de es fr hi ja ko pt ru th zh); the plan wanted vi, fil, id, pl, cs, tr,
+      it, pt_pt, uz, bn and ar_eg with the traps from the review table, and nine
+      autofill override cases in `scripts/eval/translation-autofill-cases.ts`. The
+      `formal` quick action anchors on the course setting, not the served row, and on a
+      mixed level set names both forms. Effort M.
+- [ ] **C39 — OGTE register metadata was never reclassified for pervasive
+      languages.** `texts.register` is empty for every descriptive curriculum sentence
+      (the offline classifier emitted n/a), so canonical Japanese/Korean rows generated
+      before Sep 2026 lean casual and only new rows take the polite default. A local
+      reclassification + upload would let a version bump regenerate them. Effort M.
 
 ## Frontend architecture & performance
 
 - [ ] **B23 — Library pagination (>100 cards unreachable).** The server caps the
-  library list at `LIBRARY_LIMIT = 100` (`convex/features/library.ts`) and
-  `LibraryView` subscribes with no cursor and no "load more" — a learner with more
-  than 100 matching cards silently cannot reach the rest. Fix: convert to
-  `usePaginatedQuery` (pattern already in-house in `useCollectionDetail`) with a
-  load-more affordance. Deliberately dropped from the 2026-08 cleanup round.
-  Effort M. Impact: correctness for large accounts.
+      library list at `LIBRARY_LIMIT = 100` (`convex/features/library.ts`) and
+      `LibraryView` subscribes with no cursor and no "load more" — a learner with more
+      than 100 matching cards silently cannot reach the rest. Fix: convert to
+      `usePaginatedQuery` (pattern already in-house in `useCollectionDetail`) with a
+      load-more affordance. Deliberately dropped from the 2026-08 cleanup round.
+      Effort M. Impact: correctness for large accounts.
 
 - [ ] **B9 — The `useLearningMode` one-shot split.** 1,583 lines; the file's own scope
-  note names three tangled concerns and says "don't split incrementally" — fund the
-  planned split (card lifecycle / per-language answer state / audio orchestration)
-  behind the existing e2e cover. Effort L (the biggest item on this list).
+      note names three tangled concerns and says "don't split incrementally" — fund the
+      planned split (card lifecycle / per-language answer state / audio orchestration)
+      behind the existing e2e cover. Effort L (the biggest item on this list).
 - [ ] **B19 — Split `use-audio-player.ts`.** 912 lines, five concerns, hand-managed
-  blob-URL lifetimes, two exhaustive-deps suppressions. Seams:
-  `useMergedCardAudio` + `useMediaSessionBinding`. Effort L.
+      blob-URL lifetimes, two exhaustive-deps suppressions. Seams:
+      `useMergedCardAudio` + `useMediaSessionBinding`. Effort L.
 - [ ] **B11 — Decide (and write down) the router story.** Six `page.tsx` files return
-  null while a 465-line client layout hand-rolls pushState routing with all views kept
-  mounted — costing server components, per-route loading, route-level splitting, and
-  stale-build detection. Either an ADR documenting the SPA-shell choice + revisit
-  trigger, or a migration project. Effort S (ADR) / L (migration).
+      null while a 465-line client layout hand-rolls pushState routing with all views kept
+      mounted — costing server components, per-route loading, route-level splitting, and
+      stale-build detection. Either an ADR documenting the SPA-shell choice + revisit
+      trigger, or a migration project. Effort S (ADR) / L (migration).
 - [ ] **B10 — Introduce code-splitting.** Zero `next/dynamic`/`React.lazy` anywhere
-  (deliberate, documented in `AppUpdateGate`); the `hasVisited*` flags defer render
-  cost, not download cost. Start with Stats/Chat/Settings views, measured. Effort M.
+      (deliberate, documented in `AppUpdateGate`); the `hasVisited*` flags defer render
+      cost, not download cost. Start with Stats/Chat/Settings views, measured. Effort M.
 - [ ] **B18 — Narrow the i18n payload.** The full ~110 KB catalog (app + landing +
-  auth) is serialized into every page via unnarrowed `getMessages()`. Per-route-group
-  namespace narrowing (next-intl supports it). Effort M.
+      auth) is serialized into every page via unnarrowed `getMessages()`. Per-route-group
+      namespace narrowing (next-intl supports it). Effort M.
 - [ ] **B29 — Memoize list-heavy components.** Only two first-party `memo()` calls
-  exist; LibraryView's card rows, SegmentedHomeSection's rails/chips, and
-  CollectionDetailDialog re-render wholesale on live Convex updates. Effort M.
+      exist; LibraryView's card rows, SegmentedHomeSection's rails/chips, and
+      CollectionDetailDialog re-render wholesale on live Convex updates. Effort M.
 - [ ] **B27 — Split `lib/languages.ts`.** 2,604 lines mixing ~1,400 lines of language
-  data, UI helpers, the backend's LLM translation-routing config
-  (`TRANSLATION_RULES`/`LUNA_BO3`), and a voices re-export; highest-churn file in the
-  frontend. Three modules. Effort M.
+      data, UI helpers, the backend's LLM translation-routing config
+      (`TRANSLATION_RULES`/`LUNA_BO3`), and a voices re-export; highest-churn file in the
+      frontend. Three modules. Effort M.
 - [ ] **B13 — Unify paywall wiring.** The quota-check + USAGE_LIMIT-catch +
-  PaywallDialog scaffold is hand-rolled in ~7 places despite
-  `useFeatureLock`/`useLimitDialog` existing. See **docs/paywall-wiring.md** (written
-  2026-08) for the site inventory and unification recipe. Effort M.
+      PaywallDialog scaffold is hand-rolled in ~7 places despite
+      `useFeatureLock`/`useLimitDialog` existing. See **docs/paywall-wiring.md** (written
+      2026-08) for the site inventory and unification recipe. Effort M.
 - [ ] **B16/B17 — React-hooks rule cleanups.** ~50 setState-in-effect sites and ~120
-  ref-writes-during-render are why `react-hooks/set-state-in-effect` and
-  `react-hooks/refs` are globally disabled. See **docs/react-hooks-debt.md** (written
-  2026-08) for the site inventory, the `useLatest()` plan, and the staged re-enable
-  path. Effort M (refs) + L (set-state).
+      ref-writes-during-render are why `react-hooks/set-state-in-effect` and
+      `react-hooks/refs` are globally disabled. See **docs/react-hooks-debt.md** (written
+      2026-08) for the site inventory, the `useLatest()` plan, and the staged re-enable
+      path. Effort M (refs) + L (set-state).
 
 - [ ] **B31 — Extract the writing-feedback controller out of `FullReviewCardContent`.**
-  The component is ~1,950 lines and the 2026-08 branch edited it for six unrelated
-  reasons (mic gating, request sequencing, candidate scoring, paywall routing,
-  presentation object, voice options). The natural cut is a `useWritingFeedback` hook
-  owning the feedback map, request-sequence ref, quota gate, and kick-off effect —
-  which would also give the per-card reset (duplicated verbatim at the card-change and
-  restart sites; extract `resetPerCardState()`) a single home. Anchors:
-  `feedbackRequestSeqRef`, `resetSignal` effect. Effort M. Impact: velocity; the
-  restart-race class of bug becomes testable in isolation.
+      The component is ~1,950 lines and the 2026-08 branch edited it for six unrelated
+      reasons (mic gating, request sequencing, candidate scoring, paywall routing,
+      presentation object, voice options). The natural cut is a `useWritingFeedback` hook
+      owning the feedback map, request-sequence ref, quota gate, and kick-off effect —
+      which would also give the per-card reset (duplicated verbatim at the card-change and
+      restart sites; extract `resetPerCardState()`) a single home. Anchors:
+      `feedbackRequestSeqRef`, `resetSignal` effect. Effort M. Impact: velocity; the
+      restart-race class of bug becomes testable in isolation.
 - [ ] **B32 — `includeTypicalAdds` is a dead toggle.** `hooks/use-workload-forecast.ts`
-  hardcodes `includeTypicalAdds: false` ("kept as a future toggle rather than wired to
-  UI"), dragging an unused branch through `lib/workloadForecast.ts` and its tests. Wire
-  it to a visible control or delete the branch. Effort S. Impact: model and test
-  surface nothing ships.
+      hardcodes `includeTypicalAdds: false` ("kept as a future toggle rather than wired to
+      UI"), dragging an unused branch through `lib/workloadForecast.ts` and its tests. Wire
+      it to a visible control or delete the branch. Effort S. Impact: model and test
+      surface nothing ships.
 
 ## Dead code & bundle
 
 - [ ] **B1+B20 — Purge unused vendored ai-elements.** 21 of 30 files (2,857 lines)
-  have no importer; 7 of them are the only users of the `@xyflow/react` prod
-  dependency. `prompt-input.tsx` keeps 81 exports of which 7 are used — the unused
-  families drag `cmdk` + hover-card into the chat bundle. Effort S.
+      have no importer; 7 of them are the only users of the `@xyflow/react` prod
+      dependency. `prompt-input.tsx` keeps 81 exports of which 7 are used — the unused
+      families drag `cmdk` + hover-card into the chat bundle. Effort S.
 - [ ] **B2 — Purge unused shadcn/ui.** 18 of 60 files (3,017 lines incl. the 725-line
-  sidebar.tsx) with no importer; they keep `react-hook-form`, `@hookform/resolvers`,
-  `react-day-picker`, `vaul`, `react-resizable-panels`, `input-otp`, and 4 Radix
-  packages installed; `hooks/use-mobile.ts` is transitively dead. Effort S.
+      sidebar.tsx) with no importer; they keep `react-hook-form`, `@hookform/resolvers`,
+      `react-day-picker`, `vaul`, `react-resizable-panels`, `input-otp`, and 4 Radix
+      packages installed; `hooks/use-mobile.ts` is transitively dead. Effort S.
 
 ## Lint gates & type safety
 
 - [ ] **C19 — Re-enable the three react-hooks rules** (purity, set-state-in-effect,
-  refs) as `warn`, one at a time, after/alongside B16/B17. Effort S per rule once the
-  cleanups exist.
+      refs) as `warn`, one at a time, after/alongside B16/B17. Effort S per rule once the
+      cleanups exist.
 - [ ] **C20 — `no-explicit-any` → `error`.** Only ~17 occurrences across 26 non-test
-  files; fix the sites and flip the rule so the count stays zero (tests stay exempt).
-  Effort M.
+      files; fix the sites and flip the rule so the count stays zero (tests stay exempt).
+      Effort M.
 - [ ] **ts-ignore burn-down.** ~15 `@ts-ignore`/`@ts-expect-error`, mostly the untyped
-  `soundtouchjs` import — write a minimal `types/soundtouchjs.d.ts` shim. Effort S.
+      `soundtouchjs` import — write a minimal `types/soundtouchjs.d.ts` shim. Effort S.
 
 ## Tests & CI
 
 - [ ] **C9 — Run the e2e tier in CI.** 31 maintained Playwright specs never run in CI;
-  `playwright.config.ts` carries dead `process.env.CI` branches. Add a nightly or
-  on-PR workflow running the mocked (non-`@live`) tier against a local Convex backend
-  (the docker-compose stack the README documents). Needs CI secrets + infra decisions.
-  Effort L.
-  Kanban card (paste onto the board): `- [ ] Run the mocked e2e tier in CI — docs/tech-debt.md #ready-for-agent`
+      `playwright.config.ts` carries dead `process.env.CI` branches. Add a nightly or
+      on-PR workflow running the mocked (non-`@live`) tier against a local Convex backend
+      (the docker-compose stack the README documents). Needs CI secrets + infra decisions.
+      Effort L.
+      Kanban card (paste onto the board): `- [ ] Run the mocked e2e tier in CI — docs/tech-debt.md #ready-for-agent`
 - [ ] **C13 — Fast e2e script.** TESTING.md documents `--grep-invert @live`, nothing
-  implements it — bare `pnpm test:e2e` hits live OpenRouter/Google/Stripe. Add
-  `test:e2e:fast`. Effort S.
+      implements it — bare `pnpm test:e2e` hits live OpenRouter/Google/Stripe. Add
+      `test:e2e:fast`. Effort S.
 - [ ] **C22b — Cover accountDeletion + usage/ + admin/.** `features/accountDeletion.ts`
-  (irreversible path), 5/6 files in `convex/usage/` (quota accounting), 11/13 in
-  `convex/admin/` have no direct tests. Effort L.
+      (irreversible path), 5/6 files in `convex/usage/` (quota accounting), 11/13 in
+      `convex/admin/` have no direct tests. Effort L.
 - [ ] **C23 — Make the Google integration suites' skip visible.** Both use
-  `describe.skipIf(!apiKey)` — green-while-running-nothing in CI, live API calls from
-  the jsdom project when a key is present. Move to an explicit opt-in vitest project.
-  Effort M.
+      `describe.skipIf(!apiKey)` — green-while-running-nothing in CI, live API calls from
+      the jsdom project when a key is present. Move to an explicit opt-in vitest project.
+      Effort M.
 - [ ] **C35 — Split `e2e/helpers.ts`.** 35 KB / 24 exports imported by every spec,
-  feeding an 11-project Playwright dependency chain. Split by domain, document the
-  chain. Effort M.
+      feeding an 11-project Playwright dependency chain. Split by domain, document the
+      chain. Effort M.
 - [ ] **C1/C2 — Revive the pre-commit hook.** `.husky/pre-commit` is committed
-  non-executable (mode 644) so git never ran it — the typecheck + lint-staged gate has
-  been dead; it also hard-blocks commits without a Convex snapshot and uses macOS-only
-  `stat -f`. chmod +x, soften the snapshot check, make it portable. Effort S.
+      non-executable (mode 644) so git never ran it — the typecheck + lint-staged gate has
+      been dead; it also hard-blocks commits without a Convex snapshot and uses macOS-only
+      `stat -f`. chmod +x, soften the snapshot check, make it portable. Effort S.
 - [ ] **C8 — Fix the CI pnpm version mismatch.** CI pins pnpm 9 while the repo pins
-  pnpm@10.26.2 (`onlyBuiltDependencies` is pnpm-10 semantics → CI runs all postinstall
-  scripts, local runs three). Drop the hardcoded version; the action reads
-  `packageManager`. Effort S.
+      pnpm@10.26.2 (`onlyBuiltDependencies` is pnpm-10 semantics → CI runs all postinstall
+      scripts, local runs three). Drop the hardcoded version; the action reads
+      `packageManager`. Effort S.
 
 ## Dependencies & tooling
 
 - [ ] **C14 — Burn down `pnpm.overrides`.** ~74 hand-maintained security pins with
-  heavy redundancy (10× brace-expansion, 6× dompurify with strictly-subsumed dead
-  ranges). Collapse to one entry per package, drop pins whose fix is inside the
-  resolved range. Effort M.
+      heavy redundancy (10× brace-expansion, 6× dompurify with strictly-subsumed dead
+      ranges). Collapse to one entry per package, drop pins whose fix is inside the
+      resolved range. Effort M.
 - [ ] **C15+C30 — Dependency automation + patch hygiene.** No Dependabot/Renovate
-  (which is why the overrides block grows by hand); `patches/convex-test.patch` is
-  keyed to caret `^0.0.48` with no upstream issue link or removal criterion — pin
-  exactly, link upstream. Effort S.
+      (which is why the overrides block grows by hand); `patches/convex-test.patch` is
+      keyed to caret `^0.0.48` with no upstream issue link or removal criterion — pin
+      exactly, link upstream. Effort S.
 - [ ] **C26+C32 — Root `requirements.txt` + scripts cleanup.** The root file is a conda
-  osx-64 environment dump (OS-level packages) while `data_preparation/` has its own
-  three requirements files; `scripts/` mixes three runtimes and holds dead one-shots
-  (`provisionPastDue.mjs` referenced by nothing, `uploadOgteV1.mjs` only by a completed
-  runbook). Effort S.
+      osx-64 environment dump (OS-level packages) while `data_preparation/` has its own
+      three requirements files; `scripts/` mixes three runtimes and holds dead one-shots
+      (`provisionPastDue.mjs` referenced by nothing, `uploadOgteV1.mjs` only by a completed
+      runbook). Effort S.
 - [ ] **C17 — Untrack the ~18 MB of ignored-but-tracked data.** 39 tracked files match
-  `.gitignore` rules added after they were committed (11 MB classified_sentences.csv,
-  5 MB ogte jsonl, `.cursor/` editor state). `git rm --cached`. Effort M.
+      `.gitignore` rules added after they were committed (11 MB classified_sentences.csv,
+      5 MB ogte jsonl, `.cursor/` editor state). `git rm --cached`. Effort M.
 - [ ] **C27 — Run the changelog rollup.** 101 entries in `changelog/unreleased/` and
-  the monthly rollup has never run; `changelog/README.md` points at a skill path that
-  doesn't exist in-repo. Run `/changelog-roll` for July + August, fix the reference.
-  Effort S.
+      the monthly rollup has never run; `changelog/README.md` points at a skill path that
+      doesn't exist in-repo. Run `/changelog-roll` for July + August, fix the reference.
+      Effort S.

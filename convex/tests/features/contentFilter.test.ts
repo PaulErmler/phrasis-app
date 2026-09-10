@@ -392,3 +392,213 @@ describe('content-source filter: updateCourseSettings', () => {
     ).rejects.toThrow();
   });
 });
+
+/**
+ * `nextDueDate` drives the live "next review in X" countdown on the caught-up
+ * screen. It has to name the instant the SERVING path will actually hand a card
+ * over, or the countdown promises a card that never arrives, so these pin it
+ * against the same mode/filter/track dimensions the queue itself branches on.
+ */
+describe('getCardForReviewEmptyReason: nextDueDate', () => {
+  /** Push every seeded card into the future so the deck reads as caught up. */
+  async function pushAllFuture(
+    t: TestConvex<typeof schema>,
+    f: Awaited<ReturnType<typeof seedFilterFixture>>,
+    offsets: {
+      premade: number;
+      editedPremade: number;
+      custom: number;
+      chat: number;
+    },
+  ) {
+    const now = Date.now();
+    await t.run(async (ctx) => {
+      await ctx.db.patch(f.premadeCard, { dueDate: now + offsets.premade });
+      await ctx.db.patch(f.editedPremadeCard, {
+        dueDate: now + offsets.editedPremade,
+      });
+      await ctx.db.patch(f.customCard, { dueDate: now + offsets.custom });
+      await ctx.db.patch(f.chatCard, { dueDate: now + offsets.chat });
+    });
+    return now;
+  }
+
+  async function setSchedulingMode(
+    t: TestConvex<typeof schema>,
+    courseId: Id<'courses'>,
+    schedulingMode: 'learn_new' | 'learnAndReview' | 'radio',
+  ) {
+    await t.run(async (ctx) => {
+      const row = await ctx.db
+        .query('courseSettings')
+        .withIndex('by_courseId', (q) => q.eq('courseId', courseId))
+        .unique();
+      if (!row) throw new Error('courseSettings missing');
+      await ctx.db.patch(row._id, { schedulingMode });
+    });
+  }
+
+  it('reports the earliest future due date when caught up', async () => {
+    const t = convexTest(schema, modules);
+    const f = await seedFilterFixture(t);
+    const now = await pushAllFuture(t, f, {
+      premade: 3 * 60_000,
+      editedPremade: 9 * 60_000,
+      custom: 7 * 60_000,
+      chat: 5 * 60_000,
+    });
+    const asUser = t.withIdentity({ subject: 'user_F' });
+
+    const reason = await asUser.query(
+      api.features.scheduling.getCardForReviewEmptyReason,
+      { now },
+    );
+    expect(reason.reason).toBe('all_caught_up');
+    if (reason.reason === 'all_caught_up') {
+      expect(reason.nextDueDate).toBe(now + 3 * 60_000);
+    }
+  });
+
+  it('honours the content filter rather than the whole deck', async () => {
+    const t = convexTest(schema, modules);
+    const f = await seedFilterFixture(t);
+    // The soonest card in the deck is premade, which filter='custom' hides. A
+    // countdown to it would expire with nothing to show.
+    const now = await pushAllFuture(t, f, {
+      premade: 60_000,
+      editedPremade: 2 * 60_000,
+      custom: 30 * 60_000,
+      chat: 20 * 60_000,
+    });
+    await setFilter(t, f.courseId, 'custom');
+    const asUser = t.withIdentity({ subject: 'user_F' });
+
+    const reason = await asUser.query(
+      api.features.scheduling.getCardForReviewEmptyReason,
+      { now },
+    );
+    expect(reason.reason).toBe('filtered_out');
+    if (reason.reason === 'filtered_out') {
+      // The chat card, earliest of the custom+chat fan-out.
+      expect(reason.nextDueDate).toBe(now + 20 * 60_000);
+    }
+  });
+
+  it('is null when the earliest card is already due', async () => {
+    const t = convexTest(schema, modules);
+    await seedFilterFixture(t);
+    // The fixture seeds every card overdue, so the serving query would return
+    // one. If this screen renders anyway it is a stale subscription, and a
+    // negative countdown is worse than none.
+    const asUser = t.withIdentity({ subject: 'user_F' });
+
+    const reason = await asUser.query(
+      api.features.scheduling.getCardForReviewEmptyReason,
+      { now: Date.now() },
+    );
+    expect(reason.reason).toBe('all_caught_up');
+    if (reason.reason === 'all_caught_up') {
+      expect(reason.nextDueDate).toBeNull();
+    }
+  });
+
+  it('is null in Learn-new mode once every card has graduated', async () => {
+    const t = convexTest(schema, modules);
+    const f = await seedFilterFixture(t);
+    const now = await pushAllFuture(t, f, {
+      premade: 60_000,
+      editedPremade: 2 * 60_000,
+      custom: 3 * 60_000,
+      chat: 4 * 60_000,
+    });
+    await t.run(async (ctx) => {
+      for (const id of [
+        f.premadeCard,
+        f.editedPremadeCard,
+        f.customCard,
+        f.chatCard,
+      ]) {
+        await ctx.db.patch(id, { isGraduated: true });
+      }
+    });
+    await setSchedulingMode(t, f.courseId, 'learn_new');
+    const asUser = t.withIdentity({ subject: 'user_F' });
+
+    const reason = await asUser.query(
+      api.features.scheduling.getCardForReviewEmptyReason,
+      { now },
+    );
+    // Nothing will ever come due in this mode, so there is nothing to promise;
+    // the screen keeps its "add more sentences" copy.
+    expect(reason.reason).toBe('all_caught_up');
+    if (reason.reason === 'all_caught_up') {
+      expect(reason.nextDueDate).toBeNull();
+    }
+  });
+
+  it('is null in free play, which never reads the due queue', async () => {
+    const t = convexTest(schema, modules);
+    const f = await seedFilterFixture(t);
+    const now = await pushAllFuture(t, f, {
+      premade: 60_000,
+      editedPremade: 2 * 60_000,
+      custom: 3 * 60_000,
+      chat: 4 * 60_000,
+    });
+    await setSchedulingMode(t, f.courseId, 'radio');
+    const asUser = t.withIdentity({ subject: 'user_F' });
+
+    const reason = await asUser.query(
+      api.features.scheduling.getCardForReviewEmptyReason,
+      { now },
+    );
+    expect(reason.reason).toBe('all_caught_up');
+    if (reason.reason === 'all_caught_up') {
+      // Radio serves from a rotation, so a due instant would be meaningless.
+      expect(reason.nextDueDate).toBeNull();
+    }
+  });
+
+  it('reads the writing track when separateModeTracking is on', async () => {
+    const t = convexTest(schema, modules);
+    const f = await seedFilterFixture(t);
+    const now = Date.now();
+    // Shared track soon, writing track much later. In Writing mode the
+    // countdown must follow writingDueDate, not dueDate.
+    await t.run(async (ctx) => {
+      const row = await ctx.db
+        .query('courseSettings')
+        .withIndex('by_courseId', (q) => q.eq('courseId', f.courseId))
+        .unique();
+      if (!row) throw new Error('courseSettings missing');
+      await ctx.db.patch(row._id, {
+        separateModeTracking: true,
+        reviewMode: 'full',
+        writingSeedDone: true,
+      });
+      const offsets = [60_000, 2 * 60_000, 3 * 60_000, 4 * 60_000];
+      const ids = [
+        f.premadeCard,
+        f.editedPremadeCard,
+        f.customCard,
+        f.chatCard,
+      ];
+      for (const [i, id] of ids.entries()) {
+        await ctx.db.patch(id, {
+          dueDate: now + offsets[i],
+          writingDueDate: now + 45 * 60_000 + offsets[i],
+        });
+      }
+    });
+    const asUser = t.withIdentity({ subject: 'user_F' });
+
+    const reason = await asUser.query(
+      api.features.scheduling.getCardForReviewEmptyReason,
+      { now },
+    );
+    expect(reason.reason).toBe('all_caught_up');
+    if (reason.reason === 'all_caught_up') {
+      expect(reason.nextDueDate).toBe(now + 45 * 60_000 + 60_000);
+    }
+  });
+});

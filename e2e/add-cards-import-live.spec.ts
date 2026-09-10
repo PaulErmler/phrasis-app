@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { dismissTour, openCardImport, pasteImport } from './helpers';
+import {
+  dismissTour,
+  neutralizeTours,
+  openCardImport,
+  pasteImport,
+} from './helpers';
 import { deckCardCount, fixtureEmail } from './convex-hooks';
 
 /**
@@ -89,6 +94,12 @@ test.describe('add cards: import (live)', { tag: '@live' }, () => {
     const marker = `${EN_WORDS[pickA]} ${EN_WORDS[pickB]}`;
     const markerEs = `${ES_WORDS[pickA]} ${ES_WORDS[pickB]}`;
 
+    // Before any navigation. `dismissTour` only strips what is on screen
+    // when it runs, and the post-import bounce through /app arms the tour
+    // again — its overlay then intercepts the collection "Add" click and
+    // the test burns its whole 180s budget (2026-09-09). This hides the
+    // overlay on every navigation instead.
+    await neutralizeTours(page);
     await openCardImport(page);
     await pasteImport(
       page,
@@ -136,14 +147,14 @@ test.describe('add cards: import (live)', { tag: '@live' }, () => {
     // The post-import flow can bounce through /app (the content hub) before
     // settling; if it does, the home_tour driver overlay can mount and stick
     // around. Strip any popover before the next click.
-    await dismissTour(page).catch(() => {});
+    await dismissTour(page, undefined, 500).catch(() => {});
 
     // --- Add the imported texts to the deck from the Custom collection ---
     // (see the header: importing creates pending TEXTS; cards need an
     // explicit add while the due queue is non-empty).
     await page.goto('/app');
     await page.waitForLoadState('domcontentloaded');
-    await dismissTour(page, 'home_tour');
+    await dismissTour(page, 'home_tour', 500);
     await page.getByRole('tab', { name: /custom content/i }).click();
     await page.getByRole('button', { name: /^manually added$/i }).click();
     const customTile = page.getByTestId('collection-tile-Custom');
@@ -182,7 +193,7 @@ test.describe('add cards: import (live)', { tag: '@live' }, () => {
     // --- Verify: the marker cards are in the library… ---
     await page.goto('/app/library');
     await page.waitForLoadState('domcontentloaded');
-    await dismissTour(page);
+    await dismissTour(page, undefined, 500);
 
     const search = page.getByTestId('library-search').first();
     await expect(search).toBeVisible({ timeout: 20_000 });

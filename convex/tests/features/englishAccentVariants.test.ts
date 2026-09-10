@@ -13,6 +13,7 @@ import { liveTranslation } from '../../db/translationReads';
 import { findAudioAssetInAnyAccent } from '../../lib/audioAssets';
 import { SOURCE_VERBATIM_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
 import { getVoiceLocale, pickAccentForText } from '../../../lib/voices';
+import { getCurrentTtsVersion } from '../../../lib/languages';
 import { llmPool, ttsPool } from '../../lib/workpools';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
@@ -248,6 +249,23 @@ describe('English accent variants', () => {
       return storageId;
     }
 
+    function insertVerbatimRow(
+      t: TestConvex<typeof schema>,
+      textId: Id<'texts'>,
+      targetLanguage: string,
+      translatedText: string,
+    ) {
+      return t.run((ctx) =>
+        ctx.db.insert('translations', {
+          textId,
+          targetLanguage,
+          translatedText,
+          translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
+          speakerGender: 'female',
+        }),
+      );
+    }
+
     it('a British clip made for mixed English is stored under en + en-GB and reused by a UK course', async () => {
       const t = convexTest(schema, modules);
       const textId = await seedEnglishText(t, 'Hello world');
@@ -294,6 +312,57 @@ describe('English accent variants', () => {
           .first(),
       );
       expect(pointer?.assetId).toBe(assets[0]._id);
+    });
+
+    it('an Australian clip from before the General-accent prompt is re-synthesized; a British one is kept', async () => {
+      const t = convexTest(schema, modules);
+      const textId = await seedEnglishText(t, 'Hello world');
+      await storeMixedEnglishClip(t, textId, 'Hello world', 'Leda@en-AU');
+      const textGb = await seedEnglishText(t, 'Hello there');
+      await storeMixedEnglishClip(t, textGb, 'Hello there', 'Leda@en-GB');
+
+      const assets = await t.run((ctx) =>
+        ctx.db.query('audioAssets').collect(),
+      );
+      expect(assets).toHaveLength(2);
+      const au = assets.find((a) => a.regionVariant === 'en-AU')!;
+      const gb = assets.find((a) => a.regionVariant === 'en-GB')!;
+      // A fresh clip is stamped with its own accent's version (en_au v2),
+      // the British one with en's.
+      expect(au.ttsVersion).toBe(getCurrentTtsVersion('en', 'en-AU'));
+      expect(gb.ttsVersion).toBe(getCurrentTtsVersion('en'));
+      expect(au.ttsVersion).toBeGreaterThan(gb.ttsVersion!);
+
+      // Age both to the stamp every clip carried before the bump.
+      await t.run(async (ctx) => {
+        await ctx.db.patch(au._id, { ttsVersion: 1 });
+        await ctx.db.patch(gb._id, { ttsVersion: 1 });
+      });
+
+      async function fill(
+        id: Id<'texts'>,
+        course: 'en_au' | 'en_gb',
+        spoken: string,
+      ) {
+        const translationId = await insertVerbatimRow(t, id, course, spoken);
+        return t.run(async (ctx) => {
+          const text = (await ctx.db.get(id))!;
+          const translation = (await ctx.db.get(translationId))!;
+          return scheduleAudioForLanguage(
+            ctx,
+            text,
+            course,
+            'female',
+            translation,
+          );
+        });
+      }
+      // The Australian clip is stale against en_au's version: a real job.
+      expect(await fill(textId, 'en_au', 'Hello world')).toBe(true);
+      expect(ttsEnqueues()).toMatchObject([{ language: 'en_au' }]);
+      // The British clip is still current: reused, nothing enqueued.
+      expect(await fill(textGb, 'en_gb', 'Hello there')).toBe(true);
+      expect(ttsEnqueues()).toHaveLength(1);
     });
 
     it('a UK-course clip is reused by mixed English only for texts whose accent is British', async () => {
@@ -551,7 +620,10 @@ describe('English accent variants', () => {
 
       const res = await t
         .withIdentity({ subject: 'user_A' })
-        .mutation(api.features.scheduling.flagTranslation, { cardId });
+        .mutation(api.features.scheduling.flagTranslation, {
+          cardId,
+          reasons: ['wrong_translation'],
+        });
       expect(res.retranslated).toBe(true);
 
       expect(llmEnqueues().map((e) => e.targetLanguage)).toEqual(['es']);

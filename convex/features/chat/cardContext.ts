@@ -2,9 +2,12 @@ import type { MutationCtx } from '../../_generated/server';
 import type { Id } from '../../_generated/dataModel';
 import {
   servedSourceText,
-  servedTranslatedText,
   viewOfCard,
+  renderingSettingsOf,
+  renderingTextOf,
+  resolveServedRendering,
 } from '../../db/translationReads';
+import { getCourseSettings } from '../../db/courseSettings';
 
 /**
  * Look up a card's source text, course-scoped translations, and course
@@ -56,17 +59,27 @@ export async function resolveCardContext(
   // accessors. The tutor must see the wording the learner's card shows,
   // which for a card pinned before a version bump is not the live row, and
   // for the source line on a Mixed English card is the accent row.
-  const view = viewOfCard(card);
+  // The rendering the card shows (its variant when the course has
+  // sentence-form settings), so the tutor discusses the wording on screen.
+  const view = viewOfCard(
+    card,
+    renderingSettingsOf(await getCourseSettings(ctx, course._id)),
+  );
+  const renderingText = renderingTextOf(text);
   const [source, served] = await Promise.all([
     servedSourceText(ctx, text, view),
     Promise.all(
       [...courseLangs].map(async (lang) => ({
         language: lang,
-        text: await servedTranslatedText(ctx, {
-          textId: card.textId,
-          targetLanguage: lang,
-          pinAt: view.pinAt,
-        }),
+        text:
+          (
+            await resolveServedRendering(ctx, {
+              textId: card.textId,
+              targetLanguage: lang,
+              text: renderingText,
+              view,
+            })
+          ).served?.row.translatedText ?? null,
       })),
     ),
   ]);

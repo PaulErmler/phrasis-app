@@ -960,6 +960,13 @@ export const completeOnboarding = mutation({
       activeCollectionId: collection?._id,
       reviewMode: progress.reviewMode,
       writingInputMode: progress.writingInputMode,
+      // The politeness answer (lib/languageForms.ts). Only when present: an
+      // absent key must not clear a stored value on a re-onboarded course
+      // (`patch` removes fields set to undefined), and it is absent whenever
+      // the wizard never asked (an unmarked course).
+      ...(progress.politenessLevels !== undefined
+        ? { politenessLevels: progress.politenessLevels }
+        : {}),
       autoAddCards: true,
       // Match the onboarding seed batch so the auto-add fired mid-first-lesson
       // pulls the same number of cards the initial seed did. See
@@ -1145,6 +1152,24 @@ export const getActiveCourseSettings = query({
     if (!active) return null;
 
     return dbGetCourseSettings(ctx, active.course._id);
+  },
+});
+
+/**
+ * The settings of one of the caller's courses, active or not. The course
+ * languages sheet (components/course/CourseLanguageSettings.tsx) edits any
+ * course from the course menu, and its sentence-form controls read from
+ * here; `getActiveCourseSettings` only covers the active course.
+ */
+export const getCourseSettingsForCourse = query({
+  args: { courseId: v.id('courses') },
+  returns: v.union(courseSettingsDocValidator, v.null()),
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const course = await ctx.db.get(args.courseId);
+    if (!course || course.userId !== userId) return null;
+    return dbGetCourseSettings(ctx, args.courseId);
   },
 });
 

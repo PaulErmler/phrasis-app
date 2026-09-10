@@ -46,6 +46,21 @@ vi.mock('next-intl', async () => {
   };
 });
 
+// cmdk (Command palette) uses ResizeObserver and Element.scrollIntoView;
+// jsdom ships neither.
+if (typeof globalThis.ResizeObserver === 'undefined') {
+  class StubResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+  (globalThis as unknown as { ResizeObserver: unknown }).ResizeObserver =
+    StubResizeObserver;
+}
+if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = function () {};
+}
+
 // Basic MediaRecorder / HTMLMediaElement shims for audio tests
 if (typeof window !== 'undefined') {
   window.HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);

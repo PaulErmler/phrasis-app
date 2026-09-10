@@ -167,7 +167,7 @@ describe('geminiTts.speak: empty-response retry', () => {
     const fetchMock = vi.fn().mockResolvedValue(pcmResponse(4096));
     vi.stubGlobal('fetch', fetchMock);
 
-    // The Australian course: its own notes tone the accent down.
+    // The Australian course: its own notes name the General accent.
     await geminiTts.speak({
       text: 'Hello.',
       language: 'en_au',
@@ -176,7 +176,7 @@ describe('geminiTts.speak: empty-response retry', () => {
     });
     const auInput = bodyOf(fetchMock.mock.calls[0]).input;
     expect(auInput).toContain('native Australian English speaker');
-    expect(auInput).toContain('Keep the Australian accent mild.');
+    expect(auInput).toContain('Use a General Australian accent');
     // Notes belong to the instruction, never to the spoken transcript.
     expect(transcriptOf(fetchMock.mock.calls[0])).toBe('Hello.');
 
@@ -188,13 +188,13 @@ describe('geminiTts.speak: empty-response retry', () => {
       speed: 1,
     });
     expect(bodyOf(fetchMock.mock.calls[1]).input).toContain(
-      'Keep the Australian accent mild.',
+      'Use a General Australian accent',
     );
 
     // A language without notes keeps the bare instruction.
     await geminiTts.speak(INPUT);
     expect(bodyOf(fetchMock.mock.calls[2]).input).not.toContain(
-      'Keep the Australian accent mild.',
+      'Use a General Australian accent',
     );
   });
 

@@ -11,6 +11,7 @@ import { CardActionsMenu } from './CardActionsMenu';
 import { CardSpeedBadge } from './CardSpeedBadge';
 import { ClickableWords } from './ClickableWords';
 import { AnnotationLines } from './AnnotationLines';
+import { FormChips } from './formChips';
 import type { CardTranslation } from './types';
 import type { CardPresentation } from './cardPresentation';
 import type { ButtonPlaybackActive } from '@/hooks/use-button-playback';
@@ -193,6 +194,10 @@ export function CardShell({
               {originPill.label}
             </Badge>
           )}
+          {/* What the served wording IS on the sentence-form axes. Built
+              here rather than passed in, so every surface that renders a
+              card through this shell shows them (review, library). */}
+          <FormChips translations={translations} />
           {translationStatePill && (
             <Badge
               // Transparent warning fill (15% alpha of theme's --color-warning).

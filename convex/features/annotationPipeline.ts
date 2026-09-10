@@ -1,10 +1,11 @@
 import { ActionCtx, MutationCtx } from '../_generated/server';
-import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
 import { romanizeText } from './translation';
 import { getRomanizationSource } from '../lib/localRomanization';
 import {
   TEXT_ANNOTATIONS,
+  runSourceAnnotation,
+  runTranslationAnnotation,
   type AnnotationField,
   type AnnotationKind,
 } from '../lib/textAnnotations';
@@ -15,41 +16,62 @@ import { liveTranslation } from '../db/translationReads';
  * Romanization/annotation pipeline: the worker actions that romanize source
  * texts and translations, and the idempotent store mutations every
  * annotation producer (romanization here, IPA/furigana in their Node-runtime
- * modules) writes through. Owns the empty-string "tried and failed" sentinel
- * and the `forText` wording-race guard. The registered functions stay in
+ * modules) writes through. Owns the `forText` wording-race guard and the
+ * stale-engine overwrite rule. The registered functions stay in
  * features/decks.ts and delegate here.
  */
 
 /**
  * Handler body of `processRomanizationForSourceText`: romanize a source text
- * (in the texts table). (The IPA sibling lives in convex/features/ipa.ts:
- * espeak needs the Node runtime; both write through the generic store
- * mutations below.)
+ * (in the texts table). The same generic runner the IPA and furigana actions
+ * use (convex/lib/textAnnotations.ts): a failure about the text persists the
+ * `''` sentinel, and a TransientAnnotationError (missing key, rate limit,
+ * outage, empty Google reply) leaves the field undefined for the next view.
  */
 export async function processRomanizationForSourceTextHandler(
   ctx: ActionCtx,
   args: { textId: Id<'texts'>; text: string; language: string },
 ): Promise<null> {
-  let romanized: string;
-  try {
-    romanized = await romanizeText(args.text, args.language);
-  } catch (err) {
-    // `romanizeText` already retried up to 3 times before throwing.
-    // Persist an empty-string sentinel so `scheduleMissingContent` doesn't
-    // reschedule another 3-retry burst on every ensureContent call.
-    console.error('Source romanization error (persisting sentinel):', err);
-    romanized = '';
-  }
-  // Source recorded even on failure: lets a strategy swap target failed
-  // rows by the source that produced the sentinel.
-  await ctx.runMutation(internal.features.decks.storeSourceAnnotation, {
-    textId: args.textId,
-    kind: 'romanization',
-    value: romanized,
-    source: getRomanizationSource(args.language),
-    forText: args.text,
-  });
-  return null;
+  return runSourceAnnotation(
+    ctx,
+    'romanization',
+    args,
+    romanizeText,
+    getRomanizationSource(args.language),
+  );
+}
+
+/**
+ * Whether this write may land on a row that already has a value.
+ *
+ * The plain `=== undefined` guard is what makes the pipeline idempotent: a
+ * lazy fill racing a backfill must not double-write. But it also silently
+ * DROPPED every stale-engine refresh — the probe reported the card as needing
+ * work, the scheduler enqueued it, the action recomputed the value, and this
+ * mutation threw the result away because a value was already there. A user
+ * looking at their library saw the old transcription no matter how many times
+ * the engine was bumped.
+ *
+ * So an existing value is overwritten only when its engine tag is not the one
+ * we ship today. That is self-limiting: the write stamps the current tag, so
+ * a second refresh finds the row current and stops.
+ */
+function mayStoreAnnotation(
+  spec: (typeof TEXT_ANNOTATIONS)[AnnotationKind],
+  row: Partial<Record<AnnotationField, string>>,
+  language: string,
+): boolean {
+  const value = row[spec.textField];
+  if (value === undefined) return true;
+  // The '' sentinel counts as a value: the engine that wrote it already
+  // tried, and a duplicate job's late result under the same tag does not
+  // outrank that. A sentinel under a retired tag is replaced like any other
+  // stale value.
+  const storedSource = row[spec.sourceField];
+  // Untagged rows predate the source field; there is nothing to compare, and
+  // overwriting them on every pass would be an unbounded rewrite loop.
+  if (storedSource === undefined) return false;
+  return storedSource !== spec.currentSource(language);
 }
 
 /**
@@ -57,10 +79,11 @@ export async function processRomanizationForSourceTextHandler(
  * or IPA) on a source text document.
  *
  * Idempotent against a real-value race: only patches when the row hasn't
- * been written yet (`=== undefined` on the kind's value field). The
- * empty-string sentinel for "tried and failed" also wins on first write but
- * never overwrites a previously-stored real value. `source` is recorded so
- * a future strategy swap can find + invalidate the row.
+ * been written yet (`=== undefined` on the kind's value field) or holds a
+ * value from a retired engine (`mayStoreAnnotation`). The empty-string
+ * sentinel for "tried and failed" also wins on first write but never
+ * overwrites a previously-stored real value. `source` is recorded so a
+ * future strategy swap can find + invalidate the row.
  */
 export async function storeSourceAnnotationHandler(
   ctx: MutationCtx,
@@ -83,7 +106,7 @@ export async function storeSourceAnnotationHandler(
   if (args.forText !== undefined && text && text.text !== args.forText) {
     return null;
   }
-  if (text && text[spec.textField] === undefined) {
+  if (text && mayStoreAnnotation(spec, text, text.language)) {
     const patch: Partial<Record<AnnotationField, string>> = {};
     patch[spec.textField] = args.value;
     patch[spec.sourceField] = args.source;
@@ -100,8 +123,8 @@ export async function storeSourceAnnotationHandler(
 
 /**
  * Handler body of `processRomanizationForTranslation`: romanize an existing
- * translation (backfill). (IPA sibling: processIpaForTranslation in
- * convex/features/ipa.ts.)
+ * translation (backfill). Same runner and failure rule as the source-text
+ * handler above.
  */
 export async function processRomanizationForTranslationHandler(
   ctx: ActionCtx,
@@ -112,28 +135,13 @@ export async function processRomanizationForTranslationHandler(
     translationId?: Id<'translations'>;
   },
 ): Promise<null> {
-  let romanized: string;
-  try {
-    romanized = await romanizeText(args.text, args.language);
-  } catch (err) {
-    // `romanizeText` already retried up to 3 times before throwing.
-    // Persist an empty-string sentinel so `scheduleMissingContent` doesn't
-    // reschedule another 3-retry burst on every ensureContent call.
-    console.error('Translation romanization error (persisting sentinel):', err);
-    romanized = '';
-  }
-  // Source recorded even on failure: lets a strategy swap target failed
-  // rows by the source that produced the sentinel.
-  await ctx.runMutation(internal.features.decks.storeTranslationAnnotation, {
-    textId: args.textId,
-    language: args.language,
-    kind: 'romanization',
-    value: romanized,
-    source: getRomanizationSource(args.language),
-    forText: args.text,
-    translationId: args.translationId,
-  });
-  return null;
+  return runTranslationAnnotation(
+    ctx,
+    'romanization',
+    args,
+    romanizeText,
+    getRomanizationSource(args.language),
+  );
 }
 
 /**
@@ -174,7 +182,10 @@ export async function storeTranslationAnnotationHandler(
   ) {
     return null;
   }
-  if (translation && translation[spec.textField] === undefined) {
+  if (
+    translation &&
+    mayStoreAnnotation(spec, translation, translation.targetLanguage)
+  ) {
     const patch: Partial<Record<AnnotationField, string>> = {};
     patch[spec.textField] = args.value;
     patch[spec.sourceField] = args.source;

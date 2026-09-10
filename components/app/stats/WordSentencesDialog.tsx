@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge';
 import { AudioButton } from '@/components/app/learning/AudioButton';
 import { CardActionsMenu } from '@/components/app/learning/CardActionsMenu';
 import { CardSpeedBadge } from '@/components/app/learning/CardSpeedBadge';
+import { FormChips } from '@/components/app/learning/formChips';
 import { EditCardDialog } from '@/components/app/learning/EditCardDialog';
 import type { CardTranslation } from '@/components/app/learning/types';
 import { ConfirmDialog } from '@/components/app/ConfirmDialog';
@@ -258,9 +259,14 @@ export function WordSentencesDialog({
                   {/* Card actions row */}
                   {cardId && (
                     <div className="flex items-center justify-between -mt-1 -mx-1 mb-1">
-                      <Badge variant="secondary" className="text-xs">
-                        {sentence.reviewCount} Reviews
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {sentence.reviewCount} Reviews
+                        </Badge>
+                        {/* Same sentence-form chips as the review card and
+                            the library, in the same top-bar position. */}
+                        <FormChips translations={sentence.translations} />
+                      </div>
                       <CardActionsMenu
                         isFavorite={isFavorite}
                         isMastered={isMastered}

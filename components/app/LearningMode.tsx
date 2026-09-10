@@ -497,7 +497,11 @@ export function LearningMode({
   const handleFlagPrimary = hasTargetTranslation
     ? () => {
         audio.pause();
-        state.cardActions.requestFlag(state.cardId);
+        state.cardActions.requestFlag(state.cardId, {
+          userCreated:
+            state.collectionOrigin === 'custom' ||
+            state.collectionOrigin === 'chat',
+        });
       }
     : undefined;
 
@@ -832,6 +836,13 @@ function NoCardsDueWithFilter({
     emptyReason?.reason === 'all_caught_up'
       ? emptyReason.customCardsPendingAdd
       : false;
+  // Same two variants as `customCardsPendingAdd`: when the earliest still-
+  // scheduled card comes due, for the live countdown on the empty screen.
+  const nextDueDate =
+    emptyReason?.reason === 'filtered_out' ||
+    emptyReason?.reason === 'all_caught_up'
+      ? emptyReason.nextDueDate
+      : null;
   // separateModeTracking enable-time seed still running. The writing queue
   // is empty only because cards aren't seeded yet.
   const isPreparingWriting = emptyReason?.reason === 'preparing_writing';
@@ -853,6 +864,7 @@ function NoCardsDueWithFilter({
       currentSourceHasAnyCards={currentSourceHasAnyCards}
       filterUnblockAvailable={filterUnblockAvailable}
       customCardsPendingAdd={customCardsPendingAdd}
+      nextDueDate={nextDueDate}
       isPreparingWriting={isPreparingWriting}
       onIncludeOtherSource={handleIncludeOtherSource}
       onCreateChatCards={onNavigateToChat}

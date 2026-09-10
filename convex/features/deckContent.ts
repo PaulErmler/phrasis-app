@@ -17,9 +17,19 @@ import { ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
 import { fetchFreePlayRotation } from '../lib/freePlay';
 import { fetchTrackDueCards } from '../lib/dueQueue';
 import {
+  flushRenderingStamps,
+  newMetadataCallBudget,
+  newRenderingStampCollector,
   ProbeNeedsWork,
   scheduleMissingContent,
+  scheduleMissingRenderings,
 } from '../lib/contentScheduling';
+import { renderingCardOf, renderingSettingsOf } from '../db/translationReads';
+import {
+  hasRenderingOverride,
+  type RenderingCard,
+  type RenderingSettings,
+} from '../../lib/preferenceResolution';
 import { getNextAddableTextsFromRank } from './collectionCardAdding';
 
 /**
@@ -51,13 +61,37 @@ export async function ensureCardContentHandler(
   const text = await ctx.db.get(args.textId);
   if (!text) return { translationsScheduled: 0, audioScheduled: 0 };
 
-  return scheduleMissingContent(
+  const canonical = await scheduleMissingContent(
     ctx,
     args.textId,
     text,
     active.course.baseLanguages,
     active.course.targetLanguages,
   );
+  // The card's rendering variants (docs/architecture/translation-variants.md):
+  // the learner has this card, so its wording AND its voice are card
+  // demand. A card from before the feature resolves to canonical inside.
+  const settings = renderingSettingsOf(
+    await getCourseSettings(ctx, active.course._id),
+  );
+  const renderingCard = renderingCardOf(card);
+  const variants =
+    card.followsCoursePreferences || hasRenderingOverride(renderingCard)
+      ? await scheduleMissingRenderings(
+          ctx,
+          args.textId,
+          text,
+          active.course.baseLanguages,
+          active.course.targetLanguages,
+          settings,
+          { card: renderingCard },
+        )
+      : { translationsScheduled: 0, audioScheduled: 0 };
+  return {
+    translationsScheduled:
+      canonical.translationsScheduled + variants.translationsScheduled,
+    audioScheduled: canonical.audioScheduled + variants.audioScheduled,
+  };
 }
 
 /**
@@ -143,13 +177,23 @@ async function scheduleContentForUpcomingCards(
   cards: Doc<'cards'>[],
 ): Promise<number> {
   let processed = 0;
+  const renderingSettings = renderingSettingsOf(
+    await getCourseSettings(ctx, active.course._id),
+  );
   // Batch-load the texts up front (one concurrent read round, not one
   // sequential get per card) before the sequential probe loop.
   const texts = await Promise.all(cards.map((card) => ctx.db.get(card.textId)));
+  // Rows without rendering stamps across the whole batch, so the classifier
+  // is asked once per language per 25 rows rather than once per card.
+  const stamps = newRenderingStampCollector();
+  // Sentence-metadata calls this pass may cause (five), so a batch of
+  // unclassified curriculum texts is worked through over several passes.
+  const metadataCalls = newMetadataCallBudget();
   for (let i = 0; i < cards.length; i++) {
     const card = cards[i];
     const text = texts[i];
     if (!text) continue;
+    const renderingCard = renderingCardOf(card);
     let needsWork = false;
     try {
       await scheduleMissingContent(
@@ -158,8 +202,22 @@ async function scheduleContentForUpcomingCards(
         text,
         active.course.baseLanguages,
         active.course.targetLanguages,
-        { probe: true },
+        { probe: true, stamps, metadataCalls },
       );
+      if (
+        card.followsCoursePreferences ||
+        hasRenderingOverride(renderingCard)
+      ) {
+        await scheduleMissingRenderings(
+          ctx,
+          card.textId,
+          text,
+          active.course.baseLanguages,
+          active.course.targetLanguages,
+          renderingSettings,
+          { probe: true, stamps, card: renderingCard },
+        );
+      }
     } catch (error) {
       if (error instanceof ProbeNeedsWork) {
         needsWork = true;
@@ -183,11 +241,18 @@ async function scheduleContentForUpcomingCards(
           textId: card.textId,
           baseLanguages: active.course.baseLanguages,
           targetLanguages: active.course.targetLanguages,
+          renderingSettings: card.followsCoursePreferences
+            ? renderingSettings
+            : undefined,
+          renderingCard,
         },
       );
       processed++;
     }
   }
+  // Claims the rows in this transaction, so the dispatched
+  // `prepareCardContent` sweeps above find them requested and skip them.
+  await flushRenderingStamps(ctx, stamps);
 
   // This sweep does NOT reach past the deck into not-yet-added collection
   // texts; that proved too late for fast reviewers (batches observed added
@@ -292,23 +357,47 @@ export async function prepareCardContentHandler(
     llmPriority?: LlmPriority;
     /** Requester attribution for the cost events (see ContentSweepOpts). */
     requestedByUserId?: string;
+    /**
+     * The course's sentence-form settings, when the caller's card follows
+     * them: the rendering variants are filled after the canonical sweep.
+     * Absent = canonical only.
+     */
+    renderingSettings?: RenderingSettings;
+    /**
+     * The caller's card, so a per-card correction renders even when the
+     * card follows no settings. Absent for callers without a card.
+     */
+    renderingCard?: NonNullable<RenderingCard>;
   },
 ): Promise<null> {
   const text = await ctx.db.get(args.textId);
   if (!text) return null;
 
+  const opts = {
+    priority: args.priority,
+    llmPriority: args.llmPriority,
+    requestedByUserId: args.requestedByUserId,
+  };
   await scheduleMissingContent(
     ctx,
     args.textId,
     text,
     args.baseLanguages,
     args.targetLanguages,
-    {
-      priority: args.priority,
-      llmPriority: args.llmPriority,
-      requestedByUserId: args.requestedByUserId,
-    },
+    opts,
   );
+  const card = args.renderingCard ?? null;
+  if (args.renderingSettings || hasRenderingOverride(card)) {
+    await scheduleMissingRenderings(
+      ctx,
+      args.textId,
+      text,
+      args.baseLanguages,
+      args.targetLanguages,
+      args.renderingSettings,
+      { ...opts, card },
+    );
+  }
   return null;
 }
 
@@ -326,6 +415,11 @@ export async function warmNextCollectionBatchHandler(
 ): Promise<null> {
   const course = await ctx.db.get(args.courseId);
   if (!course) return null;
+  // The next batch becomes curriculum cards that follow the course's
+  // settings, so their variants are warmed with the canonical content.
+  const renderingSettings = renderingSettingsOf(
+    await getCourseSettings(ctx, course._id),
+  );
   const scan = await getNextAddableTextsFromRank(ctx, {
     collectionId: args.collectionId,
     afterRank: args.afterRank,
@@ -347,6 +441,14 @@ export async function warmNextCollectionBatchHandler(
         text,
         course.baseLanguages,
         course.targetLanguages,
+      );
+      await scheduleMissingRenderings(
+        ctx,
+        text._id,
+        text,
+        course.baseLanguages,
+        course.targetLanguages,
+        renderingSettings,
       );
     } catch (error) {
       console.error(

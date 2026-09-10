@@ -5,6 +5,8 @@ import { describe, it, expect } from 'vitest';
 import schema from '../../schema';
 import type { Id } from '../../_generated/dataModel';
 import { buildTextContentBatchForLanguages } from '../../lib/cardContent';
+import { annotationFieldsOf, getIpaSource } from '../../lib/textAnnotations';
+import { getRomanizationSource } from '../../lib/localRomanization';
 import { insertAudioFixture } from './audioFixtures';
 
 const modules = import.meta.glob('../../**/*.ts');
@@ -31,6 +33,8 @@ async function seedCard(
     translations: Array<{
       language: string;
       romanizedText?: string;
+      /** Engine tag beside `romanizedText`; omit for an untagged row. */
+      romanizationSource?: string;
       /** Same tri-state convention as sourceIpaText. */
       ipaText?: string | null;
     }>;
@@ -75,6 +79,9 @@ async function seedCard(
         translatedText: `translated-${tr.language}`,
         ...(tr.romanizedText !== undefined
           ? { romanizedText: tr.romanizedText }
+          : {}),
+        ...(tr.romanizationSource !== undefined
+          ? { romanizationSource: tr.romanizationSource }
           : {}),
         ...(trIpa !== null ? { ipaText: trIpa } : {}),
       });
@@ -124,10 +131,7 @@ async function hasMissingContent(
           textId,
           sourceText: 'source text',
           sourceLanguage,
-          sourceRomanization:
-            (await ctx.db.get(textId))!.romanizedText ?? undefined,
-          sourceIpa: (await ctx.db.get(textId))!.ipaText ?? undefined,
-          sourceFurigana: (await ctx.db.get(textId))!.furiganaText ?? undefined,
+          sourceAnnotations: annotationFieldsOf((await ctx.db.get(textId))!),
           userCreated: false,
         },
       ],
@@ -138,6 +142,42 @@ async function hasMissingContent(
     return map.get('k')!.hasMissingContent;
   });
 }
+
+describe('buildTextContentBatchForLanguages: stale engine tags', () => {
+  // The probe reads the stored tags, so a row a retired engine wrote is
+  // missing content the moment it is looked at, without a migration.
+  it('reports a translation romanized by a retired engine as missing', async () => {
+    const t = convexTest(schema, modules);
+    const textId = await seedCard(t, {
+      sourceLanguage: 'en',
+      translations: [
+        {
+          language: 'he',
+          romanizedText: 'šlwm lkwlm',
+          romanizationSource: 'hebrew-transliteration-v1',
+        },
+      ],
+    });
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['he'])).toBe(true);
+  });
+
+  it('accepts the same row once the current engine wrote it', async () => {
+    const t = convexTest(schema, modules);
+    const textId = await seedCard(t, {
+      sourceLanguage: 'en',
+      translations: [
+        {
+          language: 'he',
+          romanizedText: 'shalom lekhulam',
+          romanizationSource: getRomanizationSource('he'),
+        },
+      ],
+    });
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['he'])).toBe(
+      false,
+    );
+  });
+});
 
 describe('buildTextContentBatchForLanguages: romanization sentinel', () => {
   // `zh` needs romanization; `en` does not. The empty string is the
@@ -316,6 +356,53 @@ describe('unchecked audio (STT failed at synthesis time)', () => {
       exhaustedLanguages: ['es'],
     });
     expect(await hasMissingContent(t, textId, 'en', ['en'], ['es'])).toBe(
+      false,
+    );
+  });
+});
+
+describe('buildTextContentBatchForLanguages: stale engine', () => {
+  // The reported symptom: a French-voice transcription, "(en)and(fr) jˈu",
+  // sat on an English card through a version bump. The scheduler knew it was
+  // stale, but the client only calls ensureCardContent when
+  // hasMissingContent is true, and that probe asked "is a value present?"
+  // rather than "is the value current?" — so the card never asked for the
+  // work and the bad line stayed on screen.
+  //
+  // seedCard builds an otherwise-complete card (audio, timings, translation),
+  // so the only term left free is the annotation one.
+  async function seedWithIpaSource(
+    t: TestConvex<typeof schema>,
+    ipaSource: string | undefined,
+  ) {
+    const textId = await seedCard(t, {
+      sourceLanguage: 'en',
+      translations: [{ language: 'de' }],
+    });
+    await t.run(async (ctx) => ctx.db.patch(textId, { ipaSource }));
+    return textId;
+  }
+
+  it('reports missing content for IPA tagged with a retired engine', async () => {
+    const t = convexTest(schema, modules);
+    const textId = await seedWithIpaSource(t, 'espeak-ng-emscripten-0.3.5-v1');
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['de'])).toBe(true);
+  });
+
+  it('reports complete once the row carries the current tag', async () => {
+    const t = convexTest(schema, modules);
+    const textId = await seedWithIpaSource(t, getIpaSource('en'));
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['de'])).toBe(
+      false,
+    );
+  });
+
+  it('leaves an untagged legacy row alone', async () => {
+    // Nothing to compare against, and treating it as stale would re-attempt
+    // every legacy sentinel on every view.
+    const t = convexTest(schema, modules);
+    const textId = await seedWithIpaSource(t, undefined);
+    expect(await hasMissingContent(t, textId, 'en', ['en'], ['de'])).toBe(
       false,
     );
   });

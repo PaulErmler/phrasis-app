@@ -363,7 +363,7 @@ describe('flagging a Mixed English card', () => {
 
     const result = await asUser.mutation(
       api.features.scheduling.flagTranslation,
-      { cardId: card._id },
+      { cardId: card._id, reasons: ['wrong_translation'] },
     );
 
     expect(result.retranslated).toBe(true);
@@ -535,6 +535,7 @@ describe('the version bump of a verbatim accent row', () => {
     const content = await t.run(async (ctx) => {
       const { buildTextContentBatchForLanguages } =
         await import('../../lib/cardContent');
+      const { annotationFieldsOf } = await import('../../lib/textAnnotations');
       const text = (await ctx.db.get(ids.textId))!;
       const map = await buildTextContentBatchForLanguages(
         ctx,
@@ -544,6 +545,7 @@ describe('the version bump of a verbatim accent row', () => {
             textId: ids.textId,
             sourceText: text.text,
             sourceLanguage: 'en',
+            sourceAnnotations: annotationFieldsOf(text),
             userCreated: false,
             view: viewOfCard(card),
           },

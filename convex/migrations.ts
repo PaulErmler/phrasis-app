@@ -25,8 +25,11 @@ import {
 import { isProtectedTranslationSource } from '../lib/translationProvenance';
 import { foldApostrophes } from '../lib/textCompare/normalize';
 import { isAllLowercase, MAX_TEXTS_PER_WORD } from './db/stats/wordTracking';
-import { FURIGANA_LANGUAGES } from '../lib/languages';
-import { getFuriganaSource } from './lib/textAnnotations';
+import {
+  FURIGANA_LANGUAGES,
+  languageNeedsRomanization,
+} from '../lib/languages';
+import { getFuriganaSource, getIpaSource } from './lib/textAnnotations';
 import { buildSearchableTextPatchForCard } from './lib/cardContent';
 import type { Id } from './_generated/dataModel';
 import { isPremadeLevelCollection } from './lib/collections';
@@ -308,6 +311,7 @@ export async function rebuildCardSearchableTextPatch(
   // cache across a pagination page).
   return buildSearchableTextPatchForCard(ctx, doc, text, {
     deckLanguages: new Map(),
+    deckRenderingSettings: new Map(),
   });
 }
 
@@ -582,20 +586,112 @@ export function recomputeRomanizationPatch(
 }
 
 /**
- * Furigana backfill: schedule the Node-runtime annotation action for every
- * Japanese row that has never been attempted (`furiganaText === undefined`).
+ * Clear romanization whose stored source is not what the current routing
+ * would produce, so the lazy pipeline refills it from the right engine.
  *
- * The engine (lindera WASM, convex/features/furigana.ts) can only run in the
- * Node runtime, and `migrations.define` handlers are V8 mutations — so unlike
- * `recompute*Romanization` above this cannot write the value in place. It
- * schedules the same per-row actions the lazy view-time pipeline uses, which
- * write through the store mutations' `=== undefined` idempotence guard: a
- * lazy fill racing the backfill is harmless, and re-running the migration
- * after the actions land schedules nothing.
+ * The per-language pairs above each cover one library swap. This one is
+ * keyed on the routing itself, which is what a BACKEND change needs: Sep
+ * 2026 moved Hebrew off `hebrew-transliteration` to the model and Arabic
+ * (five codes) off `arabic-transliterate` to Google v3, and a per-language
+ * pair for each would have been six boilerplate twins.
  *
- * The `''` failure sentinel is honoured (not "missing"), so a re-run never
- * resurrects rows the engine already gave up on.
+ * Rows the routing still agrees with are untouched, so this is safe to leave
+ * in the runner: on a deployment where nothing changed it finds nothing.
+ * The `''` sentinel resets too — a failure under the old engine deserves one
+ * attempt under the new one, and for Hebrew and Arabic the old engine is
+ * exactly why those rows were poor.
+ *
+ * An UNTAGGED row (written before `romanizationSource` existed) is cleared
+ * only for the languages in RETIRED_ROMANIZATION_BACKEND_LANGUAGES. There it
+ * can only have come from the retired engine. Anywhere else its engine may
+ * well be the current one, so it is left alone, the same rule
+ * missingAnnotationKinds applies. Without that distinction the sweep wiped
+ * every pre-tag Russian, Hindi and Japanese row and refilled them one Google
+ * call at a time although nothing about their routing had changed.
  */
+export function resetStaleRomanizationBackendPatch(doc: {
+  language?: string;
+  targetLanguage?: string;
+  romanizedText?: string;
+  romanizationSource?: string;
+}): { romanizedText: undefined; romanizationSource: undefined } | undefined {
+  if (doc.romanizedText === undefined) return undefined;
+  const language = doc.language ?? doc.targetLanguage ?? '';
+  if (!languageNeedsRomanization(language)) return undefined;
+  if (doc.romanizationSource === undefined) {
+    return RETIRED_ROMANIZATION_BACKEND_LANGUAGES.has(language)
+      ? { romanizedText: undefined, romanizationSource: undefined }
+      : undefined;
+  }
+  if (doc.romanizationSource === getRomanizationSource(language)) {
+    return undefined;
+  }
+  return { romanizedText: undefined, romanizationSource: undefined };
+}
+
+/**
+ * Languages whose only previous romanizer was removed in Sep 2026 (Hebrew's
+ * `hebrew-transliteration`, Arabic's `arabic-transliterate` across the five
+ * codes). Hebrew was added a day before the source tag existed, so untagged
+ * Hebrew rows are real and are the retired engine's output.
+ */
+const RETIRED_ROMANIZATION_BACKEND_LANGUAGES = new Set([
+  'he',
+  'ar',
+  'ar_sa',
+  'ar_eg',
+  'ar_iq',
+  'ar_lev',
+]);
+
+export const resetStaleTextRomanizationBackend = migrations.define({
+  table: 'texts',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => resetStaleRomanizationBackendPatch(doc),
+});
+
+export const resetStaleTranslationRomanizationBackend = migrations.define({
+  table: 'translations',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => resetStaleRomanizationBackendPatch(doc),
+});
+
+/**
+ * Clear IPA produced by a stale engine version. Same invalidate-by-source
+ * contract as the furigana reset below; the current version lives in
+ * IPA_SOURCES (convex/lib/textAnnotations.ts). Sentinel rows ('') reset too:
+ * a failure under the old engine deserves one retry under the new one.
+ *
+ * There is no matching backfill. The lazy path refills a cleared row the next
+ * time the card is viewed, and for the languages that lost their `ipaVoice`
+ * this sweep is the point: it purges rows nothing will ever refill, which is
+ * how the mangled Thai/Hebrew/Arabic transcriptions leave the database rather
+ * than merely stopping at the projection in lib/cardContent.ts.
+ */
+export function resetStaleIpaPatch(doc: {
+  language?: string;
+  targetLanguage?: string;
+  ipaText?: string;
+  ipaSource?: string;
+}): { ipaText: undefined; ipaSource: undefined } | undefined {
+  if (doc.ipaText === undefined) return undefined;
+  const language = doc.language ?? doc.targetLanguage ?? '';
+  if (doc.ipaSource === getIpaSource(language)) return undefined;
+  return { ipaText: undefined, ipaSource: undefined };
+}
+
+export const resetStaleTextIpa = migrations.define({
+  table: 'texts',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => resetStaleIpaPatch(doc),
+});
+
+export const resetStaleTranslationIpa = migrations.define({
+  table: 'translations',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) => resetStaleIpaPatch(doc),
+});
+
 /**
  * Clear furigana produced by a stale engine version so the backfills below
  * re-schedule it. Same invalidate-by-source contract as the romanization
@@ -624,6 +720,21 @@ export const resetStaleTranslationFurigana = migrations.define({
   migrateOne: (_ctx, doc) => resetStaleFuriganaPatch(doc),
 });
 
+/**
+ * Furigana backfill: schedule the Node-runtime annotation action for every
+ * Japanese row that has never been attempted (`furiganaText === undefined`).
+ *
+ * The engine (lindera WASM, convex/features/furigana.ts) can only run in the
+ * Node runtime, and `migrations.define` handlers are V8 mutations — so unlike
+ * `recompute*Romanization` above this cannot write the value in place. It
+ * schedules the same per-row actions the lazy view-time pipeline uses, which
+ * write through the store mutations' `=== undefined` idempotence guard: a
+ * lazy fill racing the backfill is harmless, and re-running the migration
+ * after the actions land schedules nothing.
+ *
+ * The `''` failure sentinel is honoured (not "missing"), so a re-run never
+ * resurrects rows the engine already gave up on.
+ */
 export const backfillTextFurigana = migrations.define({
   table: 'texts',
   batchSize: WORK_SWEEP_BATCH_SIZE,
@@ -1081,6 +1192,10 @@ export const runAll = migrations.runner([
   internal.migrations.resetStaleBulgarianTranslationRomanizationV3,
   internal.migrations.recomputeTextRomanization,
   internal.migrations.recomputeTranslationRomanization,
+  internal.migrations.resetStaleTextRomanizationBackend,
+  internal.migrations.resetStaleTranslationRomanizationBackend,
+  internal.migrations.resetStaleTextIpa,
+  internal.migrations.resetStaleTranslationIpa,
   internal.migrations.resetStaleTextFurigana,
   internal.migrations.resetStaleTranslationFurigana,
   internal.migrations.backfillTextFurigana,
