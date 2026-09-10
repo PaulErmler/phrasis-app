@@ -17,11 +17,7 @@ import { ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
 import { fetchFreePlayRotation } from '../lib/freePlay';
 import { fetchTrackDueCards } from '../lib/dueQueue';
 import { ensureTextContent, ProbeNeedsWork } from '../lib/contentScheduling';
-import { renderingCardOf, renderingSettingsOf } from '../db/translationReads';
-import type {
-  RenderingCard,
-  RenderingSettings,
-} from '../../lib/preferenceResolution';
+import { renderingCardOf, type SweepCard } from '../db/translationReads';
 import { getNextAddableTextsFromRank } from './collectionCardAdding';
 
 /**
@@ -56,16 +52,13 @@ export async function ensureCardContentHandler(
   // The learner has this card, so its wording AND its voice are card
   // demand; the sweep resolves the card's rendering key per language
   // (docs/architecture/rendering-keys.md).
-  const settings = renderingSettingsOf(
-    await getCourseSettings(ctx, active.course._id),
-  );
   return ensureTextContent(
     ctx,
     args.textId,
     text,
     active.course.baseLanguages,
     active.course.targetLanguages,
-    { card: renderingCardOf(card), settings },
+    { card: renderingCardOf(card) },
   );
 }
 
@@ -152,9 +145,6 @@ async function scheduleContentForUpcomingCards(
   cards: Doc<'cards'>[],
 ): Promise<number> {
   let processed = 0;
-  const renderingSettings = renderingSettingsOf(
-    await getCourseSettings(ctx, active.course._id),
-  );
   // Batch-load the texts up front (one concurrent read round, not one
   // sequential get per card) before the sequential probe loop.
   const texts = await Promise.all(cards.map((card) => ctx.db.get(card.textId)));
@@ -171,7 +161,7 @@ async function scheduleContentForUpcomingCards(
         text,
         active.course.baseLanguages,
         active.course.targetLanguages,
-        { probe: true, card: renderingCard, settings: renderingSettings },
+        { probe: true, card: renderingCard },
       );
     } catch (error) {
       if (error instanceof ProbeNeedsWork) {
@@ -196,7 +186,6 @@ async function scheduleContentForUpcomingCards(
           textId: card.textId,
           baseLanguages: active.course.baseLanguages,
           targetLanguages: active.course.targetLanguages,
-          renderingSettings,
           renderingCard,
         },
       );
@@ -307,13 +296,11 @@ export async function prepareCardContentHandler(
     llmPriority?: LlmPriority;
     /** Requester attribution for the cost events (see ContentSweepOpts). */
     requestedByUserId?: string;
-    /** The course's politeness setting; absent = the primary form. */
-    renderingSettings?: RenderingSettings;
     /**
      * The caller's card, so a per-card correction renders. Absent for
      * callers without a card, which get the rendering a new card would.
      */
-    renderingCard?: NonNullable<RenderingCard>;
+    renderingCard?: NonNullable<SweepCard>;
     /** Translation-only pass; see ContentSweepOpts. */
     skipTts?: boolean;
   },
@@ -331,7 +318,6 @@ export async function prepareCardContentHandler(
       llmPriority: args.llmPriority,
       requestedByUserId: args.requestedByUserId,
       card: args.renderingCard ?? null,
-      settings: args.renderingSettings,
       skipTts: args.skipTts,
     },
   );
@@ -354,9 +340,6 @@ export async function warmNextCollectionBatchHandler(
   if (!course) return null;
   // The next batch becomes curriculum cards that follow the course's
   // settings, so their variants are warmed with the canonical content.
-  const renderingSettings = renderingSettingsOf(
-    await getCourseSettings(ctx, course._id),
-  );
   const scan = await getNextAddableTextsFromRank(ctx, {
     collectionId: args.collectionId,
     afterRank: args.afterRank,
@@ -378,7 +361,7 @@ export async function warmNextCollectionBatchHandler(
         text,
         course.baseLanguages,
         course.targetLanguages,
-        { settings: renderingSettings },
+        {},
       );
     } catch (error) {
       console.error(

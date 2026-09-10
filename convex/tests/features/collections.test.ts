@@ -19,7 +19,7 @@ import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { MAX_PREVIEW_PAGE_SIZE } from '../../lib/collections';
 import { insertAudioFixture } from '../lib/audioFixtures';
 import { renderingTextOf } from '../../db/translationReads';
-import { primaryRenderingKey } from '../../../lib/preferenceResolution';
+import { textRenderingKey } from '../../../lib/preferenceResolution';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -243,7 +243,6 @@ describe('features/collections', () => {
           initialReviewCount: 5,
           // "formal" is usted on Spain Spanish (form v) while the stored
           // wording below is tú (form t).
-          politenessLevels: ['formal'],
         });
         const textId = await ctx.db.insert('texts', {
           text: 'Are you coming?',
@@ -281,11 +280,9 @@ describe('features/collections', () => {
         },
       );
       const row = res.page[0];
-      // The Spanish row is complete, which is exactly the trap: the client
-      // batches off this list, so the row was never sent. ('en' can appear
-      // here for its own reason, the Mixed English accent row.)
+      // The Spanish row is complete. ('en' can appear here for its own
+      // reason, the Mixed English accent row.)
       expect(row.missingTranslationLanguages).not.toContain('es');
-      expect(row.needsRenderingRewrite).toBe(true);
     });
 
     it('lists texts in rank order with status + missingTranslationLanguages', async () => {
@@ -718,7 +715,7 @@ describe('features/collections', () => {
       expect(ttsClaims).toEqual([]);
     });
 
-    it('renders a fresh keyed row for a version-stale legacy translation while browsing', async () => {
+    it('regenerates a version-stale translation in place while browsing', async () => {
       const t = convexTest(schema, modules);
       const { collId } = await seedCourseWithTexts(t, 1);
       // An en curriculum text whose es translation is stamped below the
@@ -777,25 +774,20 @@ describe('features/collections', () => {
       expect(
         staleRow.translations.find((tr) => tr.language === 'es')?.text,
       ).toBe('Hola viejo');
-      // The user-provided row is a legacy row too: never version-stale
-      // (user wording is not regenerated), but the browse reads the keyed
-      // row and shows the legacy wording as a placeholder until the sweep
-      // has adopted it under the key, which the rewrite flag requests.
+      // The user-provided wording is never regenerated, so the browse
+      // reports nothing missing for it.
       const userRow = browsed.page.find((r) => r._id === userTextId)!;
       expect(userRow.missingTranslationLanguages).not.toContain('es');
-      expect(userRow.needsRenderingRewrite).toBe(true);
 
-      // A legacy row is never regenerated (the cards on it keep it). The
-      // stale wording is not adopted under the key either, so the keyed
-      // row is rendered afresh; the user-provided wording is current and
-      // offered to a verifying adoption job. Both legacy rows and the
-      // paired audio stay exactly as they are.
+      // The stale row is regenerated in place; the user-provided wording
+      // is never regenerated. Both rows and the paired audio stay exactly
+      // as they are until the replacement lands.
       vi.mocked(llmPool.enqueueAction).mockClear();
       const res = await asUser.mutation(
         api.features.collections.requestPreviewTranslations,
         { collectionId: collId, textIds: [enTextId, userTextId] },
       );
-      expect(res.translationsScheduled).toBe(2);
+      expect(res.translationsScheduled).toBe(1);
       const { translations, audio } = await t.run(async (ctx) => ({
         translations: await ctx.db.query('translations').collect(),
         audio: await ctx.db.query('audioRecordings').collect(),
@@ -814,16 +806,10 @@ describe('features/collections', () => {
             adoptLegacy?: boolean;
           },
       );
-      expect(regen.length).toBe(2);
+      expect(regen.length).toBe(1);
       expect(regen.find((job) => job.textId === enTextId)).toMatchObject({
         skipTts: true,
-      });
-      expect(
-        regen.find((job) => job.textId === enTextId)?.replaceExisting,
-      ).toBeUndefined();
-      expect(regen.find((job) => job.textId === userTextId)).toMatchObject({
-        skipTts: true,
-        adoptLegacy: true,
+        replaceExisting: true,
       });
       // The user-provided sibling survived untouched.
       expect(
@@ -871,10 +857,9 @@ describe('features/collections', () => {
           textId,
           targetLanguage: 'el',
           translatedText: 'Καλημέρα',
-          variantKey: primaryRenderingKey({
+          variantKey: textRenderingKey({
             text: renderingTextOf((await ctx.db.get(textId))!),
             textId,
-            code: 'el',
           }),
         });
         return { collId, textId };

@@ -17,9 +17,6 @@ import {
 } from '../../db/users';
 import { getActiveCourseForUser } from '../../db/courses';
 import { getCourseSettings } from '../../db/courseSettings';
-import { renderingSettingsValidator } from '../../types';
-import { renderingSettingsOf } from '../../db/translationReads';
-import type { RenderingSettings } from '../../../lib/preferenceResolution';
 import { consumeQuota } from '../../usage/helpers';
 import { CHAT_CREDIT_USD_STEP, CREDIT_COSTS, FEATURE_IDS } from '../featureIds';
 import { agent, AGENT_TOOLS, createMarkAlsoCorrectTool } from './agent';
@@ -45,7 +42,6 @@ import {
   buildDifficultySection,
   buildLanguageSection,
   type LearnerDifficulty,
-  buildFormsSection,
 } from './promptSections';
 import {
   deriveLegacyCefrTier,
@@ -121,9 +117,6 @@ export const getCourseLanguagesForUser = internalQuery({
       baseLanguages: v.array(v.string()),
       targetLanguages: v.array(v.string()),
       difficulty: v.union(learnerDifficultyValidator, v.null()),
-      // The course's sentence-form settings (lib/languageForms.ts), for
-      // the forms section of the prompt; null on courses without any.
-      renderingSettings: v.union(renderingSettingsValidator, v.null()),
     }),
     v.null(),
   ),
@@ -134,9 +127,6 @@ export const getCourseLanguagesForUser = internalQuery({
       baseLanguages: active.course.baseLanguages,
       targetLanguages: active.course.targetLanguages,
       difficulty: await resolveLearnerDifficulty(ctx, active.course),
-      renderingSettings:
-        renderingSettingsOf(await getCourseSettings(ctx, active.course._id)) ??
-        null,
     };
   },
 });
@@ -149,7 +139,6 @@ function buildQuickActionSteering(
   quickAction: QuickAction,
   cardData: Awaited<ReturnType<typeof resolveCardContext>>,
   active: Awaited<ReturnType<typeof getActiveCourseForUser>>,
-  renderingSettings: RenderingSettings | undefined,
 ): string {
   return expandQuickAction(quickAction, {
     card: cardData,
@@ -157,7 +146,6 @@ function buildQuickActionSteering(
       cardData?.baseLanguages ?? active?.course.baseLanguages ?? [],
     targetLanguages:
       cardData?.targetLanguages ?? active?.course.targetLanguages ?? [],
-    renderingSettings,
   });
 }
 
@@ -232,16 +220,7 @@ export const sendMessage = mutation({
     const { cardData, active } = turn;
 
     const steering = args.quickAction
-      ? buildQuickActionSteering(
-          args.quickAction,
-          cardData,
-          active,
-          active
-            ? renderingSettingsOf(
-                await getCourseSettings(ctx, active.course._id),
-              )
-            : undefined,
-        )
+      ? buildQuickActionSteering(args.quickAction, cardData, active)
       : undefined;
 
     // One save; the array order persists the steering as a hidden system
@@ -369,13 +348,6 @@ async function scheduleResponse(
   const difficultySection = difficulty
     ? buildDifficultySection(difficulty)
     : undefined;
-  const formsSection = active
-    ? buildFormsSection(
-        renderingSettingsOf(await getCourseSettings(ctx, active.course._id)),
-        active.course,
-      )
-    : undefined;
-
   // The privacy policy promises that declining analytics stops chat content
   // from reaching PostHog. The consent choice lives in the browser, mirrored
   // to `userSettings` by ConsentSync; unset means never synced → withhold.
@@ -391,7 +363,6 @@ async function scheduleResponse(
       cardContextSection,
       languageSection,
       difficultySection,
-      formsSection,
       prompt: args.prompt,
       includeAiContent,
       userId: args.userId,
@@ -588,9 +559,7 @@ export const generateResponse = internalAction({
     cardContextSection: v.optional(v.string()),
     languageSection: v.optional(v.string()),
     difficultySection: v.optional(v.string()),
-    // The course's sentence-form settings (buildFormsSection); absent on
     // courses without any and re-derived like the language section.
-    formsSection: v.optional(v.string()),
     // Passed through from sendMessage purely so the cost event can carry the
     // prompt as `$ai_input`. Re-reading it from the agent component here would
     // cost an extra query for data the caller already had in hand.
@@ -622,8 +591,7 @@ export const generateResponse = internalAction({
     try {
       let languageSection = args.languageSection;
       let difficultySection = args.difficultySection;
-      let formsSection = args.formsSection;
-      if (!languageSection || !difficultySection || !formsSection) {
+      if (!languageSection || !difficultySection) {
         const thread = await ctx.runQuery(agentComponent.threads.getThread, {
           threadId: args.threadId,
         });
@@ -640,10 +608,6 @@ export const generateResponse = internalAction({
               courseLanguages.difficulty,
             );
           }
-          formsSection ??= buildFormsSection(
-            courseLanguages.renderingSettings,
-            courseLanguages,
-          );
         }
       }
 
@@ -654,9 +618,6 @@ export const generateResponse = internalAction({
       }
       if (difficultySection) {
         dynamicContextParts.push(difficultySection);
-      }
-      if (formsSection) {
-        dynamicContextParts.push(formsSection);
       }
       if (args.cardContextSection) {
         dynamicContextParts.push(args.cardContextSection);

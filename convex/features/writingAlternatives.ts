@@ -1,8 +1,6 @@
 import {
   servedSourceText,
   viewOfCard,
-  renderingCardOf,
-  renderingSettingsOf,
   renderingTextOf,
   resolveServedRendering,
 } from '../db/translationReads';
@@ -16,10 +14,7 @@ import {
   type MutationCtx,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
-import { getCourseSettings } from '../db/courseSettings';
-import {
-  resolveCardRendering,
-} from '../../lib/preferenceResolution';
+import { resolveCardRendering } from '../../lib/preferenceResolution';
 import type { Id } from '../_generated/dataModel';
 import {
   MAX_CARD_TEXT_LENGTH,
@@ -173,15 +168,11 @@ async function primaryTextForLanguage(
   // same way; reading the canonical row here made the edit dialog treat
   // the canonical wording as "the card's own sentence" on a variant-served
   // card, deleting a real alternative and accepting the card's sentence.
-  const deck = await ctx.db.get(card.deckId);
-  const settings = deck
-    ? renderingSettingsOf(await getCourseSettings(ctx, deck.courseId))
-    : undefined;
   const rendering = await resolveServedRendering(ctx, {
     textId: card.textId,
     targetLanguage: language,
     text: renderingTextOf(text),
-    view: viewOfCard(card, settings),
+    view: viewOfCard(card),
   });
   return rendering.served?.row.translatedText ?? null;
 }
@@ -327,15 +318,14 @@ export const getAlternativeContext = internalQuery({
     if (!row) return null;
     const card = await ctx.db.get(row.cardId);
     const text = card ? await ctx.db.get(card.textId) : null;
-    // The voice the card is spoken in: the text's own, or the card's
-    // Flag-dialog correction (docs/architecture/rendering-keys.md). Only a
-    // card without a text falls back to a flip seeded on the alternative.
+    // The voice the card is spoken in: the text's own
+    // (docs/architecture/rendering-keys.md). Only a card without a text
+    // falls back to a flip seeded on the alternative.
     const primaryGender =
       text && card
         ? resolveCardRendering({
             text: renderingTextOf(text),
             textId: text._id,
-            card: renderingCardOf(card),
           }).voiceGender
         : resolveAudioSpeakerGender(
             text?.audioSpeakerGender ?? text?.speakerGender,

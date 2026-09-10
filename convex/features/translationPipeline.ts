@@ -33,14 +33,8 @@ import {
   translationReasonValidator,
   voiceGenderValidator,
 } from '../types';
-import {
-  liveTranslation,
-  audioPointer,
-  primaryKeyForLanguage,
-} from '../db/translationReads';
-import {
-  parseRenderingKey,
-} from '../../lib/preferenceResolution';
+import { liveTranslation, audioPointer } from '../db/translationReads';
+import { parseRenderingKey } from '../../lib/preferenceResolution';
 import { scheduleTranslationAnnotations } from '../lib/textAnnotations';
 
 /**
@@ -178,7 +172,6 @@ const vStoreTranslationAndScheduleTtsArgs = v.object({
    * while the job ran) is refused: the next ensure pass versions the new
    * wording. Absent on a primary write.
    */
-  versionedFromText: v.optional(v.string()),
   /** The rendering classifier's verdict on the wording; see schema.ts. */
   renderingVerified: v.optional(v.boolean()),
 });
@@ -208,12 +201,7 @@ export async function getTranslationForTextLanguageHandler(
   regionVariant?: string;
   translationSource?: string;
 } | null> {
-  const row = await liveTranslation(
-    ctx,
-    args.textId,
-    args.targetLanguage,
-    args.variantKey,
-  );
+  const row = await liveTranslation(ctx, args.textId, args.targetLanguage);
   if (!row) return null;
   return {
     translatedText: row.translatedText,
@@ -301,17 +289,6 @@ type TranslationWriteResult = {
  *    lands, the row it meant to replace may have been swept, and refusing
  *    then would leave the card with no translation at all.
  */
-/** The primary key of (text, language) on the row's dialect. */
-function primaryKeyOf(
-  text: Doc<'texts'>,
-  args: Pick<
-    StoreTranslationAndScheduleTtsArgs,
-    'textId' | 'targetLanguage' | 'regionVariant'
-  >,
-): string {
-  return primaryKeyForLanguage(text, args.targetLanguage, args.regionVariant);
-}
-
 async function guardTranslationWrite(
   ctx: MutationCtx,
   args: StoreTranslationAndScheduleTtsArgs,
@@ -330,12 +307,7 @@ async function guardTranslationWrite(
   }
 
   if (args.expectedClaimId !== undefined) {
-    const llmClaim = await getLlmClaim(
-      ctx,
-      args.textId,
-      args.targetLanguage,
-      args.variantKey,
-    );
+    const llmClaim = await getLlmClaim(ctx, args.textId, args.targetLanguage);
     if (llmClaim?._id !== args.expectedClaimId) {
       await resolveRetranslation(
         ctx,
@@ -346,37 +318,7 @@ async function guardTranslationWrite(
     }
   }
 
-  if (args.versionedFromText !== undefined) {
-    const primary = await liveTranslation(
-      ctx,
-      args.textId,
-      args.targetLanguage,
-      primaryKeyOf(text, args),
-    );
-    if (primary !== null && primary.translatedText !== args.versionedFromText) {
-      console.warn(
-        '[storeTranslationAndScheduleTTS] dropping a versioning of a superseded primary wording',
-        {
-          textId: args.textId,
-          targetLanguage: args.targetLanguage,
-          variantKey: args.variantKey,
-        },
-      );
-      await resolveRetranslation(
-        ctx,
-        args.retranslationAuditId,
-        'dropped_superseded',
-      );
-      return null;
-    }
-  }
-
-  const existing = await liveTranslation(
-    ctx,
-    args.textId,
-    args.targetLanguage,
-    args.variantKey,
-  );
+  const existing = await liveTranslation(ctx, args.textId, args.targetLanguage);
 
   if (existing && args.replaceExisting && isUserCreatedText(text)) {
     await resolveRetranslation(
@@ -419,9 +361,6 @@ async function insertTranslationRow(
     ...(args.regionVariant ? { regionVariant: args.regionVariant } : {}),
     ...(args.speakerGender ? { speakerGender: args.speakerGender } : {}),
     ...(args.variantKey ? { variantKey: args.variantKey } : {}),
-    ...(args.versionedFromText !== undefined
-      ? { versionedFromText: args.versionedFromText }
-      : {}),
     ...(args.renderingVerified !== undefined
       ? { renderingVerified: args.renderingVerified }
       : {}),
@@ -460,7 +399,6 @@ async function invalidateAudioIfAudiblyChanged(
   if (!audioUnchangedBySound) {
     await deleteAudioRowsForTextLanguage(ctx, textId, targetLanguage, {
       keepAsset: true,
-      variantKey,
     });
   }
   return audioUnchangedBySound;
@@ -502,7 +440,6 @@ async function replaceTranslationRow(
     regionVariant: string | undefined;
     speakerGender: 'male' | 'female';
     translationVersion: number;
-    versionedFromText: string | undefined;
     renderingVerified: boolean | undefined;
   }> = {
     translatedText,
@@ -510,7 +447,6 @@ async function replaceTranslationRow(
     translationVersion: getCurrentTranslationVersion(args.targetLanguage),
     // The derivation and the verdict describe the new wording (or nothing,
     // for a primary write).
-    versionedFromText: args.versionedFromText,
     renderingVerified: args.renderingVerified,
   };
   if (romanizedText !== undefined) {
@@ -594,7 +530,6 @@ async function archiveTranslationRevision(
       speakerGender: existing.speakerGender,
       translationVersion: existing.translationVersion,
       variantKey: existing.variantKey,
-      versionedFromText: existing.versionedFromText,
       renderingVerified: existing.renderingVerified,
       audioAssetId,
       supersededAt,
@@ -647,9 +582,6 @@ async function replaceForVersionBump(
       // A derivation-stale row that came back byte-identical must still
       // record the primary wording it now matches, or the sweep buys the
       // same versioning on every pass. Same for the verdict.
-      ...(args.versionedFromText !== undefined
-        ? { versionedFromText: args.versionedFromText }
-        : {}),
       ...(args.renderingVerified !== undefined
         ? { renderingVerified: args.renderingVerified }
         : {}),
@@ -676,12 +608,7 @@ async function replaceForVersionBump(
           .withIndex('by_textId', (q) => q.eq('textId', args.textId))
           .first();
   if (referencingCard) {
-    const audio = await audioPointer(
-      ctx,
-      args.textId,
-      args.targetLanguage,
-      args.variantKey,
-    );
+    const audio = await audioPointer(ctx, args.textId, args.targetLanguage);
     if (audio) {
       await archiveTranslationRevision(ctx, existing, audio.assetId);
     }
@@ -879,16 +806,12 @@ async function scheduleTtsForLandedTranslation(
   ctx: MutationCtx,
   args: StoreTranslationAndScheduleTtsArgs,
   translatedText: string,
-  isPrimaryRendering: boolean,
 ): Promise<void> {
   let ttsPriority = args.priority;
   if (args.skipTts) {
     // skipTts means "don't spend synthesis on texts nobody studies". A
-    // card referencing this text disproves that premise for the PRIMARY
-    // rendering (see the arg's docstring for the race this closes), so only
-    // skip when none exists; any other key is voiced by the ensure pass of
-    // a card that actually reads it.
-    if (!isPrimaryRendering) return;
+    // card referencing this text disproves that premise (see the arg's
+    // docstring for the race this closes), so only skip when none exists.
     const cardForText = await ctx.db
       .query('cards')
       .withIndex('by_textId', (q) => q.eq('textId', args.textId))
@@ -902,12 +825,7 @@ async function scheduleTtsForLandedTranslation(
     ttsPriority = undefined;
   }
 
-  let existingAudio = await audioPointer(
-    ctx,
-    args.textId,
-    args.targetLanguage,
-    args.variantKey,
-  );
+  let existingAudio = await audioPointer(ctx, args.textId, args.targetLanguage);
 
   // Keyed pointers only. A pointer speaking a different sentence is not
   // "already voiced": a clip that outlived its wording (a TTS job still in
@@ -951,7 +869,6 @@ async function scheduleTtsForLandedTranslation(
         args.textId,
         args.targetLanguage,
         ttsPriority,
-        args.variantKey,
       );
       if (claimed) {
         await enqueueTtsForVoice(ctx, {
@@ -1089,11 +1006,6 @@ export async function storeTranslationAndScheduleTTSHandler(
   if (write.audioUnchangedBySound) {
     return null;
   }
-  await scheduleTtsForLandedTranslation(
-    ctx,
-    args,
-    translatedText,
-    args.variantKey === undefined || args.variantKey === primaryKeyOf(gate.text, args),
-  );
+  await scheduleTtsForLandedTranslation(ctx, args, translatedText);
   return null;
 }

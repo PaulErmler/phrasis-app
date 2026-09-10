@@ -1,11 +1,9 @@
 import {
-  renderingSettingsOf,
   renderingTextOf,
   resolveServedRendering,
   servedSourceText,
   viewOfCard,
 } from '../translationReads';
-import { getCourseSettings } from '../courseSettings';
 import { MutationCtx } from '../../_generated/server';
 import { Doc } from '../../_generated/dataModel';
 import { ConvexError } from 'convex/values';
@@ -304,10 +302,7 @@ export async function recordReviewStats(
       // counting the canonical wording here listed "te" and "llamas" under
       // a card showing "¿Cómo se llama usted?". One settings read, and only
       // on a card's first review (untracked languages).
-      const view = viewOfCard(
-        card,
-        renderingSettingsOf(await getCourseSettings(ctx, deck.courseId)),
-      );
+      const view = viewOfCard(card);
       const renderingText = renderingTextOf(text);
       for (const lang of untrackedLanguages) {
         if (lang === text.language) continue;

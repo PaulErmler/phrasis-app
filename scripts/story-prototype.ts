@@ -348,7 +348,9 @@ function scoreStory(
 ): Metrics {
   const storyText = story.lines.map((l) => l.text).join(' ');
   const normalizedStory = normalizeForComparison(storyText);
-  const normalizedLines = story.lines.map((l) => normalizeForComparison(l.text));
+  const normalizedLines = story.lines.map((l) =>
+    normalizeForComparison(l.text),
+  );
 
   let verbatim = 0;
   let nearVerbatim = 0;
@@ -380,7 +382,9 @@ function scoreStory(
       newWords.push(token.original);
     }
   }
-  const knownHits = storyTokens.filter((t) => knownSet.has(t.normalized)).length;
+  const knownHits = storyTokens.filter((t) =>
+    knownSet.has(t.normalized),
+  ).length;
 
   return {
     storyWords: storyTokens.length,
@@ -517,7 +521,8 @@ function ttsJobs(result: Result): TtsJob[] {
       result,
       condition: 'two-voice-stitched' as const,
       text: line.text,
-      voice: VOICES[Math.max(0, speakers.indexOf(line.speaker)) % VOICES.length],
+      voice:
+        VOICES[Math.max(0, speakers.indexOf(line.speaker)) % VOICES.length],
     })),
   ];
 }
@@ -528,7 +533,10 @@ function ttsJobs(result: Result): TtsJob[] {
  * earlier generation rows have long since landed, so the cost lookups return
  * on their first attempt instead of sleeping through a backoff each.
  */
-async function measureTts(apiKey: string, targets: Result[]): Promise<TtsRun[]> {
+async function measureTts(
+  apiKey: string,
+  targets: Result[],
+): Promise<TtsRun[]> {
   const jobs = targets.flatMap(ttsJobs);
   const clips = await pool(jobs, 8, async (job) => ({
     job,
@@ -640,7 +648,10 @@ async function main() {
       );
       // Shuffled for the prompt (sentence order would leak the sentences),
       // but `knownWords` keeps source order for the scorer and the report.
-      const shuffledKnown = shuffled(known, mulberry32(SEED + i * 31 + lang.length));
+      const shuffledKnown = shuffled(
+        known,
+        mulberry32(SEED + i * 31 + lang.length),
+      );
       for (const mode of MODES) {
         const prompt =
           mode === 'sentences'
@@ -760,7 +771,9 @@ async function main() {
   }
 
   flush(ttsRuns);
-  console.log(`\nLLM spend: $${spent.toFixed(4)} over ${results.length} stories`);
+  console.log(
+    `\nLLM spend: $${spent.toFixed(4)} over ${results.length} stories`,
+  );
   console.log(`Wrote ${OUT_DIR}/results.json`);
 }
 

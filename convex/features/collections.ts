@@ -69,12 +69,9 @@ import {
   viewOfCard,
   audioPointer,
   previewView,
-  renderingSettingsOf,
   renderingTextOf,
   resolveServedRendering,
 } from '../db/translationReads';
-import { getCourseSettings } from '../db/courseSettings';
-import type { RenderingSettings } from '../../lib/preferenceResolution';
 
 // ============================================================================
 // QUERIES
@@ -143,7 +140,6 @@ export const browseCollectionTexts = query({
        * never asked for and the row sat on "updating" for good
        * (2026-09-09, the Thai pre-A1 rows).
        */
-      needsRenderingRewrite: v.boolean(),
     }),
   ),
   handler: async (ctx, args) => {
@@ -256,9 +252,6 @@ export const browseCollectionTexts = query({
       mark: marks[i],
     }));
 
-    const renderingSettings = renderingSettingsOf(
-      await getCourseSettings(ctx, course._id),
-    );
     const inputs = rows.map((row, i) => ({
       key: String(i),
       textId: row.text._id,
@@ -273,9 +266,7 @@ export const browseCollectionTexts = query({
       // wording that card shows, with its pin, its accent and its
       // rendering. Otherwise the live rows, the accent row and the
       // rendering a new card would get (canonical until the variant lands).
-      view: row.card
-        ? viewOfCard(row.card, renderingSettings)
-        : previewView(renderingSettings),
+      view: row.card ? viewOfCard(row.card) : previewView(),
     }));
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
@@ -308,10 +299,6 @@ export const browseCollectionTexts = query({
       // could not see a stale-engine row, so a Hebrew preview kept its old
       // consonant-only line until the card was opened elsewhere.
       const needsAnnotationBackfill = content.hasMissingAnnotation;
-      // `formPending` is per language; the row is what the client batches.
-      const needsRenderingRewrite = content.translations.some(
-        (tr) => tr.formPending === true,
-      );
       return {
         _id: row.text._id,
         text: sourceTextFromContent(content, row.text),
@@ -332,7 +319,6 @@ export const browseCollectionTexts = query({
         audioRecordings: content.audioRecordings,
         missingTranslationLanguages,
         needsAnnotationBackfill,
-        needsRenderingRewrite,
       };
     });
 
@@ -456,7 +442,6 @@ export async function scheduleMissingTranslationsForText(
      * that should render it. Absent, every language gets the sentence's
      * primary rendering, which is what a preview with no setting shows.
      */
-    renderingSettings?: RenderingSettings;
   },
 ): Promise<number> {
   const { translationsScheduled } = await ensureTextContent(
@@ -467,7 +452,6 @@ export async function scheduleMissingTranslationsForText(
     [],
     {
       skipTts: true,
-      settings: opts?.renderingSettings,
       requestedByUserId: opts?.requestedByUserId,
       llmPriority: opts?.llmPriority,
       // Warm work. If a landing primary translation still triggers TTS (a
@@ -513,9 +497,6 @@ export const requestPreviewTranslations = mutation({
       course.targetLanguages,
     );
 
-    const renderingSettings = renderingSettingsOf(
-      await getCourseSettings(ctx, course._id),
-    );
     let translationsScheduled = 0;
     for (const textId of textIds) {
       const text = await ctx.db.get(textId);
@@ -534,7 +515,7 @@ export const requestPreviewTranslations = mutation({
         languages,
         // Explicit preview request: the viewing user caused this spend. The
         // prewarm sibling below stays unattributed (speculative work).
-        { requestedByUserId: userId, renderingSettings },
+        { requestedByUserId: userId },
       );
     }
 
@@ -660,12 +641,10 @@ export const requestPreviewAudio = mutation({
         textId: args.textId,
         targetLanguage: audioLanguage,
         text: renderingTextOf(text),
-        view: previewView(
-          renderingSettingsOf(await getCourseSettings(ctx, course._id)),
-        ),
+        view: previewView(),
       });
       const servedRow = rendering.served?.row;
-      if (rendering.servedKeyed && servedRow) {
+      if (servedRow) {
         // `ensureRenderingAudio` derives the voice from the rendering
         // itself, so no `resolveCardSpeakerGenders` call is needed here.
         const scheduled = await ensureRenderingAudio(

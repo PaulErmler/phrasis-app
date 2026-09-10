@@ -20,7 +20,6 @@ import { FEATURE_IDS } from '../featureIds';
 import { applyCardEdit } from '../scheduling';
 import { applyTextMetadata } from '../sentenceMetadata';
 import { renderingKey } from '../../../lib/preferenceResolution';
-import { NO_FORM } from '../../../lib/languageForms';
 import { storeWritingAlternative } from '../writingAlternatives';
 import { resolveCardContext } from './cardContext';
 import { MAX_CARD_TEXT_LENGTH } from '../../../lib/constants/learning';
@@ -146,7 +145,7 @@ async function processApproval(
     await ctx.db.insert('translations', {
       textId,
       targetLanguage: entry.language,
-      variantKey: renderingKey(audioSpeakerGender, NO_FORM),
+      variantKey: renderingKey(audioSpeakerGender),
       speakerGender: audioSpeakerGender,
       translatedText: userEdited
         ? canonicalizeApostrophes(entry.language, entry.text)

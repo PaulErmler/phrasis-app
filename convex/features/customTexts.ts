@@ -6,8 +6,6 @@ import {
   internalQuery,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
-import { renderingSettingsOf } from '../db/translationReads';
-import { getCourseSettings } from '../db/courseSettings';
 import type { Id } from '../_generated/dataModel';
 import { requireAuthUserId, getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -39,10 +37,7 @@ import {
   parseAutofillResponse,
 } from '../lib/translationAutofillPrompt';
 import { EVENTS, track } from '../analytics';
-import {
-  sourcedTranslationEntriesValidator,
-  renderingSettingsValidator,
-} from '../types';
+import { sourcedTranslationEntriesValidator } from '../types';
 import {
   captureGeneration,
   openrouterCostUsd,
@@ -53,7 +48,6 @@ import {
   resolveAudioSpeakerGender,
 } from '../../lib/languages';
 import { renderingKey } from '../../lib/preferenceResolution';
-import { NO_FORM } from '../../lib/languageForms';
 
 export const consumeAutoFillQuota = internalMutation({
   args: { userId: v.string() },
@@ -71,10 +65,6 @@ export const getAllowedLanguagesForAutoFill = internalQuery({
     v.null(),
     v.object({
       allowedLanguages: v.array(v.string()),
-      // The course's sentence-form settings, for the prompt's settings
-      // block (lib/translationAutofillPrompt.ts); null when the course has
-      // none.
-      renderingSettings: v.union(renderingSettingsValidator, v.null()),
     }),
   ),
   handler: async (ctx, { userId }) => {
@@ -84,11 +74,7 @@ export const getAllowedLanguagesForAutoFill = internalQuery({
     const allowedLanguages = [
       ...new Set([...course.baseLanguages, ...course.targetLanguages]),
     ];
-    return {
-      allowedLanguages,
-      renderingSettings:
-        renderingSettingsOf(await getCourseSettings(ctx, course._id)) ?? null,
-    };
+    return { allowedLanguages };
   },
 });
 
@@ -253,8 +239,6 @@ export const autoFillTranslations = action({
       resolvedTargets: targetLanguages.map(
         (code) => resolutionByRequested.get(code)!.resolved,
       ),
-      settings: courseCtx.renderingSettings ?? undefined,
-      politenessSeed: variantSeed,
       speakerGender,
     });
 
@@ -501,7 +485,7 @@ export const createCustomText = mutation({
         textId,
         targetLanguage: entry.language,
         translatedText: canonicalizeApostrophes(entry.language, entry.text),
-        variantKey: renderingKey(audioSpeakerGender, NO_FORM),
+        variantKey: renderingKey(audioSpeakerGender),
         speakerGender: audioSpeakerGender,
         ...(entry.regionVariant ? { regionVariant: entry.regionVariant } : {}),
         // The client tags autofilled entries with the model slug and
@@ -690,7 +674,7 @@ export const createCustomTextsBatch = mutation({
           textId,
           targetLanguage: entry.language,
           translatedText: canonicalizeApostrophes(entry.language, entry.text),
-          variantKey: renderingKey(audioSpeakerGender, NO_FORM),
+          variantKey: renderingKey(audioSpeakerGender),
           speakerGender: audioSpeakerGender,
           // Bulk-import is exclusively manual, no autofill path here, so
           // every inserted translation is user-typed. Tag it explicitly so

@@ -304,9 +304,9 @@ test.describe('add cards: import', () => {
       await editor.fill('Bye');
       await editor.press('Enter');
 
-      await expect(
-        page.getByText(/english( \(mixed\))?: empty/i),
-      ).toHaveCount(0);
+      await expect(page.getByText(/english( \(mixed\))?: empty/i)).toHaveCount(
+        0,
+      );
       await expect(page.getByTestId('import-submit').first()).toBeEnabled();
     });
 

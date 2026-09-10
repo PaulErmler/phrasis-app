@@ -48,12 +48,6 @@ import { ProficiencyBranchStep } from './steps/ProficiencyBranchStep';
 import { CefrSelfPickStep } from './steps/CefrSelfPickStep';
 import { PlacementTestStep } from './steps/PlacementTestStep';
 import { ReviewModeStep, type ReviewModeChoice } from './steps/ReviewModeStep';
-import { PolitenessStep } from './steps/PolitenessStep';
-import {
-  onboardingAsksPoliteness,
-  POLITENESS_LEVELS,
-  type PolitenessLevel,
-} from '@/lib/languageForms';
 
 /**
  * The onboarding wizard proper: step order, per-step state, persistence
@@ -100,7 +94,6 @@ export interface SaveProgressArgs {
   placementTest?: Omit<PlacementTestState, 'strategyVersion'> & {
     strategyVersion?: number;
   };
-  politenessLevels?: PolitenessLevel[];
 }
 
 /**
@@ -154,8 +147,6 @@ export function buildProgressPayload(
     priorAppsFreeText: fd.priorAppsFreeText ?? undefined,
     dailyTimeGoalMinutes: fd.dailyTimeGoalMinutes ?? undefined,
     placementTest: fd.placementTest ?? undefined,
-    politenessLevels:
-      fd.politenessLevels.length > 0 ? fd.politenessLevels : undefined,
   };
 }
 
@@ -331,19 +322,7 @@ export function OnboardingWizard({
         advanced_anyway: true,
       });
     }
-    // The politeness question follows the language pair, and only for the
-    // targets in ONBOARDING_POLITENESS_TARGETS (Japanese, Korean). Every
-    // other target starts on every level so its sentences alternate,
-    // stored explicitly: an absent setting renders the canonical form
-    // (lib/preferenceResolution.ts), not the mix, and a stored set is
-    // inert on a language that marks nothing. Written on every pass so a
-    // target changed via Back never keeps the previous target's answer.
-    if (onboardingAsksPoliteness(data.targetLanguages)) {
-      advance('politeness');
-      return;
-    }
-    persist({ politenessLevels: [...POLITENESS_LEVELS] });
-    advance(stepAfter('politeness'));
+    advance(stepAfter('language-pair'));
   };
 
   const onProficiencyContinue = () => {
@@ -467,8 +446,6 @@ export function OnboardingWizard({
         return data.proficiencyBranch === null;
       case 'cefr-pick':
         return false; // slider has a value at all times; button is always enabled
-      case 'politeness':
-        return data.politenessLevels.length === 0;
       case 'review-mode':
         return data.reviewMode === null;
       default:
@@ -498,9 +475,6 @@ export function OnboardingWizard({
         return;
       case 'cefr-pick':
         onCefrPickContinue();
-        return;
-      case 'politeness':
-        advance(stepAfter('politeness'));
         return;
       case 'review-mode':
         await onFinishOnboarding();
@@ -706,15 +680,6 @@ function renderStep({
           sourceLanguage={data.baseLanguages[0] ?? 'en'}
           initialOgteLevel={data.placementTest?.finalLevel}
           onComplete={onPlacementComplete}
-        />
-      );
-    case 'politeness':
-      return (
-        <PolitenessStep
-          targetLanguages={data.targetLanguages}
-          baseLanguages={data.baseLanguages}
-          selected={data.politenessLevels}
-          onChange={(levels) => persist({ politenessLevels: levels })}
         />
       );
     case 'review-mode':

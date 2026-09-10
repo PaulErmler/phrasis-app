@@ -339,30 +339,7 @@ describe('features/translationLLM', () => {
       expect(p).not.toContain('<register>');
     });
 
-    describe('the rendering key: the voice and the politeness form', () => {
-      const form = {
-        id: 'v',
-        label: 'Polite · Sie',
-        prompt:
-          'Sie (Ihnen, Ihr, capitalised) with third-person plural verb forms.',
-        intro: 'German uses du with friends and Sie with everyone else.',
-      };
-
-      it('emits <politeness_form> and the language block for a requested form, even without an addressee', () => {
-        const p = buildPrompt({
-          ...baseArgs,
-          addressesSomeone: false,
-          requestedForm: form,
-        });
-        expect(p).toContain('<politeness_form>v</politeness_form>');
-        expect(p).not.toContain('<addressee_gender>');
-        expect(p).toContain(form.intro);
-        expect(p).toContain('Required speech level / address form');
-        expect(p).toContain('Polite · Sie.');
-        expect(p).toContain(form.prompt);
-        expect(p).toContain('register-locked');
-      });
-
+    describe('the rendering key: the voice', () => {
       it('the speaker gender is the key voice and adds the first-person instruction', () => {
         const p = buildPrompt({
           ...baseArgs,
@@ -374,94 +351,32 @@ describe('features/translationLLM', () => {
         expect(p).toContain('Speaker gender agreement');
       });
 
-      it('the versioning prompt names the speaker as context when the voice stays', () => {
-        // 2026-09-08 review: on Thai, going from the plain form to the
-        // particle form means ADDING ครับ or ค่ะ, and the form prompt's own
-        // fallback for an unstated speaker is ค่ะ — a male-voiced card got
-        // the female particle in a male voice.
-        const p = buildPrompt({
-          ...baseArgs,
-          targetLang: 'th',
-          targetLangName: 'Thai',
-          addressesSomeone: false,
-          speakerGender: 'male',
-          rewriteOf: 'ขอบคุณ',
-          requestedForm: form,
-        });
-        expect(p).toContain('The speaker is a man.');
-        expect(p).toContain('politeness particle');
-        // Context, not a re-gendering request: the wording the sentence
-        // already has must survive untouched.
-        expect(p).toContain(
-          'do not re-gender wording the sentence already has',
-        );
-        expect(p).not.toContain('masculine first-person forms');
-        expect(p).toContain('<translation>ขอบคุณ</translation>');
-      });
-
-      it('a versioning that changes the voice asks for every first-person form, once', () => {
-        const p = buildPrompt({
-          ...baseArgs,
-          addressesSomeone: false,
-          speakerGender: 'female',
-          rewriteOf: 'Kommst du?',
-          rewriteChangesGender: true,
-          requestedForm: form,
-        });
-        expect(p).toContain('feminine first-person forms');
-        expect(p).not.toContain('The speaker is a woman.');
-      });
-
-      it('a versioning prompt carries no intro: it changes only what the form requires', () => {
-        const p = buildPrompt({
-          ...baseArgs,
-          addressesSomeone: false,
-          speakerGender: 'male',
-          rewriteOf: 'Kommst du?',
-          requestedForm: form,
-        });
-        expect(p).not.toContain(form.intro);
-        expect(p).toContain('change NOTHING else');
-      });
-
       it('the retry after a failed verification names the previous attempt', () => {
         const fresh = buildPrompt({
           ...baseArgs,
           addressesSomeone: false,
           speakerGender: 'male',
-          requestedForm: form,
           previousAttempt: 'Kommst du?',
         });
         expect(fresh).toContain('<prior>Kommst du?</prior>');
         expect(fresh).toContain('did not carry the required speaker gender');
-        const versioned = buildPrompt({
-          ...baseArgs,
-          addressesSomeone: false,
-          speakerGender: 'male',
-          rewriteOf: 'Kommst du?',
-          requestedForm: form,
-          previousAttempt: 'Kommst du?',
-        });
-        expect(versioned).toContain('<previous_attempt>');
         expect(
           buildPrompt({ ...baseArgs, addressesSomeone: false }),
         ).not.toContain('<previous_attempt>');
       });
 
-      it('nothing requested: no form lines, no speaker line', () => {
+      it('nothing requested: no speaker line', () => {
         expect(requestedFormInstruction({})).toEqual([]);
         const p = buildPrompt({ ...baseArgs, addressesSomeone: false });
-        expect(p).not.toContain('Required speech level');
         expect(p).not.toContain('Speaker gender agreement');
       });
 
-      it('the best-of-N judge sees the same requested-form instruction', () => {
+      it('the best-of-N judge sees the same speaker instruction', () => {
         const p = buildJudgePrompt(
-          { ...baseArgs, addressesSomeone: false, requestedForm: form },
+          { ...baseArgs, addressesSomeone: false, speakerGender: 'female' },
           ['a', 'b'],
         );
-        expect(p).toContain('<politeness_form>v</politeness_form>');
-        expect(p).toContain('Polite · Sie.');
+        expect(p).toContain('feminine first-person forms');
       });
     });
 

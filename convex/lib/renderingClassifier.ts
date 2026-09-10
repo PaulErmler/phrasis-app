@@ -1,42 +1,27 @@
 /**
  * The rendering classifier: given sentences in ONE language, say what each
- * wording actually is on the two axes a rendering key names, the speaker's
- * gender as revealed by first-person forms and the politeness form. Used as
- * a VERIFIER: `verifyRendering` (convex/features/renderingClassification.ts)
- * checks a freshly generated wording against its key
- * (docs/architecture/rendering-keys.md).
+ * wording reveals about the speaker's gender through its first-person
+ * forms. Used as a VERIFIER: `verifyRendering`
+ * (convex/features/renderingClassification.ts) checks a freshly generated
+ * wording against its key (docs/architecture/rendering-keys.md).
  *
  * Convex-runtime-free (like translationAutofillPrompt.ts) so
  * scripts/eval-rendering-detection.ts grades through the exact production
  * prompt.
  *
- * Categories come from lib/languageForms.ts, so the prompt names the
- * language's own forms (です・ます, du/Sie, pan/pani) with their examples.
- * A language that marks neither axis is never classified.
+ * The examples come from lib/languageForms.ts, so the prompt shows the
+ * language's own masculine/feminine pair. A language whose wording does not
+ * change with the speaker is never classified.
  */
 
 import { getLanguageByCode } from '../../lib/languages';
-import {
-  distinctPolitenessForms,
-  getFirstPersonConfig,
-  getPolitenessConfig,
-  type PolitenessLevel,
-} from '../../lib/languageForms';
+import { getFirstPersonConfig } from '../../lib/languageForms';
 import { stripJsonFences } from './llmJson';
 
 export const RENDERED_GENDERS = ['masculine', 'feminine', 'unmarked'] as const;
 export type RenderedGender = (typeof RENDERED_GENDERS)[number];
-export const RENDERED_POLITENESS = [
-  'casual',
-  'polite',
-  'formal',
-  'unmarked',
-] as const;
-export type RenderedPoliteness = (typeof RENDERED_POLITENESS)[number];
-
 export type RenderingClassification = {
   gender: RenderedGender;
-  politeness: RenderedPoliteness;
 };
 
 /**
@@ -46,25 +31,9 @@ export type RenderingClassification = {
  */
 export type PromptWording = 'product' | 'literature';
 
-/** Which axes the classifier can say anything about for this language. */
-export function renderingAxesFor(code: string): {
-  gender: boolean;
-  politeness: boolean;
-} {
-  return {
-    gender: getFirstPersonConfig(code) !== undefined,
-    politeness: getPolitenessConfig(code) !== undefined,
-  };
-}
-
-/**
- * The global level each distinct form of a language is reported as: the
- * LOWEST level the form covers (German du -> casual, Sie -> formal; French
- * tu -> casual, vous -> polite; Japanese all three). Chips look the level
- * up through the same config, so the label is the form's own.
- */
-export function reportedPolitenessLevels(code: string): PolitenessLevel[] {
-  return distinctPolitenessForms(code).map((entry) => entry.levels[0]);
+/** Whether the classifier can say anything about this language. */
+export function renderingAxesFor(code: string): { gender: boolean } {
+  return { gender: getFirstPersonConfig(code) !== undefined };
 }
 
 function genderSection(code: string, wording: PromptWording): string {
@@ -79,29 +48,6 @@ function genderSection(code: string, wording: PromptWording): string {
   return `${head}
   Example: "${config.masculine}" = masculine, "${config.feminine}" = feminine (both: "${config.exampleEn}").
   "unmarked" when there is no first-person gender marking: no first person at all, a first-person form that does not mark gender, or gender marking that belongs to the addressee or a third person (those never count).`;
-}
-
-function politenessSection(code: string, wording: PromptWording): string {
-  const config = getPolitenessConfig(code);
-  if (!config) {
-    return `"politeness": always "unmarked". ${languageName(code)} has no politeness forms this classifier tracks.`;
-  }
-  const levels = reportedPolitenessLevels(code);
-  const lines = levels.map((level) => {
-    const form = config.forms[level];
-    return `  - "${level}": ${form.promptLabel}. ${wording === 'literature' ? form.prompt : form.description}. Example: "${form.example}"`;
-  });
-  const head =
-    wording === 'literature'
-      ? `"politeness": the speech level / address form the wording commits to. ${config.intro} Exactly one of:`
-      : `"politeness": which of these forms the sentence uses. ${config.intro} Exactly one of:`;
-  const unmarkedRule =
-    config.marking === 'address'
-      ? '"unmarked" when the sentence does not address anyone (no "you", no imperative, no vocative), so no form is chosen.'
-      : config.marking === 'pronoun'
-        ? '"unmarked" when the sentence contains no pronoun or particle that commits to a form.'
-        : '"unmarked" only for a fragment with no predicate or particle at all.';
-  return `${head}\n${lines.join('\n')}\n  ${unmarkedRule}`;
 }
 
 function languageName(code: string): string {
@@ -120,16 +66,14 @@ export function buildRenderingClassifierPrompt(
   code: string,
   wording: PromptWording = 'product',
 ): string {
-  return `You classify sentences written in ${languageName(code)}. For each numbered sentence, report two properties of its WORDING as it stands. Judge the form itself, never the topic, and never guess from stereotype.
+  return `You classify sentences written in ${languageName(code)}. For each numbered sentence, report one property of its WORDING as it stands. Judge the form itself, never the topic, and never guess from stereotype.
 
 Return ONLY a JSON array with one object per input sentence, in the same order, and no other text:
-[{"i": 1, "gender": "masculine" | "feminine" | "unmarked", "politeness": "casual" | "polite" | "formal" | "unmarked"}, ...]
+[{"i": 1, "gender": "masculine" | "feminine" | "unmarked"}, ...]
 
 ${genderSection(code, wording)}
 
-${politenessSection(code, wording)}
-
-Quoted speech inside the sentence belongs to the quoted person: judge only the sentence's own speaker and addressee.`;
+Quoted speech inside the sentence belongs to the quoted person: judge only the sentence's own speaker.`;
 }
 
 export function buildRenderingClassifierUserPrompt(
@@ -142,9 +86,9 @@ export function buildRenderingClassifierUserPrompt(
 /**
  * Parse the model's reply into one classification per input sentence.
  * Missing or invalid entries come back as `null` so a bad reply degrades to
- * "not classified" for that row instead of a wrong stamp. Axes the language
- * cannot mark, and politeness levels outside `reportedPolitenessLevels`,
- * are forced to "unmarked" whatever the model said.
+ * "not classified" for that row instead of a wrong stamp. A language that
+ * does not mark the speaker is forced to "unmarked" whatever the model
+ * said.
  */
 export function parseRenderingClassifications(
   code: string,
@@ -169,27 +113,14 @@ export function parseRenderingClassifications(
         : position;
     if (index < 0 || index >= count) return;
     const gender = obj.gender;
-    const politeness = obj.politeness;
     if (
       typeof gender !== 'string' ||
-      !(RENDERED_GENDERS as readonly string[]).includes(gender) ||
-      typeof politeness !== 'string' ||
-      !(RENDERED_POLITENESS as readonly string[]).includes(politeness)
+      !(RENDERED_GENDERS as readonly string[]).includes(gender)
     ) {
       return;
     }
-    // A level the language never reports names no form of its own (a
-    // "polite" verdict on German, whose forms are du and Sie), so it is
-    // not a stamp: unmarked keeps the gender verdict and stops the retry.
-    const levelReported =
-      politeness === 'unmarked' ||
-      (reportedPolitenessLevels(code) as string[]).includes(politeness);
     out[index] = {
       gender: axes.gender ? (gender as RenderedGender) : 'unmarked',
-      politeness:
-        axes.politeness && levelReported
-          ? (politeness as RenderedPoliteness)
-          : 'unmarked',
     };
   });
   return out;

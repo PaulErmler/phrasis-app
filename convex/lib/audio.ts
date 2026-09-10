@@ -51,27 +51,23 @@ export async function deleteAudioRow(
 }
 
 /**
- * Delete the `audioRecordings` pointers of one (text, language) that speak
- * the wording of one rendering, via the reference-aware `deleteAudioRow`.
- * `variantKey` undefined is the legacy pointer; a key names that key's
- * pointer. Every OTHER key keeps its clip: each keyed row is its own
- * wording, and a wording change on one rendering says nothing about the
- * others (docs/architecture/rendering-keys.md).
+ * Delete the `audioRecordings` pointer of one (text, language), via the
+ * reference-aware `deleteAudioRow`.
  */
 export async function deleteAudioRowsForTextLanguage(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   language: string,
-  opts?: { keepAsset?: boolean; variantKey?: string },
+  opts?: { keepAsset?: boolean },
 ): Promise<void> {
-  const row = await audioPointer(ctx, textId, language, opts?.variantKey);
+  const row = await audioPointer(ctx, textId, language);
   if (row) await deleteAudioRow(ctx, row, opts);
 }
 
 /**
- * Delete EVERY pointer of (text, language), legacy and keyed alike. For the
- * manual regenerate button and the cascades that drop a text's audio
- * wholesale.
+ * Delete EVERY pointer of (text, language). One under the invariant; the
+ * range read also clears a stray row from an older build. For the manual
+ * regenerate button and the cascades that drop a text's audio wholesale.
  */
 export async function deleteAllAudioRowsForTextLanguage(
   ctx: MutationCtx,

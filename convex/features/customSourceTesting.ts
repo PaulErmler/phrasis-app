@@ -1,10 +1,7 @@
 import { v } from 'convex/values';
 import { internalMutation } from '../_generated/server';
 import type { Id } from '../_generated/dataModel';
-import {
-  activeCourseForEmail,
-  assertTestHooksEnabled,
-} from '../lib/testHooks';
+import { activeCourseForEmail, assertTestHooksEnabled } from '../lib/testHooks';
 import {
   getCollectionProgress,
   getOrCreateCustomCollection,

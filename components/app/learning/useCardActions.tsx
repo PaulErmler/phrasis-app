@@ -11,7 +11,6 @@ import { getUserTimezone } from '@/lib/timezone';
 import { reportError } from '@/lib/report-error';
 import { ConfirmDialog } from '@/components/app/ConfirmDialog';
 import { ConfettiBurst } from '@/components/effects/ConfettiBurst';
-import { useAppData } from '@/components/app/AppDataProvider';
 import {
   FlagTranslationDialog,
   type FlagSubmission,
@@ -281,10 +280,6 @@ export function CardActionConfirmDialogs({
   actions: CardActions;
 }) {
   const t = useTranslations('LearningMode');
-  const { activeCourse } = useAppData();
-  const courseLanguages = activeCourse
-    ? [...activeCourse.baseLanguages, ...activeCourse.targetLanguages]
-    : [];
   return (
     <>
       <ConfirmDialog
@@ -306,7 +301,6 @@ export function CardActionConfirmDialogs({
           if (!open) actions.closeFlagConfirm();
         }}
         onSubmit={actions.confirmFlag}
-        courseLanguages={courseLanguages}
         allowCorrections={actions.flagTarget?.userCreated !== true}
       />
       {actions.flagCelebration !== null && (

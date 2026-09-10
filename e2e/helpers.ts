@@ -47,10 +47,6 @@ export interface OnboardingWalkOptions {
   // `placementMaxQuestions` to bail if something goes wrong.
   placementAnswer?: 'knew' | 'didnt'; // applied to every question
   placementMaxQuestions?: number;
-  // Politeness step (Sep 2026), right after the language pair and only for
-  // Japanese and Korean targets, so the walker checks which step appeared.
-  // Default: every row, the preselected recommended answer.
-  politeness?: ('casual' | 'polite' | 'formal')[];
   // Final step: review-mode pick. Shadowing (audio) is the default;
   // translate/transcribe both land in the writing mode with that input style.
   reviewMode?: 'audio' | 'translate' | 'transcribe';
@@ -108,46 +104,9 @@ export async function completeOnboardingFresh(
   await page.getByTestId(`language-option-${target}`).first().click();
   await page.getByTestId(`language-option-${source}`).first().click();
   await page.getByTestId('onboarding-continue').click();
-
-  // 1b. Politeness, only for Japanese and Korean targets. Whichever of the
-  // two steps appears next decides. Every row starts ticked (the
-  // recommended answer). No `politeness` option keeps that; otherwise
-  // toggle each row to the wanted state.
-  await expect
-    .poll(
-      async () => {
-        await dismissErrorBoundary(page);
-        const politeness = await page
-          .getByTestId('onboarding-step-politeness')
-          .isVisible()
-          .catch(() => false);
-        const acquisition = await page
-          .getByTestId('onboarding-step-acquisition')
-          .isVisible()
-          .catch(() => false);
-        return politeness || acquisition;
-      },
-      { timeout: 20_000 },
-    )
-    .toBe(true);
-  if (await page.getByTestId('onboarding-step-politeness').isVisible()) {
-    const levels = opts.politeness;
-    if (levels && levels.length > 0) {
-      const rows = page.locator(
-        '[data-testid^="politeness-"][role="checkbox"]',
-      );
-      for (const row of await rows.all()) {
-        const level = (await row.getAttribute('data-testid'))?.replace(
-          'politeness-',
-          '',
-        );
-        const wanted = levels.includes(level as (typeof levels)[number]);
-        const ticked = (await row.getAttribute('aria-checked')) === 'true';
-        if (wanted !== ticked) await row.click();
-      }
-    }
-    await advance(null, 'onboarding-step-acquisition');
-  }
+  await expect(page.getByTestId('onboarding-step-acquisition')).toBeVisible({
+    timeout: 20_000,
+  });
 
   // 2. Acquisition source.
   await page.getByTestId(`acquisition-option-${acquisition}`).click();

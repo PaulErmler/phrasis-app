@@ -312,7 +312,6 @@ export async function rebuildCardSearchableTextPatch(
   // cache across a pagination page).
   return buildSearchableTextPatchForCard(ctx, doc, text, {
     deckLanguages: new Map(),
-    deckRenderingSettings: new Map(),
   });
 }
 
@@ -1203,7 +1202,9 @@ function unsetPatch<T extends Record<string, unknown>>(
 ): Partial<T> | undefined {
   const stale = columns.filter((column) => doc[column] !== undefined);
   if (stale.length === 0) return undefined;
-  return Object.fromEntries(stale.map((column) => [column, undefined])) as Partial<T>;
+  return Object.fromEntries(
+    stale.map((column) => [column, undefined]),
+  ) as Partial<T>;
 }
 
 export async function dropRenderingCutoverTranslationOne(

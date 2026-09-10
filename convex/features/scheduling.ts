@@ -12,15 +12,12 @@ import {
   cardRowLanguages,
   servedSourceText,
   viewOfCard,
-  renderingSettingsOf,
   renderingTextOf,
   audioPointer,
   renderingCardOf,
   resolveServedRendering,
-  sourceRenderingForView,
-  primaryKeyForLanguage,
-  viewAcceptsLegacyRow,
 } from '../db/translationReads';
+import { textRenderingKey } from '../../lib/preferenceResolution';
 import {
   TEXT_ANNOTATIONS,
   annotationFieldsOf,
@@ -76,7 +73,6 @@ import {
   type CardEditLanguageRole,
   type FlagReason,
   flagReasonValidator,
-  politenessLevelValidator,
   voiceGenderValidator,
 } from '../types';
 import { cardOriginPillFields, originsForFilter } from '../lib/collections';
@@ -332,7 +328,6 @@ export const getCardForReview = query({
       settings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
     const studyContext = studyContextFromSettings(settings);
     const { schedulingMode, studyContentFilter } = studyContext;
-    const renderingSettings = renderingSettingsOf(settings);
 
     const now = resolveClientNow(args.now);
 
@@ -377,7 +372,7 @@ export const getCardForReview = query({
               sourceAnnotations: annotationFieldsOf(text),
               userCreated: text.userCreated,
               renderingText: renderingTextOf(text),
-              view: viewOfCard(card, renderingSettings),
+              view: viewOfCard(card),
             },
           ]
         : [];
@@ -389,11 +384,7 @@ export const getCardForReview = query({
       contentInputs,
       course.baseLanguages,
       course.targetLanguages,
-      {
-        rawRomanization: true,
-        ignoreMissingWordTimings: true,
-        includeVariantGaps: true,
-      },
+      { rawRomanization: true, ignoreMissingWordTimings: true },
     );
 
     // AI-feedback accepted alternatives, card-scoped (unlike the shared text
@@ -798,7 +789,6 @@ export const reviewCard = mutation({
       ctx,
       card,
       course,
-      renderingSettingsOf(reviewSettings),
     );
 
     // Record stats first so we can fold the new wordsTrackedLanguages stamp
@@ -1558,13 +1548,11 @@ async function enqueueFlagRetranslation(
   const RULE = 'retranslation_high';
   const auditFields = { ...opts.audit, rule: RULE };
 
-  const renderingKey = opts.row.variantKey;
   const claimId = await claimLlmTranslationIfAvailable(
     ctx,
     text._id,
     targetLanguage,
     undefined,
-    renderingKey,
   );
   if (!claimId) {
     // Something else owns this (text, language). This request — and any
@@ -1592,13 +1580,12 @@ async function enqueueFlagRetranslation(
         sourceLanguage: text.language,
         targetLanguage,
         text: text.text,
-        // A legacy row is re-rendered for the text's primary key (its voice
-        // and primary form) and stored back into the legacy slot.
-        renderingKeys: [
-          renderingKey ??
-            primaryKeyForLanguage(text, targetLanguage, opts.row.regionVariant),
-        ],
-        ...(renderingKey === undefined ? { replacesLegacyRow: true } : {}),
+        // Re-rendered for the sentence's voice, replacing the row the
+        // learner disputed.
+        renderingKey: textRenderingKey({
+          text: renderingTextOf(text),
+          textId: text._id,
+        }),
         previousTranslation: opts.previousTranslation,
         // The flagging/editing user deliberately asked for this retranslation.
         requestedByUserId: opts.audit.userId,
@@ -1879,9 +1866,8 @@ export const flagTranslation = mutation({
     reasons: v.array(flagReasonValidator),
     // Only read with the 'other' reason; trimmed and capped.
     note: v.optional(v.string()),
-    // The learner's pick under wrong_gender / wrong_politeness.
+    // The learner's pick under wrong_gender.
     requestedGender: v.optional(voiceGenderValidator),
-    requestedPolitenessLevel: v.optional(politenessLevelValidator),
   },
   returns: v.object({
     retranslated: v.boolean(),
@@ -1904,14 +1890,12 @@ export const flagTranslation = mutation({
       ? args.note?.trim().slice(0, FLAG_NOTE_MAX_LENGTH) || undefined
       : undefined;
 
-    const text = await ctx.db.get(card.textId);
-    if (!text)
+    const textRow = await ctx.db.get(card.textId);
+    if (!textRow)
       throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
+    let text: Doc<'texts'> = textRow;
 
-    const renderingSettings = renderingSettingsOf(
-      await getCourseSettings(ctx, course._id),
-    );
-    const view = viewOfCard(card, renderingSettings);
+    const view = viewOfCard(card);
     const renderingText = renderingTextOf(text);
 
     // Languages we need translations for. Every row the card shows
@@ -1948,12 +1932,7 @@ export const flagTranslation = mutation({
         }),
       ),
     );
-    // A placeholder (the legacy wording shown while the card's keyed row
-    // is being written) is not the card's wording: nothing to dispute
-    // there, the keyed row is on its way.
-    const served = renderings.flatMap((r) =>
-      r.served && !r.textPending ? [r.served] : [],
-    );
+    const served = renderings.flatMap((r) => (r.served ? [r.served] : []));
 
     if (served.length === 0) {
       return { retranslated: false, creditsAwarded: 0 };
@@ -1981,12 +1960,7 @@ export const flagTranslation = mutation({
           // rendering it shows (its variant may already exist for the live
           // wording, generated for other learners), so the index holds the
           // words the card now displays.
-          view: {
-            pinAt: now,
-            accentLanguage: card.accentLanguage,
-            settings: view.settings,
-            card: view.card,
-          },
+          view: { pinAt: now, accentLanguage: card.accentLanguage },
         },
       );
       // Raw patch: no card aggregate keys on the pin or the search fields.
@@ -2105,45 +2079,23 @@ export const flagTranslation = mutation({
       ? await payFlagReward(ctx, userId, Date.now())
       : 0;
 
-    // The learner's correction, kept on the card. Written whatever the
-    // classifier will say: a definitive verdict outranks it in the resolver
-    // (lib/preferenceResolution.ts), so an override on a sentence that fixes
-    // its own gender is inert rather than wrong. The card's variant is card
-    // demand from now on, so the ensure pass runs for it right away.
-    const overridePatch: {
-      renderingGenderOverride?: 'male' | 'female';
-      renderingPolitenessOverride?: NonNullable<
-        Doc<'cards'>['renderingPolitenessOverride']
-      >;
-    } = {};
-    if (reasons.includes('wrong_gender') && args.requestedGender) {
-      overridePatch.renderingGenderOverride = args.requestedGender;
-    }
-    if (reasons.includes('wrong_politeness') && args.requestedPolitenessLevel) {
-      overridePatch.renderingPolitenessOverride = args.requestedPolitenessLevel;
-    }
-    if (Object.keys(overridePatch).length > 0) {
-      // Raw patch: no card aggregate keys involved.
-      await ctx.db.patch(card._id, overridePatch);
-      await ctx.scheduler.runAfter(
-        0,
-        internal.features.decks.prepareCardContent,
-        {
-          textId: card.textId,
-          baseLanguages: course.baseLanguages,
-          targetLanguages: course.targetLanguages,
-          requestedByUserId: userId,
-          renderingSettings,
-          renderingCard: { ...renderingCardOf(card), ...overridePatch },
-        },
-      );
-    }
-
-    // A gender complaint on a text the current classifier has not judged:
-    // ask it now, from the source sentence alone. A text already at the
-    // current source is not re-asked (same prompt, same answer); the
-    // override above is the learner's lever there.
+    // A sentence has one voice and one translation written for it, so a
+    // speaker correction moves the SENTENCE, not one card: the learner's
+    // pick becomes the text's voice and every row of it is re-rendered
+    // below. The classifier is asked in the same breath, from the source
+    // sentence alone; its verdict outranks the pick when it lands
+    // (`applyTextMetadata`). A text already judged by the current
+    // classifier is not re-asked: same prompt, same answer.
     if (reasons.includes('wrong_gender')) {
+      if (
+        args.requestedGender &&
+        text.audioSpeakerGender !== args.requestedGender
+      ) {
+        await ctx.db.patch(text._id, {
+          audioSpeakerGender: args.requestedGender,
+        });
+        text = { ...text, audioSpeakerGender: args.requestedGender };
+      }
       await requestSentenceMetadataIfNeeded(
         ctx,
         text,
@@ -2153,16 +2105,13 @@ export const flagTranslation = mutation({
       );
     }
 
-    // Every flag under the cap attempts a fix (Paul, 2026-09-09): a reason
-    // with a pick is answered by the override above; one without a pick
-    // falls back to a retranslation of the shared row, gender and
-    // politeness alike.
+    // Every flag under the cap attempts a fix (Paul, 2026-09-09): whatever
+    // the reason, the shared row is retranslated, now for the corrected
+    // voice.
     const wantsRetranslation =
       reasons.includes('wrong_translation') ||
       reasons.includes('other') ||
-      (reasons.includes('wrong_politeness') &&
-        args.requestedPolitenessLevel === undefined) ||
-      (reasons.includes('wrong_gender') && args.requestedGender === undefined);
+      reasons.includes('wrong_gender');
 
     // 2) Per-language: over-cap rows record their skip (counter already rose
     // above); under-cap rows claim a slot and enqueue, charging quota on the
@@ -2268,33 +2217,19 @@ export const regenerateCardAudio = mutation({
     // live audio would spend the quota unit on a clip this card never plays,
     // so those languages re-synthesize their archived asset in place instead
     // and keep the live pointer as it is.
-    const renderingSettings = renderingSettingsOf(
-      await getCourseSettings(ctx, course._id),
-    );
-    const view = viewOfCard(card, renderingSettings);
+    const view = viewOfCard(card);
     // The rows this card plays. A Mixed English card plays its accent row's
     // clip for the source slot (`cardRowLanguages`), so that row is the one
     // regenerated, not the source clip the card never plays.
     const audioLanguages = cardRowLanguages(text, view, allLanguages);
     // The clip the card plays per language: its keyed row's pointer when
-    // it reads a keyed row, else the legacy pointer; the source slot's clip
-    // under the card's voice (docs/architecture/rendering-keys.md). A
-    // language served an archived revision re-synthesizes that revision's
-    // asset in place instead and keeps its live pointer.
+    // A language served an archived revision re-synthesizes that
+    // revision's asset in place instead and keeps its live pointer.
     const renderingText = renderingTextOf(text);
     const supersededLanguages = new Set<string>();
     for (const lang of audioLanguages) {
       if (lang === text.language) {
-        // A legacy view plays the legacy source clip; every other view the
-        // clip under its voice key (`loadContentState`).
-        const pointer = await audioPointer(
-          ctx,
-          card.textId,
-          lang,
-          viewAcceptsLegacyRow(view, renderingText)
-            ? undefined
-            : sourceRenderingForView(view, renderingText, card.textId).key,
-        );
+        const pointer = await audioPointer(ctx, card.textId, lang);
         if (pointer) await deleteAudioRow(ctx, pointer);
         continue;
       }
@@ -2304,8 +2239,6 @@ export const regenerateCardAudio = mutation({
         text: renderingText,
         view,
       });
-      // A placeholder's clip is not this card's to regenerate.
-      if (served.textPending) continue;
       if (served.served?.archived) {
         supersededLanguages.add(lang);
         await regenerateSupersededRevisionAudio(ctx, text, served.served.row, {
@@ -2317,12 +2250,7 @@ export const regenerateCardAudio = mutation({
         });
         continue;
       }
-      const pointer = await audioPointer(
-        ctx,
-        card.textId,
-        lang,
-        served.servedKeyed ? served.rendering.key : undefined,
-      );
+      const pointer = await audioPointer(ctx, card.textId, lang);
       if (pointer) await deleteAudioRow(ctx, pointer);
     }
 
@@ -2340,7 +2268,6 @@ export const regenerateCardAudio = mutation({
         forceAudioRegen: true,
         requestedByUserId: userId,
         card: renderingCardOf(card),
-        settings: renderingSettings,
       },
     );
 

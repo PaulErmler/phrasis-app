@@ -11,7 +11,6 @@ import {
   audioRecordingValidator,
   ttsPriorityValidator,
   llmPriorityValidator,
-  renderingSettingsValidator,
   renderingCardValidator,
 } from '../types';
 import { vAnnotationKind } from '../lib/textAnnotations';
@@ -399,7 +398,6 @@ export const prepareCardContent = internalMutation({
     llmPriority: v.optional(llmPriorityValidator),
     requestedByUserId: v.optional(v.string()),
     // See prepareCardContentHandler.
-    renderingSettings: v.optional(renderingSettingsValidator),
     renderingCard: v.optional(renderingCardValidator),
     skipTts: v.optional(v.boolean()),
   },

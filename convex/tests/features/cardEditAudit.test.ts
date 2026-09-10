@@ -441,7 +441,8 @@ describe('features/cardEditAudit', () => {
 
     it('marks a vanished text as dropped rather than leaving the row pending', async () => {
       const t = convexTest(schema, modules);
-      const { auditId, claimId, variantKey } = await seedPendingRetranslation(t);
+      const { auditId, claimId, variantKey } =
+        await seedPendingRetranslation(t);
       const orphanTextId = await t.run(async (ctx) => {
         const collectionId = await ctx.db.insert('collections', {
           name: 'tmp',
@@ -556,7 +557,7 @@ describe('features/cardEditAudit', () => {
       });
 
       const translation = await t.run(async (ctx) =>
-        liveTranslation(ctx, textId, 'en', variantKey),
+        liveTranslation(ctx, textId, 'en'),
       );
       expect(translation?.translatedText).toBe('Hey there');
     });

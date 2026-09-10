@@ -37,7 +37,7 @@ import {
   audioPointer,
   renderingTextOf,
 } from '../../db/translationReads';
-import { primaryRenderingKey } from '../../../lib/preferenceResolution';
+import { textRenderingKey } from '../../../lib/preferenceResolution';
 
 // Partial module mock: every real language's voice pickers only ever return
 // curated apiCodes, so `scheduleAudioForLanguage`'s "not in the curated voice
@@ -1400,8 +1400,8 @@ describe('features/decks', () => {
     it("keeps a stamped translation whose gender differs from the card's voice gender", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedTextWithSpanish(t, {
-        // Stamped 'male' while the card's audioSpeakerGender is 'female':
-        // no longer drift, the row is a valid rendering.
+        // Stamped 'male' while the text's audioSpeakerGender is 'female'.
+        // The stamp is not the key: an unkeyed row is left alone.
         translation: {
           speakerGender: 'male',
           translationSource: 'google-translate-v2',
@@ -1410,7 +1410,10 @@ describe('features/decks', () => {
       expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
     });
 
-    it('keeps a legacy translation and its other-gender clip on a premade text', async () => {
+    it('keeps the translation and re-voices a clip in the other voice', async () => {
+      // One clip per sentence, in the sentence's voice: a male clip on a
+      // female-voiced text is wrong for it and is detached to be re-voiced.
+      // The wording itself is untouched.
       const t = convexTest(schema, modules);
       const { textId } = await seedTextWithSpanish(t, {
         translation: { translationSource: 'google-translate-v2' },
@@ -1418,7 +1421,7 @@ describe('features/decks', () => {
       });
       expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
       const audio = await t.run((ctx) => audioPointer(ctx, textId, 'es'));
-      expect(audio).not.toBeNull();
+      expect(audio).toBeNull();
     });
 
     it('re-voices an other-gender clip on a USER-WRITTEN text', async () => {
@@ -1618,10 +1621,9 @@ describe('features/decks', () => {
         });
         // A keyed row: only rows written under a key are ever regenerated
         // (a legacy row is frozen for the cards still on it).
-        const esKey = primaryRenderingKey({
+        const esKey = textRenderingKey({
           text: renderingTextOf((await ctx.db.get(textId))!),
           textId,
-          code: 'es',
         });
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
@@ -1648,11 +1650,7 @@ describe('features/decks', () => {
       });
     }
 
-    async function runSweep(
-      t: TestConvex<typeof schema>,
-      textId: Id<'texts'>,
-      esKey: string,
-    ) {
+    async function runSweep(t: TestConvex<typeof schema>, textId: Id<'texts'>) {
       return t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
         const result = await ensureTextContent(
@@ -1662,7 +1660,7 @@ describe('features/decks', () => {
           ['en'],
           ['es'],
         );
-        const tr = await liveTranslation(ctx, textId, 'es', esKey);
+        const tr = await liveTranslation(ctx, textId, 'es');
         const audio = await ctx.db
           .query('audioRecordings')
           .withIndex('by_text_and_language', (q) =>
@@ -1675,11 +1673,8 @@ describe('features/decks', () => {
 
     it('regenerates a premade stale translation IN PLACE: row and audio keep serving, replacement job scheduled', async () => {
       const t = convexTest(schema, modules);
-      const { textId, trId, audioId, esKey } = await seedStaleTranslation(
-        t,
-        false,
-      );
-      const { result, tr, audio } = await runSweep(t, textId, esKey);
+      const { textId, trId, audioId } = await seedStaleTranslation(t, false);
+      const { result, tr, audio } = await runSweep(t, textId);
       // Nothing is deleted up front: the old wording (and its audio) serves
       // until the version-bump replacement lands, and the write choke point
       // then archives it for existing cards (see translationArchive.test.ts).
@@ -1700,8 +1695,8 @@ describe('features/decks', () => {
 
     it('keeps a user-created stale translation (the !userCreated guard) and its audio', async () => {
       const t = convexTest(schema, modules);
-      const { textId, esKey } = await seedStaleTranslation(t, true);
-      const { tr, audio } = await runSweep(t, textId, esKey);
+      const { textId } = await seedStaleTranslation(t, true);
+      const { tr, audio } = await runSweep(t, textId);
       // userCreated translations are user-owned → never version-regenerated.
       expect(tr).not.toBeNull();
       expect(audio).not.toBeNull();

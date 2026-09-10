@@ -409,11 +409,10 @@ export async function upsertAudioPointer(
   textId: Id<'texts'>,
   language: string,
   assetId: Id<'audioAssets'>,
-  // The rendering variant this pointer speaks (schema.ts); absent =
-  // canonical. Each key is its own pointer row.
+  // The rendering key this pointer speaks: the text's voice (schema.ts).
   variantKey?: string,
 ): Promise<void> {
-  const existing = await audioPointer(ctx, textId, language, variantKey);
+  const existing = await audioPointer(ctx, textId, language);
   if (!existing) {
     await ctx.db.insert('audioRecordings', {
       textId,
@@ -423,9 +422,12 @@ export async function upsertAudioPointer(
     });
     return;
   }
-  if (existing.assetId === assetId) return;
+  if (existing.assetId === assetId && existing.variantKey === variantKey) {
+    return;
+  }
   const previousAssetId = existing.assetId;
-  await ctx.db.patch(existing._id, { assetId });
+  await ctx.db.patch(existing._id, { assetId, variantKey });
+  if (previousAssetId === assetId) return;
   await releaseAudioAssetIfUnreferenced(ctx, previousAssetId);
 }
 

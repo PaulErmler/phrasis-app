@@ -38,7 +38,6 @@ const KIND_LABELS: Record<CardEditKind, string> = {
 const FLAG_REASON_LABELS: Record<FlagReason, string> = {
   wrong_translation: 'wrong translation',
   wrong_gender: 'wrong speaker gender',
-  wrong_politeness: 'wrong politeness',
   other: 'other',
 };
 

@@ -16,7 +16,6 @@ import {
 } from '@/app/app/onboarding/types';
 import { FLOW_ORDER, type StepId } from '@/app/app/onboarding/lib/resumeStep';
 import { CURRENT_PLACEMENT_STRATEGY_VERSION } from '@/app/app/onboarding/lib/placementStrategies';
-import { onboardingAsksPoliteness } from '@/lib/languageForms';
 
 /**
  * The wizard with a floating control panel: pick a language scenario and a
@@ -73,7 +72,6 @@ const ANSWERS: Record<StepId, Partial<OnboardingData>> = {
     },
   },
   'placement-test': {},
-  politeness: { politenessLevels: ['casual', 'polite', 'formal'] },
   'review-mode': {},
 };
 
@@ -138,10 +136,6 @@ export function OnboardingPreview() {
     [router],
   );
 
-  const asksPoliteness = onboardingAsksPoliteness(
-    scenario.target ? [scenario.target] : [],
-  );
-
   return (
     <div className="relative">
       <OnboardingWizard
@@ -193,30 +187,21 @@ export function OnboardingPreview() {
                 Jump to step
               </span>
               <div className="flex flex-wrap gap-1">
-                {STEPS.map((step) => {
-                  const skipped = step === 'politeness' && !asksPoliteness;
-                  return (
-                    <button
-                      key={step}
-                      type="button"
-                      onClick={() => jump(scenarioId, step)}
-                      title={
-                        skipped
-                          ? 'Skipped for this scenario in the real flow'
-                          : undefined
-                      }
-                      className={cn(
-                        'rounded-md border px-2 py-1 text-xs',
-                        step === stepId
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'hover:bg-muted',
-                        skipped && 'border-dashed opacity-60',
-                      )}
-                    >
-                      {step}
-                    </button>
-                  );
-                })}
+                {STEPS.map((step) => (
+                  <button
+                    key={step}
+                    type="button"
+                    onClick={() => jump(scenarioId, step)}
+                    className={cn(
+                      'rounded-md border px-2 py-1 text-xs',
+                      step === stepId
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'hover:bg-muted',
+                    )}
+                  >
+                    {step}
+                  </button>
+                ))}
               </div>
             </div>
             <Button

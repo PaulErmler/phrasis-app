@@ -101,7 +101,10 @@ describe('nextReviewLine keys against the real catalogs', () => {
       key: 'empty.nextReviewTomorrow',
       values: { time: '14h 23m', clock: '04:00' },
     },
-    { key: 'empty.nextReviewOn', values: { time: '3d 2h', clock: 'Sat, 04:00' } },
+    {
+      key: 'empty.nextReviewOn',
+      values: { time: '3d 2h', clock: 'Sat, 04:00' },
+    },
   ];
 
   for (const locale of ['en', 'de'] as const) {

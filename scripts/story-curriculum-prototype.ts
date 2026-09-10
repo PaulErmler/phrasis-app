@@ -404,9 +404,9 @@ async function main() {
         level,
         slot: firstSlotInLevel(rows, level),
       }));
-  const motivations = (
-    Object.keys(MOTIVATIONS) as MotivationKey[]
-  ).filter((m) => !ONLY_MOTIVATIONS || ONLY_MOTIVATIONS.includes(m));
+  const motivations = (Object.keys(MOTIVATIONS) as MotivationKey[]).filter(
+    (m) => !ONLY_MOTIVATIONS || ONLY_MOTIVATIONS.includes(m),
+  );
 
   console.log(`curriculum: ${rows.length} English sentences`);
   for (const { level, slot } of levels) {

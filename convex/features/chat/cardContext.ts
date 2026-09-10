@@ -3,11 +3,9 @@ import type { Id } from '../../_generated/dataModel';
 import {
   servedSourceText,
   viewOfCard,
-  renderingSettingsOf,
   renderingTextOf,
   resolveServedRendering,
 } from '../../db/translationReads';
-import { getCourseSettings } from '../../db/courseSettings';
 
 /**
  * Look up a card's source text, course-scoped translations, and course
@@ -61,10 +59,7 @@ export async function resolveCardContext(
   // for the source line on a Mixed English card is the accent row.
   // The rendering the card shows (its variant when the course has
   // sentence-form settings), so the tutor discusses the wording on screen.
-  const view = viewOfCard(
-    card,
-    renderingSettingsOf(await getCourseSettings(ctx, course._id)),
-  );
+  const view = viewOfCard(card);
   const renderingText = renderingTextOf(text);
   const [source, served] = await Promise.all([
     servedSourceText(ctx, text, view),

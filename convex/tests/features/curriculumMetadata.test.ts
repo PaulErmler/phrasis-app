@@ -21,7 +21,7 @@ import {
   MAX_METADATA_ATTEMPTS,
   metadataState,
 } from '../../lib/contentScheduling';
-import { audioPointer, liveTranslation } from '../../db/translationReads';
+import { audioPointer } from '../../db/translationReads';
 import { getTtsProviderForLanguage } from '../../../lib/languages';
 import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
 
@@ -52,8 +52,7 @@ const llmEnqueues = () =>
         c[2] as {
           textId: Id<'texts'>;
           targetLanguage: string;
-          renderingKeys: string[];
-          adoptLegacy?: boolean;
+          renderingKey: string;
           replaceExisting?: boolean;
           translationReason?: string;
         },
@@ -61,10 +60,6 @@ const llmEnqueues = () =>
     .filter(
       (job) => job.targetLanguage !== 'en_gb' && job.targetLanguage !== 'en_au',
     );
-const ttsEnqueues = () =>
-  vi
-    .mocked(ttsPool.enqueueAction)
-    .mock.calls.map((c) => c[2] as { language: string; voiceGender: string });
 beforeEach(() => {
   vi.mocked(llmPool.enqueueAction).mockClear();
   vi.mocked(ttsPool.enqueueAction).mockClear();
@@ -121,8 +116,8 @@ async function seed(
     });
     const rows: Record<string, Id<'translations'>> = {};
     for (const [lang, text, key] of [
-      ['ja', '僕たちは兄弟だ。', 'male|desu-masu'],
-      ['de', 'Wir sind Brüder.', 'male|none'],
+      ['ja', '僕たちは兄弟だ。', 'male'],
+      ['de', 'Wir sind Brüder.', 'male'],
     ] as const) {
       rows[lang] = await ctx.db.insert('translations', {
         textId,
@@ -209,85 +204,34 @@ describe('metadataState', () => {
   });
 });
 
-describe('the metadata precondition', () => {
-  it('asks the classifier for an unclassified curriculum text, from the source alone, and waits', async () => {
+describe('the sweep no longer classifies up front', () => {
+  it('leaves a complete text alone and never asks the classifier', async () => {
     const t = convexTest(schema, modules);
-    const { textId } = await seed(t);
-    const result = await sweep(t, textId);
-    expect(result).toEqual({ translationsScheduled: 1, audioScheduled: 0 });
-    const jobs = await pendingJobs(t, 'classifyCurriculumText');
-    expect(jobs).toHaveLength(1);
-    expect(jobs[0].args[0]).toMatchObject({
-      textId,
-      translations: [{ language: 'en', text: 'We are brothers.' }],
-      schedulePrepareCard: true,
-    });
-    const text = await t.run((ctx) => ctx.db.get(textId));
-    expect(text?.metadataRequestedAt).toBeDefined();
-    expect(text?.metadataAttempts).toBe(1);
-    // No key was computed from a guess: nothing else was asked for.
-    expect(llmEnqueues()).toEqual([]);
-    expect(ttsEnqueues()).toEqual([]);
-    expect(
-      await t.run((ctx) => liveTranslation(ctx, textId, 'de', 'male|none')),
-    ).toBeNull();
-  });
-
-  it('does not ask again inside the cooldown, nor for a classified or user-written text', async () => {
-    const t = convexTest(schema, modules);
-    const { textId: inFlight } = await seed(t, {
-      metadataRequestedAt: Date.now() - 1000,
-    });
-    const { textId: classified } = await seed(t, {
-      metadata: { speakerGender: 'neutral' },
-    });
-    const { textId: own } = await seed(t, { userCreated: true });
-    for (const id of [inFlight, classified, own]) await sweep(t, id);
-    expect(await pendingJobs(t, 'classifyCurriculumText')).toHaveLength(0);
-  });
-
-  it('a text in flight is left alone until the verdict lands', async () => {
-    const t = convexTest(schema, modules);
-    const { textId } = await seed(t, {
-      metadataRequestedAt: Date.now() - 1000,
-    });
+    const { textId } = await seed(t, { keyedRows: true });
     expect(await sweep(t, textId)).toEqual({
       translationsScheduled: 0,
       audioScheduled: 0,
     });
+    expect(await pendingJobs(t, 'classifyCurriculumText')).toHaveLength(0);
     expect(llmEnqueues()).toEqual([]);
   });
 
-  it('a classified text goes on to its keyed rows: the legacy rows are offered for adoption', async () => {
+  it('re-renders a row written for the other speaker, in the text’s voice', async () => {
     const t = convexTest(schema, modules);
-    const { textId } = await seed(t, {
-      metadata: { speakerGender: 'neutral' },
-    });
-    await sweep(t, textId);
-    // ja: a form key on a legacy wording of unknown form, and de: a
-    // form-free key on a language whose wording marks the first person.
-    // Both legacy rows may stand in for the primary key, once verified.
-    const jobs = llmEnqueues();
-    expect(jobs.map((j) => [j.targetLanguage, j.renderingKeys, j.adoptLegacy]))
-      .toEqual(
-        expect.arrayContaining([
-          ['ja', ['male|desu-masu'], true],
-          ['de', ['male|none'], true],
-        ]),
-      );
-  });
-
-  it('a text the classifier keeps failing on renders from defaults', async () => {
-    const t = convexTest(schema, modules);
-    const { textId } = await seed(t, {
-      metadataAttempts: MAX_METADATA_ATTEMPTS,
-    });
+    const { textId } = await seed(t, { keyedRows: true });
+    await t.run((ctx) =>
+      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
+    );
     await sweep(t, textId);
     expect(await pendingJobs(t, 'classifyCurriculumText')).toHaveLength(0);
-    expect(llmEnqueues().map((j) => j.targetLanguage).sort()).toEqual([
-      'de',
-      'ja',
-    ]);
+    expect(
+      llmEnqueues().map((j) => [j.targetLanguage, j.renderingKey]),
+    ).toEqual(
+      expect.arrayContaining([
+        ['ja', 'female'],
+        ['de', 'female'],
+      ]),
+    );
   });
 });
 
@@ -426,7 +370,10 @@ describe('a user-written text follows the verdict', () => {
       keyedRows: true,
     });
     await t.run((ctx) =>
-      ctx.db.patch(textId, { speakerGender: undefined, metadataSource: undefined }),
+      ctx.db.patch(textId, {
+        speakerGender: undefined,
+        metadataSource: undefined,
+      }),
     );
     await t.mutation(
       internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
@@ -439,17 +386,17 @@ describe('a user-written text follows the verdict', () => {
       },
     );
     const ja = await t.run((ctx) => ctx.db.get(rows.ja));
-    expect(ja?.variantKey).toBe('female|desu-masu');
+    expect(ja?.variantKey).toBe('female');
     expect(ja?.speakerGender).toBe('female');
     expect((await t.run((ctx) => ctx.db.get(rows.de)))?.variantKey).toBe(
-      'female|none',
+      'female',
     );
-    expect(
-      await t.run((ctx) => audioPointer(ctx, textId, 'ja', 'male|desu-masu')),
-    ).toBeNull();
+    expect(await t.run((ctx) => audioPointer(ctx, textId, 'ja'))).toBeNull();
     // The clip's asset survives for the cache.
     expect(
-      await t.run(async (ctx) => (await ctx.db.query('audioAssets').collect()).length),
+      await t.run(
+        async (ctx) => (await ctx.db.query('audioAssets').collect()).length,
+      ),
     ).toBe(3);
   });
 });

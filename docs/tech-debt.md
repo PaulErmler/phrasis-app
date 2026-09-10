@@ -107,29 +107,23 @@ correctness/cost/velocity noted per item.
       into one write and add a scheduled recount. Effort M. Impact: OCC retries on busy
       decks; silent drift persistence.
 
-- [ ] **C36 — Stranded keyed rows.** A course that switches its politeness
-      setting keeps the previous key's rows and clips
-      (docs/architecture/rendering-keys.md: nothing is deleted on a switch, so
-      switching back is free). Nothing collects a keyed row no card reads any more.
-      Small and shared; revisit with a usage-aware sweep if volume warrants. Effort M.
+- [x] **C36 — Stranded keyed rows.** Moot since the politeness choice was
+      withdrawn (2026-09-11): a sentence has one live row per language, so
+      no key is ever left unread.
 - [x] **C37 — Collection previews stay canonical for preference users.** Resolved
       2026-09-10: every reader without a card resolves a key like a new card would,
       and `ensureTextContent` is the one sweep for the review, warm and browse
       surfaces (browse passes `skipTts`), so a preview requests the keyed row.
-- [ ] **C38 — Per-language sentence-form copy is English only.** The row labels,
-      descriptions and examples in `lib/languageForms.ts` (43 languages) reach the German
-      UI untranslated; the wizard and settings chrome around them is bilingual. Either
-      translate the config copy or key it into messages/\*.json. Effort M.
 - [ ] **C41 — Sentence-metadata calls are one per text.** The curriculum
       classification (`requestSentenceMetadataIfNeeded`, asked by the sweep's
       metadata gate before a text's first keyed row) sends one classifier call per
       text. Batching several source sentences into one call would cut the per-row
       overhead but needs a prompt change and its own `pnpm eval:metadata` run.
       Effort S.
-- [ ] **C42 — No way to clear a per-card rendering override.** The Flag dialog
-      writes `cards.renderingGenderOverride` / `renderingPolitenessOverride`; nothing
-      lets the learner undo one short of a card edit (which forks the text and clears
-      both). The edit dialog is the natural home. Effort S.
+- [x] **C42 — No way to clear a per-card rendering override.** Moot since
+      the per-card overrides were withdrawn (2026-09-11): a speaker
+      correction moves the sentence's own voice, and flagging it again
+      moves it back.
 - [x] **C43 — Gender/politeness pipeline cleanups (2026-09-09 review).** Resolved
       2026-09-10 by the rendering-keys restructuring
       (docs/architecture/rendering-keys.md): one sweep entry point, one batched
@@ -138,17 +132,16 @@ correctness/cost/velocity noted per item.
       `lib/renderingPrompts.ts`. The rest of
       `.scratch/speaker-gender-politeness/cleanups.md` went with the machinery it
       described (stamps, canonical/variant split, correction sweep).
-- [ ] **C40 — Sentence-form evals still owed.** The politeness corpus covers ten
-      languages (de es fr hi ja ko pt ru th zh); the plan wanted vi, fil, id, pl, cs, tr,
-      it, pt_pt, uz, bn and ar_eg with the traps from the review table, and nine
-      autofill override cases in `scripts/eval/translation-autofill-cases.ts`. The
-      `formal` quick action anchors on the course setting, not the served row, and on a
-      mixed level set names both forms. Effort M.
-- [ ] **C39 — OGTE register metadata was never reclassified for pervasive
-      languages.** `texts.register` is empty for every descriptive curriculum sentence
-      (the offline classifier emitted n/a), so canonical Japanese/Korean rows generated
-      before Sep 2026 lean casual and only new rows take the polite default. A local
-      reclassification + upload would let a version bump regenerate them. Effort M.
+- [ ] **C40 — Speaker-gender eval coverage.** The gender corpus
+      (`data_preparation/gender_eval`) misses vi, fil, id, cs, tr, pt_pt, uz
+      and bn, and `scripts/eval/translation-autofill-cases.ts` has no
+      speaker-override cases. Effort M.
+- [ ] **C39 — OGTE register metadata was never classified for pervasive
+      languages.** `texts.register` is empty for every descriptive curriculum
+      sentence (the offline classifier emitted n/a). Nothing reads it for
+      rendering any more, but the writing grader and the custom-text form
+      still show it. A local reclassification + upload would fill it.
+      Effort M.
 
 ## Frontend architecture & performance
 

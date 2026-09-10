@@ -693,19 +693,6 @@ export const finalizeOnboarding = mutation({
             }
           }
 
-          // The politeness answer, same no-op-in-the-normal-flow rule.
-          // A set: {polite, casual} and {casual, polite} are the same answer.
-          const sortedLevels = (levels: readonly string[] | undefined) =>
-            [...(levels ?? [])].sort().join(',');
-          if (
-            progress.politenessLevels !== undefined &&
-            progress.politenessLevels.length > 0 &&
-            sortedLevels(courseSettings.politenessLevels) !==
-              sortedLevels(progress.politenessLevels)
-          ) {
-            patch.politenessLevels = progress.politenessLevels;
-          }
-
           if (Object.keys(patch).length > 0) {
             await ctx.db.patch(courseSettings._id, patch);
           }

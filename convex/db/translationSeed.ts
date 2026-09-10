@@ -8,8 +8,6 @@ import {
   liveTranslation,
   audioPointer,
   audioPointersForTextLanguage,
-  dialectForRendering,
-  primaryKeyForLanguage,
 } from './translationReads';
 import { resolveCardSpeakerGenders } from '../../lib/languages';
 
@@ -125,18 +123,6 @@ export const batchUpsertTranslations = internalMutation({
         { ...textDoc, speakerGender: item.speakerGender },
         textId,
       );
-      const patchedText = {
-        ...textDoc,
-        text: item.textEn,
-        register: item.register,
-        addresseeNumber: item.addresseeNumber,
-        speakerGender: item.speakerGender,
-        addresseeGender: item.addresseeGender,
-        tenseAspect: item.tenseAspect,
-        sentenceType: item.sentenceType,
-        literalFigurative: item.literalFigurative,
-        ...genderPatch,
-      };
       await ctx.db.patch(textId, {
         text: item.textEn,
         register: item.register,
@@ -165,22 +151,14 @@ export const batchUpsertTranslations = internalMutation({
       }
 
       for (const tr of item.translations) {
-        const legacy = await liveTranslation(ctx, textId, tr.language);
-        const primaryKey = primaryKeyForLanguage(
-          patchedText,
-          tr.language,
-          dialectForRendering(tr.language, textId, legacy),
-        );
-        const existing =
-          (await liveTranslation(ctx, textId, tr.language, primaryKey)) ??
-          legacy;
+        const existing = await liveTranslation(ctx, textId, tr.language);
 
         if (!existing) {
           await ctx.db.insert('translations', {
             textId,
             targetLanguage: tr.language,
             translatedText: canonicalizeApostrophes(tr.language, tr.text),
-            variantKey: primaryKey,
+            variantKey: audioSpeakerGender,
             speakerGender: audioSpeakerGender,
             ...(tr.translationSource
               ? { translationSource: tr.translationSource }
@@ -204,14 +182,8 @@ export const batchUpsertTranslations = internalMutation({
           stats.translationsUpdated++;
 
           // Translation text changed. Delete the row's audio so it
-          // regenerates on demand; the rows versioned from this wording are
-          // derivation-stale now and the sweep re-versions them.
-          const audio = await audioPointer(
-            ctx,
-            textId,
-            tr.language,
-            existing.variantKey,
-          );
+          // regenerates on demand.
+          const audio = await audioPointer(ctx, textId, tr.language);
           if (audio) {
             await deleteAudioRow(ctx, audio);
             stats.audioInvalidated++;

@@ -24,7 +24,7 @@ import { llmPool, ttsPool } from '../../lib/workpools';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
 import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
-import { primaryRenderingKey } from '../../../lib/preferenceResolution';
+import { textRenderingKey } from '../../../lib/preferenceResolution';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -143,11 +143,10 @@ async function seed(
   // on the accent siblings).
   await t.run(async (ctx) => {
     const textDoc = (await ctx.db.get(resolvedTextId))!;
-    const keyOf = (lang: string) =>
-      primaryRenderingKey({
+    const keyOf = () =>
+      textRenderingKey({
         text: renderingTextOf(textDoc),
         textId: resolvedTextId,
-        code: lang,
       });
     const accentRow = opts.accentRow ?? 'rewrite';
     if (accentRow !== 'none') {
@@ -162,7 +161,7 @@ async function seed(
         translationVersion: getCurrentTranslationVersion('en_gb'),
         ipaText: 'ipa-gb',
         speakerGender: 'female',
-        variantKey: keyOf('en_gb'),
+        variantKey: keyOf(),
       });
       if (opts.accentAudio ?? true) {
         await insertAudioFixture(ctx, {
@@ -175,7 +174,7 @@ async function seed(
           storageId: await ctx.storage.store(new Blob([new Uint8Array([1])])),
           ttsQuality: 'validated',
           wordTimings: [{ word: 'The', start: 0, end: 0.2 }],
-          variantKey: keyOf('en_gb'),
+          variantKey: keyOf(),
         });
       }
     }
@@ -190,7 +189,7 @@ async function seed(
       storageId: await ctx.storage.store(new Blob([new Uint8Array([2])])),
       ttsQuality: 'validated',
       wordTimings: [{ word: 'The', start: 0, end: 0.2 }],
-      variantKey: keyOf('en'),
+      variantKey: keyOf(),
     });
     for (const lang of target.filter((l) => l !== 'en')) {
       await ctx.db.insert('translations', {
@@ -200,7 +199,7 @@ async function seed(
         translationSource: 'openai/gpt-5.6-luna:nitro-none',
         ipaText: '',
         speakerGender: 'female',
-        variantKey: keyOf(lang),
+        variantKey: keyOf(),
       });
       await insertAudioFixture(ctx, {
         textId: resolvedTextId,
@@ -210,7 +209,7 @@ async function seed(
         storageId: await ctx.storage.store(new Blob([new Uint8Array([3])])),
         ttsQuality: 'validated',
         wordTimings: [{ word: 'El', start: 0, end: 0.2 }],
-        variantKey: keyOf(lang),
+        variantKey: keyOf(),
       });
     }
   });
@@ -328,9 +327,7 @@ describe('editing a Mixed English card', () => {
     expect(enAudio[0].assetId).toBe(gbAudio[0].assetId);
     // The Spanish correction is still offered to the curriculum.
     // The Spanish primary key: the text's voice, no form (no "you").
-    const esRow = await t.run((ctx) =>
-      liveTranslation(ctx, ids.textId, 'es', 'female|none'),
-    );
+    const esRow = await t.run((ctx) => liveTranslation(ctx, ids.textId, 'es'));
     expect(esRow?.flagCount).toBe(1);
   });
 
@@ -361,7 +358,7 @@ describe('editing a Mixed English card', () => {
     ]);
     // The curriculum fix goes to the accent row, with the learner's wording.
     const gbRow = await t.run((ctx) =>
-      liveTranslation(ctx, ids.textId, 'en_gb', 'female|none'),
+      liveTranslation(ctx, ids.textId, 'en_gb'),
     );
     expect(gbRow?.flagCount).toBe(1);
     const fix = llmEnqueues().find(
@@ -391,7 +388,7 @@ describe('flagging a Mixed English card', () => {
 
     expect(result.retranslated).toBe(true);
     const gbRow = await t.run((ctx) =>
-      liveTranslation(ctx, ids.textId, 'en_gb', 'female|none'),
+      liveTranslation(ctx, ids.textId, 'en_gb'),
     );
     expect(gbRow?.flagCount).toBe(1);
     expect(

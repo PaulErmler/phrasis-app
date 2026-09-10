@@ -27,11 +27,7 @@
 
 import { generateText, type JSONValue } from 'ai';
 import { tryGetOpenRouter } from '../lib/openrouter';
-import {
-  languagePolitenessBlock,
-  politenessInstruction,
-  speakerInstruction,
-} from '../../lib/renderingPrompts';
+import { speakerInstruction } from '../../lib/renderingPrompts';
 import { openrouterCostUsd, openrouterGenerationId } from '../lib/posthogAi';
 import {
   postProcessTranslation,
@@ -124,9 +120,7 @@ export type LlmTranslationResult =
 
 /**
  * The agreement instructions of Prompt B (XML-structured), minus its register
- * glossary. Politeness is asked for per language instead: the language block
- * (`languagePolitenessBlock`) names this language's forms and the requested
- * one, and a language that marks no form is told nothing about register.
+ * glossary.
  *
  * Conditional rendering (handled in `buildPrompt` below):
  *   - `<speaker_gender>`: always emitted, the key's voice.
@@ -195,135 +189,36 @@ export type TranslationPromptArgs = {
    */
   accentRewrite?: AccentRewriteConfig;
   /**
-   * The politeness form of the rendering key (lib/languageForms.ts): one of
-   * the language's forms, emitted as `<politeness_form>` whether or not the
-   * sentence addresses someone, with the form's own instruction and the
-   * language's intro in the language block. Absent when the key's form is
-   * `none`: an unmarked language, or a T-V sentence with no "you".
-   */
-  requestedForm?: {
-    id: string;
-    label: string;
-    prompt: string;
-    /** `POLITENESS_CONFIG[code].intro`: how this language grades politeness. */
-    intro?: string;
-  };
-  /**
-   * The primary wording this job VERSIONS for the requested form and voice
-   * (`buildVersioningPrompt`). `buildPrompt` then returns the versioning
-   * prompt and ignores the arc and flag context, which describe a
-   * translation from the source.
-   */
-  rewriteOf?: string;
-  /**
-   * Versioning only: the key's voice differs from the primary's, so every
-   * first-person form is to change. Without it the voice is context for
-   * the form's carriers and the wording's own first-person forms stay.
-   */
-  rewriteChangesGender?: boolean;
-  /**
    * A wording the rendering classifier judged not to carry the requested
-   * voice or form (`verifyRendering`). Emitted as a `<previous_attempt>`
-   * block on the one retry, so the model does not return it again.
+   * voice (`verifyRendering`). Emitted as a `<previous_attempt>` block on
+   * the one retry, so the model does not return it again.
    */
   previousAttempt?: string;
 };
 
 /**
- * The VERSIONING prompt: rewrite the primary wording of a sentence for a
- * requested politeness form and voice, changing only what the form
- * requires. A fresh translation per rendering drifted in unrelated wording
- * on a third of sentences (scripts/eval-gender-relevance.ts, 2026-09-06:
- * "Je me suis perdu en ville" became "perdue dans la ville"), which would
- * make every such rendering a separate audio clip. A rewrite of the stored
- * text keeps the sentence identical wherever the form does not bite. Same
- * shape as `buildAccentRewritePrompt`: identity is the expected answer for
- * most inputs and is asked for by name. This is the 2026-09-06 wording that
- * won the 2026-09-07 A/B on the rewrite path; change it only with
- * `pnpm eval:adherence` in hand.
- */
-export function buildVersioningPrompt(args: {
-  targetLang: string;
-  targetLangName: string;
-  sourceText: string;
-  primaryText: string;
-  /** The key's voice. */
-  speakerGender?: 'male' | 'female';
-  /** Whether the voice differs from the primary wording's. */
-  changesGender?: boolean;
-  requestedForm?: { id: string; label: string; prompt: string };
-  previousAttempt?: string;
-}): string {
-  const requirements = requestedFormInstruction({
-    requestedForm: args.requestedForm,
-    speakerGender: args.changesGender ? args.speakerGender : undefined,
-  });
-  // Only when the voice stays: `requestedFormInstruction` already emits a
-  // stronger line for a changed voice, and stacking the two would read as a
-  // request to change every first-person form. A politeness form whose
-  // carrier agrees with the speaker (Thai ครับ/ค่ะ, a self-reference term)
-  // still has to be introduced in the right one, and the primary wording
-  // may not contain it yet; without this the model fell back to the form
-  // prompt's own default for an unstated speaker (ค่ะ on Thai), so a
-  // male-voiced card asking for the polite level got the female particle
-  // read in a male voice.
-  if (!args.changesGender && args.speakerGender) {
-    const who = args.speakerGender === 'male' ? 'a man' : 'a woman';
-    requirements.push(
-      `The speaker is ${who}. Where the required form introduces a word that agrees with the speaker (a politeness particle, a first-person pronoun or a self-reference term), use the form for ${who}. Do not change any other first-person form, and do not re-gender wording the sentence already has.`,
-    );
-  }
-  return [
-    `You are a professional ${args.targetLangName} editor. Below is an English sentence and its ${args.targetLangName} translation. Rewrite the translation so that it satisfies the requirement, and change NOTHING else: keep every word, the word order, the punctuation and the meaning exactly as they are wherever the requirement does not force a change. If the translation already satisfies the requirement, output it unchanged, character for character.`,
-    ``,
-    `<requirement>`,
-    ...requirements.map((line) => `  ${line}`),
-    `</requirement>`,
-    ...previousAttemptBlock(args.previousAttempt),
-    ``,
-    `<source>${args.sourceText}</source>`,
-    `<translation>${args.primaryText}</translation>`,
-    ``,
-    `Output only the rewritten ${args.targetLangName} sentence. No commentary, no tags, no quotation marks, no alternatives.`,
-  ].join('\n');
-}
-
-/**
  * The block for the one retry after the rendering classifier judged a
- * wording not to carry the requested voice or form.
+ * wording not to carry the requested voice.
  */
 function previousAttemptBlock(previousAttempt: string | undefined): string[] {
   if (!previousAttempt) return [];
   return [
     ``,
     `<previous_attempt>`,
-    `  A previous attempt, <prior>${previousAttempt}</prior>, did not carry the required speaker gender or politeness form. Produce a rendering that does, at every place the language marks it.`,
+    `  A previous attempt, <prior>${previousAttempt}</prior>, did not carry the required speaker gender. Produce a rendering that does, at every place the language marks it.`,
     `</previous_attempt>`,
   ];
 }
 
 /**
- * The instruction lines for a requested politeness form and/or speaker
- * gender, shared by the versioning prompt and the best-of-N judge so the
- * judge scores against exactly what was asked. Empty when nothing was
- * requested.
+ * The instruction line for the requested speaker gender, shared by the
+ * prompt and the best-of-N judge so the judge scores against exactly what
+ * was asked. Empty when nothing was requested.
  */
 export function requestedFormInstruction(
-  args: Pick<TranslationPromptArgs, 'requestedForm' | 'speakerGender'>,
+  args: Pick<TranslationPromptArgs, 'speakerGender'>,
 ): string[] {
-  const lines: string[] = [];
-  if (args.requestedForm) {
-    lines.push(
-      politenessInstruction({
-        promptLabel: args.requestedForm.label,
-        prompt: args.requestedForm.prompt,
-      }),
-    );
-  }
-  if (args.speakerGender) {
-    lines.push(speakerInstruction(args.speakerGender));
-  }
-  return lines;
+  return args.speakerGender ? [speakerInstruction(args.speakerGender)] : [];
 }
 
 /**
@@ -415,32 +310,15 @@ export function buildContextLines(args: TranslationPromptArgs): string[] {
       `  <addressee_gender>${args.addresseeGender ?? 'unspecified'}</addressee_gender>`,
     );
   }
-  // A requested form is a constraint on every sentence, so its tag is
-  // emitted whether or not the sentence addresses someone. No form, no tag:
-  // the language block says nothing about register either.
-  if (args.requestedForm) {
-    contextLines.push(
-      `  <politeness_form>${args.requestedForm.id}</politeness_form>`,
-    );
-  }
   return contextLines;
 }
 
 /**
- * The language-specific half of the instructions: this language's
- * politeness intro and the requested form, then the speaker line. Shared
+ * The language-specific half of the instructions: the speaker line. Shared
  * by the translation prompt and the judge.
  */
 function renderingInstructionLines(args: TranslationPromptArgs): string[] {
-  return [
-    ...languagePolitenessBlock({
-      intro: args.requestedForm?.intro,
-      form: args.requestedForm
-        ? { promptLabel: args.requestedForm.label, prompt: args.requestedForm.prompt }
-        : null,
-    }),
-    ...(args.speakerGender ? [speakerInstruction(args.speakerGender)] : []),
-  ];
+  return args.speakerGender ? [speakerInstruction(args.speakerGender)] : [];
 }
 
 /**
@@ -457,18 +335,6 @@ function fullLanguageName(args: TranslationPromptArgs): string {
 
 /** Build the user-message string for one translation call. */
 export function buildPrompt(args: TranslationPromptArgs): string {
-  if (args.rewriteOf !== undefined) {
-    return buildVersioningPrompt({
-      targetLang: args.targetLang,
-      targetLangName: fullLanguageName(args),
-      sourceText: args.text,
-      primaryText: args.rewriteOf,
-      speakerGender: args.speakerGender,
-      changesGender: args.rewriteChangesGender,
-      requestedForm: args.requestedForm,
-      previousAttempt: args.previousAttempt,
-    });
-  }
   if (args.accentRewrite) {
     return buildAccentRewritePrompt(args.accentRewrite, args.text, {
       previousTranslation: args.previousTranslation,

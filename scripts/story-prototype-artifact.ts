@@ -37,7 +37,12 @@ type Result = {
   } | null;
   error?: string;
   metrics?: Metrics;
-  telemetry: { costUsd?: number; latencyMs: number; inputTokens: number; outputTokens: number };
+  telemetry: {
+    costUsd?: number;
+    latencyMs: number;
+    inputTokens: number;
+    outputTokens: number;
+  };
 };
 type TtsRun = {
   index: number;
@@ -190,7 +195,9 @@ const ok = data.results.filter((r) => r.story && r.metrics);
 const llmPerStory = mean(data.results.map((r) => r.telemetry.costUsd ?? 0));
 const latency = mean(data.results.map((r) => r.telemetry.latencyMs)) / 1000;
 
-const stitched = data.ttsRuns.filter((r) => r.condition === 'two-voice-stitched');
+const stitched = data.ttsRuns.filter(
+  (r) => r.condition === 'two-voice-stitched',
+);
 const whole = data.ttsRuns.filter((r) => r.condition === 'one-voice-whole');
 const ttsStitchedPerStory = mean(
   stitched.filter((r) => r.costUsd != null).map((r) => r.costUsd as number),
@@ -227,7 +234,9 @@ const monthly = (storiesPerMonth: number) => perStoryTotal * storiesPerMonth;
 
 // ------------------------------------------------------------------ render
 
-const sets = [...new Set(data.results.map((r) => r.index))].sort((a, b) => a - b);
+const sets = [...new Set(data.results.map((r) => r.index))].sort(
+  (a, b) => a - b,
+);
 const langs = data.langs;
 
 function storyBlock(r: Result | undefined): string {
@@ -240,7 +249,9 @@ function storyBlock(r: Result | undefined): string {
   return `<div class="story">
   <div class="story__head">
     <h4 class="story__title">${esc(r.story.title)}</h4>${
-      gloss ? `\n    <p class="story__title-en">${esc(r.story.titleEn)}</p>` : ''
+      gloss
+        ? `\n    <p class="story__title-en">${esc(r.story.titleEn)}</p>`
+        : ''
     }
   </div>
   <div class="dialogue">${r.story.lines.map((l) => renderLine(l, r.sources, gloss)).join('\n')}</div>

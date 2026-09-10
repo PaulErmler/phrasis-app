@@ -53,7 +53,7 @@ describe('CardShell smoke', () => {
     expect(body.dataset.target).toBe('es');
   });
 
-  it('renders the sentence-form chips of the served target rows', () => {
+  it('renders the speaker chip of the served rows', () => {
     render(
       <CardShell
         presentation={makePresentation({
@@ -71,7 +71,6 @@ describe('CardShell smoke', () => {
               isBaseLanguage: false,
               isTargetLanguage: true,
               voiceGender: 'male',
-              politenessLevel: 'casual',
             },
           ],
         })}
@@ -83,12 +82,8 @@ describe('CardShell smoke', () => {
     );
 
     // Built inside the shell, so every surface that renders a card through
-    // it (review, library) shows them without wiring anything.
+    // it (review, library) shows it without wiring anything.
     expect(screen.getByTestId('form-chip-masculine')).toBeInTheDocument();
-    // A two-form language reads the generic word, not its own form (tu).
-    expect(screen.getByTestId('form-chip-fr-casual')).toHaveTextContent(
-      /^casual$/i,
-    );
   });
 
   it('falls back to the raw source text when there is no base translation, and bare skips the <main> wrapper', () => {

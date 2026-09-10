@@ -2,7 +2,6 @@ import {
   liveTranslation,
   servedSourceText,
   viewOfCard,
-  renderingSettingsOf,
   renderingTextOf,
 } from '../db/translationReads';
 import { QueryCtx } from '../_generated/server';
@@ -83,9 +82,6 @@ export async function getDeckCardsHandler(
     .take(maxCards);
 
   const texts = await Promise.all(cards.map((c) => ctx.db.get(c.textId)));
-  const renderingSettings = renderingSettingsOf(
-    await getCourseSettings(ctx, course._id),
-  );
 
   const inputs = cards
     .map((card, i) => {
@@ -101,7 +97,7 @@ export async function getDeckCardsHandler(
         sourceAnnotations: annotationFieldsOf(text),
         userCreated: text.userCreated,
         renderingText: renderingTextOf(text),
-        view: viewOfCard(card, renderingSettings),
+        view: viewOfCard(card),
       };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);

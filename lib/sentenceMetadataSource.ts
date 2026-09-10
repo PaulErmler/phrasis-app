@@ -48,3 +48,15 @@ export function definitiveSpeakerGender(text: {
   if (!text.userCreated && !hasCurrentSentenceMetadata(text)) return null;
   return text.speakerGender;
 }
+
+/**
+ * Whether the sentence speaks to someone. The explicit classifier boolean,
+ * with the legacy fallback for rows from before it carried:
+ * `addresseeNumber` is 'not_applicable' exactly when there is no addressee.
+ */
+export function sentenceAddressesSomeone(text: {
+  addressesSomeone?: boolean;
+  addresseeNumber?: string;
+}): boolean {
+  return text.addressesSomeone ?? text.addresseeNumber !== 'not_applicable';
+}

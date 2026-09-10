@@ -1,5 +1,3 @@
-import type { PolitenessLevel } from '@/lib/languageForms';
-
 export type ReviewMode = 'audio' | 'full';
 
 /** Writing-mode input style. Mirrors `courseSettings.writingInputMode`. */
@@ -94,10 +92,6 @@ export interface OnboardingData {
   priorAppsFreeText: string | null;
   dailyTimeGoalMinutes: DailyTimeGoalMinutes | null;
   placementTest: PlacementTestState | null;
-  /** The politeness step (lib/languageForms.ts). Copied onto the course
-   *  settings by `completeOnboarding`. Stays empty until a row is ticked,
-   *  and is never asked when no target marks it. */
-  politenessLevels: PolitenessLevel[];
 
   // Branch state, never persisted, only used by the wizard
   proficiencyBranch: 'new' | 'self-pick' | 'test' | null;
@@ -117,6 +111,5 @@ export const EMPTY_ONBOARDING_DATA: OnboardingData = {
   priorAppsFreeText: null,
   dailyTimeGoalMinutes: null,
   placementTest: null,
-  politenessLevels: [],
   proficiencyBranch: null,
 };

@@ -104,7 +104,11 @@ function parseTurns(raw: string): string[] {
     body.slice(body.indexOf('{'), body.lastIndexOf('}') + 1),
   ) as { turns: unknown };
   if (!Array.isArray(obj.turns)) throw new Error('no turns array');
-  return obj.turns.map((t) => String(t).replace(/^[AB]\s*:\s*/, '').trim());
+  return obj.turns.map((t) =>
+    String(t)
+      .replace(/^[AB]\s*:\s*/, '')
+      .trim(),
+  );
 }
 
 async function pool<T>(jobs: (() => Promise<T>)[], limit: number) {
@@ -125,9 +129,11 @@ async function pool<T>(jobs: (() => Promise<T>)[], limit: number) {
 }
 
 async function main() {
-  const all = (JSON.parse(readFileSync(SOURCE, 'utf8')) as {
-    candidates: Candidate[];
-  }).candidates;
+  const all = (
+    JSON.parse(readFileSync(SOURCE, 'utf8')) as {
+      candidates: Candidate[];
+    }
+  ).candidates;
   const picked = sample(all, SAMPLE);
   console.log(`${all.length} candidates, sampling ${picked.length}`);
 
@@ -173,7 +179,10 @@ async function main() {
   const ok = results.filter((r) => r !== undefined);
   mkdirSync(OUT_DIR, { recursive: true });
   writeFileSync(
-    resolve(OUT_DIR, VARIANT === 'plain' ? 'rewrites.json' : `rewrites-${VARIANT}.json`),
+    resolve(
+      OUT_DIR,
+      VARIANT === 'plain' ? 'rewrites.json' : `rewrites-${VARIANT}.json`,
+    ),
     JSON.stringify({ model: MODEL, spendUsd, results: ok }, null, 1),
   );
   console.log(
@@ -181,7 +190,10 @@ async function main() {
   );
   console.log(
     'wrote',
-    resolve(OUT_DIR, VARIANT === 'plain' ? 'rewrites.json' : `rewrites-${VARIANT}.json`),
+    resolve(
+      OUT_DIR,
+      VARIANT === 'plain' ? 'rewrites.json' : `rewrites-${VARIANT}.json`,
+    ),
   );
 }
 

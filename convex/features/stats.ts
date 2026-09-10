@@ -1,8 +1,4 @@
-import {
-  viewOfCard,
-  renderingSettingsOf,
-  renderingTextOf,
-} from '../db/translationReads';
+import { viewOfCard, renderingTextOf } from '../db/translationReads';
 import { v } from 'convex/values';
 import {
   paginationOptsValidator,
@@ -752,9 +748,6 @@ export const getSentencesForWord = query({
     ]);
 
     // Build inputs for the batch content loader (translations + audio for all course languages)
-    const renderingSettings = renderingSettingsOf(
-      await getCourseSettings(ctx, courseId),
-    );
     const inputs = result.page
       .map((link, i) => {
         const text = textDocs[i];
@@ -770,9 +763,7 @@ export const getSentencesForWord = query({
           userCreated: text.userCreated,
           renderingText: renderingTextOf(text),
           card: cardDocs[i] ?? null,
-          ...(cardDocs[i]
-            ? { view: viewOfCard(cardDocs[i], renderingSettings) }
-            : {}),
+          ...(cardDocs[i] ? { view: viewOfCard(cardDocs[i]) } : {}),
         };
       })
       .filter((input): input is NonNullable<typeof input> => input !== null);

@@ -1,7 +1,7 @@
 /**
  * Benchmark: how well can a cheap model tell what a stored translation's
  * wording IS on the two sentence-form axes (speaker gender in first-person
- * forms, politeness form)? This picks the model behind
+ * forms)? This picks the model behind
  * convex/lib/renderingClassifier.ts, which stamps every translation row for
  * the chips on the card and the "canonical already satisfies the
  * preference" shortcut (the backfill runs it over the whole catalogue).
@@ -14,7 +14,7 @@
  *   pnpm eval:rendering --wild=.scratch/rendering-bench/translations.jsonl --wild-n=40
  *
  * Gold: data_preparation/gender_eval (508 target-language sentences with a
- * gold speaker gender) and data_preparation/politeness_eval (143 with a
+ * gold speaker gender
  * gold register), both from the Aug 2026 metadata-classifier work. A gold
  * label maps onto the classifier's categories through lib/languageForms.ts
  * (gold "polite" on German is the du form, reported as "casual"; on French
@@ -47,12 +47,8 @@ import {
   renderingAxesFor,
   type PromptWording,
   type RenderedGender,
-  type RenderedPoliteness,
 } from '../convex/lib/renderingClassifier';
-import {
-  getPolitenessConfig,
-  distinctPolitenessForms,
-} from '../lib/languageForms';
+import {} from '../lib/languageForms';
 import { LUNA_BO3, LUNA_PROVIDER_CONSTRAINTS } from '../lib/languages';
 import {
   argValue,
@@ -122,7 +118,6 @@ type Item = {
   language: string;
   text: string;
   expectedGender?: RenderedGender;
-  expectedPoliteness?: RenderedPoliteness;
   source: 'gold' | 'wild';
 };
 
@@ -134,22 +129,6 @@ function readJsonl(path: string): Record<string, unknown>[] {
 }
 
 /** Gold register -> the level the classifier reports for that form. */
-function politenessLevelFor(
-  language: string,
-  gold: string,
-): RenderedPoliteness | undefined {
-  if (gold === 'neutral') return 'unmarked';
-  const config = getPolitenessConfig(language);
-  if (!config) return undefined;
-  if (gold !== 'casual' && gold !== 'polite' && gold !== 'formal')
-    return undefined;
-  const form = config.forms[gold];
-  const entry = distinctPolitenessForms(language).find(
-    (d) => d.form.id === form.id,
-  );
-  return entry?.levels[0];
-}
-
 function loadGold(): Item[] {
   const items: Item[] = [];
   const genderDir = resolve(ROOT, 'data_preparation/gender_eval/data');
@@ -173,22 +152,6 @@ function loadGold(): Item[] {
       });
     }
   }
-  const politenessDir = resolve(ROOT, 'data_preparation/politeness_eval/data');
-  for (const file of readdirSync(politenessDir)) {
-    if (!file.endsWith('.jsonl')) continue;
-    for (const [i, row] of readJsonl(resolve(politenessDir, file)).entries()) {
-      const language = String(row.language);
-      const expected = politenessLevelFor(language, String(row.expected));
-      if (!expected) continue;
-      items.push({
-        id: `p:${language}:${i}`,
-        language,
-        text: String(row.text),
-        expectedPoliteness: expected,
-        source: 'gold',
-      });
-    }
-  }
   return items;
 }
 
@@ -204,7 +167,7 @@ function loadWild(path: string, perLanguage: number): Item[] {
         typeof row.regionVariant === 'string' ? row.regionVariant : undefined,
     });
     const axes = renderingAxesFor(language);
-    if (!axes.gender && !axes.politeness) continue;
+    if (!axes.gender) continue;
     const list = byLanguage.get(language) ?? [];
     list.push(row);
     byLanguage.set(language, list);
@@ -231,7 +194,6 @@ function loadWild(path: string, perLanguage: number): Item[] {
 
 type Prediction = {
   gender: RenderedGender;
-  politeness: RenderedPoliteness;
 } | null;
 
 function batchKey(
@@ -401,7 +363,6 @@ async function main() {
     const label = judgeLabels.get(item.id);
     if (label) {
       item.expectedGender = label.gender;
-      item.expectedPoliteness = label.politeness;
     }
   }
 
@@ -462,16 +423,6 @@ async function main() {
             confusion.set(ck, (confusion.get(ck) ?? 0) + 1);
           }
         }
-        if (axes.politeness && item.expectedPoliteness) {
-          bump(
-            `${job.model}|${job.wording}|politeness|${job.language}|${item.source}`,
-            pred?.politeness === item.expectedPoliteness,
-          );
-          if (pred && pred.politeness !== item.expectedPoliteness) {
-            const ck = `${job.model}|${job.wording}|politeness|${item.expectedPoliteness}->${pred.politeness}`;
-            confusion.set(ck, (confusion.get(ck) ?? 0) + 1);
-          }
-        }
       });
     }
   });
@@ -485,7 +436,7 @@ async function main() {
   out(
     `\nRendering detection, ${items.length} items, judge ${FLASH_JUDGE_MODEL} for wild labels`,
   );
-  for (const axis of ['gender', 'politeness'] as const) {
+  for (const axis of ['gender'] as const) {
     out(`\n== ${axis} ==`);
     out(
       `${'model'.padEnd(28)} ${'wording'.padEnd(11)} ${'gold'.padEnd(9)} ${'wild'.padEnd(9)} per language`,

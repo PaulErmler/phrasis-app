@@ -65,7 +65,9 @@ const MODELS = {
 type ModelKey = keyof typeof MODELS;
 const DEFAULT_MODEL: ModelKey = 'gemini-3.8-flash';
 
-const PORT = Number(process.argv.find((a) => a.startsWith('--port='))?.split('=')[1] ?? 5599);
+const PORT = Number(
+  process.argv.find((a) => a.startsWith('--port='))?.split('=')[1] ?? 5599,
+);
 const DATASET = resolve(
   __dirname,
   '../data_preparation/data/output/sentences_translated.csv',
@@ -87,7 +89,10 @@ const rows: Row[] = (
 ).map((r) => ({
   difficulty: r.difficulty || '?',
   text: Object.fromEntries(
-    LANGS.filter((l) => r[column(l)]?.trim()).map((l) => [l, r[column(l)].trim()]),
+    LANGS.filter((l) => r[column(l)]?.trim()).map((l) => [
+      l,
+      r[column(l)].trim(),
+    ]),
   ),
 }));
 const BANDS = [...new Set(rows.map((r) => r.difficulty))].sort();
@@ -197,7 +202,9 @@ async function generate(body: {
   model?: string;
 }) {
   const key: ModelKey =
-    body.model && body.model in MODELS ? (body.model as ModelKey) : DEFAULT_MODEL;
+    body.model && body.model in MODELS
+      ? (body.model as ModelKey)
+      : DEFAULT_MODEL;
   const config = MODELS[key];
   const effort: ReasoningEffort = (
     config.levels as readonly ReasoningEffort[]
@@ -268,13 +275,19 @@ async function generate(body: {
     // thinking level is visible rather than buried in the total.
     reasoningTokens: res.usage?.reasoningTokens ?? 0,
     outputTokens: res.usage?.outputTokens ?? 0,
-    metrics: story ? score(body.lang, story.lines, body.words, body.sources) : null,
+    metrics: story
+      ? score(body.lang, story.lines, body.words, body.sources)
+      : null,
   };
 }
 
 // -------------------------------------------------------------------- serve
 
-function json(res: import('node:http').ServerResponse, status: number, data: unknown) {
+function json(
+  res: import('node:http').ServerResponse,
+  status: number,
+  data: unknown,
+) {
   const payload = JSON.stringify(data);
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',

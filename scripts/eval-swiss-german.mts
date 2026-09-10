@@ -273,7 +273,10 @@ const FEATURES: ReadonlyArray<readonly [string, RegExp]> = [
   ['modal', /\b(can|could|would|should|must|may|please|have to)\b/iu],
   ['we', /\b(we|us|our)\b/iu],
   ['future', /\b(will|going to|tomorrow|next)\b/iu],
-  ['diminutive-bait', /\b(house|child|children|little|small|dog|cat|girl|boy)\b/iu],
+  [
+    'diminutive-bait',
+    /\b(house|child|children|little|small|dog|cat|girl|boy)\b/iu,
+  ],
   ['k-shift', /\b(come|comes|coming|child|children|kitchen|buy|can|cold)\b/iu],
 ];
 
@@ -377,7 +380,10 @@ function inferredContext(text: string): {
   };
 }
 
-function promptArgsFor(item: Item, condition: 'de' | 'de_ch'): TranslationPromptArgs {
+function promptArgsFor(
+  item: Item,
+  condition: 'de' | 'de_ch',
+): TranslationPromptArgs {
   const ctx = inferredContext(item.text);
   if (condition === 'de') {
     const cfg = getTranslationConfigForLanguage('de');
@@ -410,10 +416,7 @@ function promptArgsFor(item: Item, condition: 'de' | 'de_ch'): TranslationPrompt
 
 // -------------------------------------------------------------------- judge
 
-function buildScoringPrompt(
-  item: Item,
-  candidates: string[],
-): string {
+function buildScoringPrompt(item: Item, candidates: string[]): string {
   const args = promptArgsFor(item, 'de_ch');
   return [
     `You are a native speaker of Zurich Swiss German (Züridütsch) and a professional translation evaluator. Score each candidate translation of the English source on a 0-10 scale for how well it works as spoken Zurich Swiss German a learner would be taught.`,
@@ -442,7 +445,9 @@ function buildScoringPrompt(
  * good; this says what is wrong, in words, with a corrected sentence, which
  * is what a human reviewing the spike actually needs.
  */
-function buildCritiquePrompt(rows: { id: string; source: string; swiss: string }[]): string {
+function buildCritiquePrompt(
+  rows: { id: string; source: string; swiss: string }[],
+): string {
   return [
     `You are a native speaker of Zurich Swiss German (Züridütsch). Below are English sentences and their proposed Zurich Swiss German translations, produced by a language-learning app.`,
     ``,
@@ -577,7 +582,10 @@ async function reviseCached(
   const hit = bench.cache[key];
   if (hit) return hit.text;
   const startedAt = Date.now();
-  const providerOptions = openrouterCallOptions(STAGE.reasoning, STAGE.provider);
+  const providerOptions = openrouterCallOptions(
+    STAGE.reasoning,
+    STAGE.provider,
+  );
   try {
     const res = await generateText({
       model: openrouter(STAGE.model),
@@ -653,7 +661,10 @@ function pcmToMp3(pcm: Uint8Array): Uint8Array {
   return out;
 }
 
-async function synthesize(text: string, notes: string | undefined): Promise<Uint8Array> {
+async function synthesize(
+  text: string,
+  notes: string | undefined,
+): Promise<Uint8Array> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error('OPENROUTER_API_KEY is not set');
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -675,11 +686,15 @@ async function synthesize(text: string, notes: string | undefined): Promise<Uint
       }),
     });
     if (!res.ok) {
-      throw new Error(`Gemini TTS ${res.status}: ${(await res.text()).slice(0, 200)}`);
+      throw new Error(
+        `Gemini TTS ${res.status}: ${(await res.text()).slice(0, 200)}`,
+      );
     }
     const pcm = new Uint8Array(await res.arrayBuffer());
     if (pcm.byteLength > 0) return pcmToMp3(pcm);
-    console.warn(`  empty audio for "${text.slice(0, 30)}" (attempt ${attempt + 1}/3)`);
+    console.warn(
+      `  empty audio for "${text.slice(0, 30)}" (attempt ${attempt + 1}/3)`,
+    );
   }
   throw new Error(`No audio returned for "${text.slice(0, 40)}"`);
 }
@@ -698,7 +713,11 @@ function audioFileName(text: string, variant: 'a' | 'b'): string {
  * The hashed originals stay put — they are the synthesis cache, and a
  * sentence is not a safe cache key once the model rewords it.
  */
-function listenFileName(index: number, text: string, variant: 'a' | 'b'): string {
+function listenFileName(
+  index: number,
+  text: string,
+  variant: 'a' | 'b',
+): string {
   const slug = text
     .normalize('NFC')
     .replace(/[\\/:*?"<>|]/gu, '') // illegal on at least one of macOS/Windows
@@ -763,7 +782,9 @@ async function main(): Promise<void> {
   const openrouter = createOpenRouterFromEnv(RUN_HINT);
 
   const items = pickItems(n, seed);
-  console.log(`${items.length} sentences, seed "${seed}", budget ${fmtUsd(budgetUsd)}\n`);
+  console.log(
+    `${items.length} sentences, seed "${seed}", budget ${fmtUsd(budgetUsd)}\n`,
+  );
 
   // ---- translate both conditions
   const rows: Row[] = items.map((item) => ({
@@ -788,7 +809,9 @@ async function main(): Promise<void> {
     row.de = de.text;
     row.swiss = swiss.text;
     row.mech = swiss.text ? mechanicalCheck(swiss.text) : null;
-    console.log(`  ${row.item.text}\n    de:  ${de.text}\n    ch:  ${swiss.text}`);
+    console.log(
+      `  ${row.item.text}\n    de:  ${de.text}\n    ch:  ${swiss.text}`,
+    );
   });
   bench.save();
 
@@ -872,7 +895,8 @@ async function main(): Promise<void> {
     rows.forEach((row, i) => {
       if (!row.swiss) return;
       jobs.push({ row, index: i + 1, variant: 'a' });
-      if (i < TTS_VARIANT_B_COUNT) jobs.push({ row, index: i + 1, variant: 'b' });
+      if (i < TTS_VARIANT_B_COUNT)
+        jobs.push({ row, index: i + 1, variant: 'b' });
     });
     await pool(jobs, 3, async ({ row, index, variant }) => {
       const text = row.swiss as string;
@@ -904,16 +928,21 @@ async function main(): Promise<void> {
   const verdictCounts: Record<string, number> = {};
   for (const r of rows) {
     if (!r.critique) continue;
-    verdictCounts[r.critique.verdict] = (verdictCounts[r.critique.verdict] ?? 0) + 1;
+    verdictCounts[r.critique.verdict] =
+      (verdictCounts[r.critique.verdict] ?? 0) + 1;
   }
 
   const lines: string[] = [];
-  lines.push(`Swiss German via the ar_lev recipe — ${items.length} sentences, seed "${seed}"`);
+  lines.push(
+    `Swiss German via the ar_lev recipe — ${items.length} sentences, seed "${seed}"`,
+  );
   lines.push(`Translation stage: ${STAGE.model} (${STAGE.reasoning})`);
   lines.push(
     `Config: name="${SWISS.translationName}" native="${SWISS.nativeName}" region="${SWISS.regionLabel}"`,
   );
-  lines.push(`TTS: ${TTS_MODEL} voice=${SWISS.voiceName} language_code=${SWISS.geminiBcp47}`);
+  lines.push(
+    `TTS: ${TTS_MODEL} voice=${SWISS.voiceName} language_code=${SWISS.geminiBcp47}`,
+  );
   lines.push('');
   lines.push('--- mechanical ---');
   lines.push(
@@ -921,13 +950,16 @@ async function main(): Promise<void> {
   );
   const leakCounts: Record<string, number> = {};
   for (const r of rows) {
-    for (const l of r.mech?.leaks ?? []) leakCounts[l] = (leakCounts[l] ?? 0) + 1;
+    for (const l of r.mech?.leaks ?? [])
+      leakCounts[l] = (leakCounts[l] ?? 0) + 1;
     if (r.mech?.preterite) {
       const k = `preterite "${r.mech.preterite}"`;
       leakCounts[k] = (leakCounts[k] ?? 0) + 1;
     }
   }
-  for (const [label, count] of Object.entries(leakCounts).sort((a, b) => b[1] - a[1])) {
+  for (const [label, count] of Object.entries(leakCounts).sort(
+    (a, b) => b[1] - a[1],
+  )) {
     lines.push(`  ${count}x  ${label}`);
   }
   lines.push(
@@ -937,10 +969,14 @@ async function main(): Promise<void> {
     lines.push('');
     lines.push('--- judge (0-10, Zurich Swiss German) ---');
     lines.push(`  de_ch prompt: ${meanSwiss.toFixed(2)}`);
-    lines.push(`  de baseline:  ${meanDe.toFixed(2)}  (the control: should be low)`);
+    lines.push(
+      `  de baseline:  ${meanDe.toFixed(2)}  (the control: should be low)`,
+    );
     lines.push('');
     lines.push('--- critique verdicts ---');
-    for (const [v, c] of Object.entries(verdictCounts).sort((a, b) => b[1] - a[1])) {
+    for (const [v, c] of Object.entries(verdictCounts).sort(
+      (a, b) => b[1] - a[1],
+    )) {
       lines.push(`  ${c}x  ${v}`);
     }
   }
@@ -950,7 +986,9 @@ async function main(): Promise<void> {
     for (let round = 0; round < REVISE_ROUNDS; round++) {
       const seen = rows.filter((r) => r.revisions?.[round] != null);
       const before = (r: Row) =>
-        round === 0 ? (r.swiss as string) : (r.revisions?.[round - 1] as string);
+        round === 0
+          ? (r.swiss as string)
+          : (r.revisions?.[round - 1] as string);
       const changed = seen.filter((r) => r.revisions?.[round] !== before(r));
       lines.push(
         `  round ${round + 1}: ${changed.length}/${seen.length} sentences changed`,
@@ -978,7 +1016,10 @@ async function main(): Promise<void> {
     lines.push('');
     for (const r of rows) {
       if (!r.revisions) continue;
-      const chain = [r.swiss as string, ...r.revisions.filter((t) => t !== null)];
+      const chain = [
+        r.swiss as string,
+        ...r.revisions.filter((t) => t !== null),
+      ];
       const moved =
         !chain.every((t) => t === chain[0]) ||
         (r.natural != null && r.natural !== chain.at(-1));
@@ -999,9 +1040,15 @@ async function main(): Promise<void> {
   lines.push('');
   lines.push('--- sentences ---');
   for (const r of rows) {
-    lines.push(`[${r.item.difficulty}] ${r.item.text}   (${r.item.features.join(', ')})`);
-    lines.push(`  de     ${r.de ?? '<failed>'}${r.scoreDe !== undefined ? `   [${r.scoreDe}]` : ''}`);
-    lines.push(`  de_ch  ${r.swiss ?? '<failed>'}${r.scoreSwiss !== undefined ? `   [${r.scoreSwiss}]` : ''}`);
+    lines.push(
+      `[${r.item.difficulty}] ${r.item.text}   (${r.item.features.join(', ')})`,
+    );
+    lines.push(
+      `  de     ${r.de ?? '<failed>'}${r.scoreDe !== undefined ? `   [${r.scoreDe}]` : ''}`,
+    );
+    lines.push(
+      `  de_ch  ${r.swiss ?? '<failed>'}${r.scoreSwiss !== undefined ? `   [${r.scoreSwiss}]` : ''}`,
+    );
     if (r.mech && !mechanicallyClean(r.mech)) {
       const bits = [...r.mech.leaks];
       if (r.mech.preterite) bits.push(`preterite "${r.mech.preterite}"`);

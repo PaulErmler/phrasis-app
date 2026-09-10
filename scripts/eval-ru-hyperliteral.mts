@@ -67,7 +67,10 @@ type Call = { parsed: Parsed | null; raw: string; costUsd: number; ms: number };
 
 function parse(raw: string): Parsed | null {
   try {
-    const j = JSON.parse(stripJsonFences(raw.trim())) as Record<string, unknown>;
+    const j = JSON.parse(stripJsonFences(raw.trim())) as Record<
+      string,
+      unknown
+    >;
     if (typeof j.stressed !== 'string' || typeof j.hyperliteral !== 'string') {
       return null;
     }
@@ -174,7 +177,9 @@ async function synthesize(i: number, text: string): Promise<Buffer> {
       }),
     });
     if (!res.ok) {
-      throw new Error(`Gemini TTS ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      throw new Error(
+        `Gemini TTS ${res.status}: ${(await res.text()).slice(0, 300)}`,
+      );
     }
     const pcm = new Uint8Array(await res.arrayBuffer());
     if (pcm.byteLength === 0) continue; // OpenRouter's intermittent empty 200
@@ -189,7 +194,10 @@ async function synthesize(i: number, text: string): Promise<Buffer> {
 /** Strip the acute so a stress diff compares letters only; back to NFC so
  *  й and ё (decomposed by NFD) compare equal to the source. */
 const plain = (s: string) =>
-  s.normalize('NFD').replace(/\u0301/g, '').normalize('NFC');
+  s
+    .normalize('NFD')
+    .replace(/\u0301/g, '')
+    .normalize('NFC');
 
 /** Canonical stressed form: NFC, and an acute on ё dropped (ё is stressed
  *  by definition, so marking it is redundant rather than wrong). */
@@ -197,12 +205,16 @@ const canon = (s: string) => s.normalize('NFC').replace(/ё\u0301/g, 'ё');
 
 async function main() {
   if (!process.env.OPENROUTER_API_KEY) {
-    console.error('OPENROUTER_API_KEY is not set. Run via: pnpm eval:ru-hyperliteral');
+    console.error(
+      'OPENROUTER_API_KEY is not set. Run via: pnpm eval:ru-hyperliteral',
+    );
     process.exit(1);
   }
   const withAudio = !process.argv.includes('--no-audio');
   let spent = 0;
-  const rows: string[] = ['Text | letters | hyperliteral 1 (text) | hyperliteral 2 (audio)'];
+  const rows: string[] = [
+    'Text | letters | hyperliteral 1 (text) | hyperliteral 2 (audio)',
+  ];
   const notes: string[] = [];
 
   for (const [i, s] of SENTENCES.entries()) {
@@ -220,20 +232,26 @@ async function main() {
         s.text,
         letters,
         t.parsed?.hyperliteral ?? '<unparsed>',
-        a ? (a.parsed?.hyperliteral ?? `<unparsed: ${a.raw.slice(0, 60)}>`) : '(skipped)',
+        a
+          ? (a.parsed?.hyperliteral ?? `<unparsed: ${a.raw.slice(0, 60)}>`)
+          : '(skipped)',
       ].join(' | '),
     );
 
     const n = i + 1;
     if (t.parsed && canon(t.parsed.stressed) !== canon(s.stressed)) {
-      notes.push(`#${n} text stress differs from reference: ${t.parsed.stressed}  (ref ${s.stressed})`);
+      notes.push(
+        `#${n} text stress differs from reference: ${t.parsed.stressed}  (ref ${s.stressed})`,
+      );
     }
     if (a?.parsed) {
       if (a.parsed.transcript && plain(a.parsed.transcript) !== s.text) {
         notes.push(`#${n} audio transcript: ${a.parsed.transcript}`);
       }
       if (canon(a.parsed.stressed) !== canon(s.stressed)) {
-        notes.push(`#${n} audio stress: ${a.parsed.stressed}  (ref ${s.stressed})`);
+        notes.push(
+          `#${n} audio stress: ${a.parsed.stressed}  (ref ${s.stressed})`,
+        );
       }
     }
     notes.push(
@@ -246,7 +264,10 @@ async function main() {
   console.log('\n' + notes.join('\n'));
   console.log(`\nmodel ${MODEL}, total ${fmtUsd(spent)}`);
   mkdirSync(OUT_DIR, { recursive: true });
-  writeFileSync(resolve(OUT_DIR, 'report.txt'), rows.join('\n') + '\n\n' + notes.join('\n') + '\n');
+  writeFileSync(
+    resolve(OUT_DIR, 'report.txt'),
+    rows.join('\n') + '\n\n' + notes.join('\n') + '\n',
+  );
 }
 
 main().catch((err) => {

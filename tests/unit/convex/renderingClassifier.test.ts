@@ -2,52 +2,30 @@ import { describe, expect, it } from 'vitest';
 import {
   buildRenderingClassifierPrompt,
   buildRenderingClassifierUserPrompt,
-  classificationLanguageForRow,
   parseRenderingClassifications,
   renderingAxesFor,
-  reportedPolitenessLevels,
 } from '../../../convex/lib/renderingClassifier';
 
 describe('renderingAxesFor', () => {
-  it('reports which axes a language can mark', () => {
-    expect(renderingAxesFor('ja')).toEqual({ gender: true, politeness: true });
-    expect(renderingAxesFor('tr')).toEqual({ gender: false, politeness: true });
-    expect(renderingAxesFor('he')).toEqual({ gender: true, politeness: false });
-    expect(renderingAxesFor('sv')).toEqual({
-      gender: false,
-      politeness: false,
-    });
-  });
-});
-
-describe('reportedPolitenessLevels', () => {
-  it('reports each distinct form as its lowest level', () => {
-    expect(reportedPolitenessLevels('tr')).toEqual(['casual', 'polite']);
-    expect(reportedPolitenessLevels('fr')).toEqual(['casual', 'polite']);
-    expect(reportedPolitenessLevels('ja')).toEqual([
-      'casual',
-      'polite',
-      'formal',
-    ]);
-    expect(reportedPolitenessLevels('en')).toEqual([]);
+  it('marks the languages whose wording follows the speaker', () => {
+    expect(renderingAxesFor('ja')).toEqual({ gender: true });
+    expect(renderingAxesFor('tr')).toEqual({ gender: false });
+    expect(renderingAxesFor('he')).toEqual({ gender: true });
+    expect(renderingAxesFor('en')).toEqual({ gender: false });
   });
 });
 
 describe('buildRenderingClassifierPrompt', () => {
-  it('names the language forms and examples', () => {
+  it('names the language example pair', () => {
     const prompt = buildRenderingClassifierPrompt('ja');
-    expect(prompt).toContain('です・ます');
-    expect(prompt).toContain('行きます');
-    expect(prompt).toContain('僕は学生です');
-    expect(prompt).toContain('"polite"');
+    expect(prompt).toContain('"gender"');
+    expect(prompt).toContain('masculine');
   });
 
-  it('forces unmarked on an axis the language lacks', () => {
-    const tr = buildRenderingClassifierPrompt('tr');
-    expect(tr).toContain('"gender": always "unmarked"');
-    expect(tr).toContain('siz');
-    const he = buildRenderingClassifierPrompt('he');
-    expect(he).toContain('"politeness": always "unmarked"');
+  it('forces unmarked on a language that does not mark the speaker', () => {
+    expect(buildRenderingClassifierPrompt('tr')).toContain(
+      '"gender": always "unmarked"',
+    );
   });
 
   it('has a literature wording arm', () => {
@@ -65,77 +43,36 @@ describe('buildRenderingClassifierPrompt', () => {
 describe('parseRenderingClassifications', () => {
   it('reads a well-formed array in order', () => {
     const raw = JSON.stringify([
-      { i: 1, gender: 'feminine', politeness: 'polite' },
-      { i: 2, gender: 'unmarked', politeness: 'casual' },
+      { i: 1, gender: 'feminine' },
+      { i: 2, gender: 'unmarked' },
     ]);
     expect(parseRenderingClassifications('ja', raw, 2)).toEqual([
-      { gender: 'feminine', politeness: 'polite' },
-      { gender: 'unmarked', politeness: 'casual' },
+      { gender: 'feminine' },
+      { gender: 'unmarked' },
     ]);
   });
 
   it('tolerates fences and falls back to array position', () => {
-    const raw = '```json\n[{"gender":"masculine","politeness":"formal"}]\n```';
+    const raw = '```json\n[{"gender":"masculine"}]\n```';
     expect(parseRenderingClassifications('he', raw, 1)).toEqual([
-      { gender: 'masculine', politeness: 'unmarked' },
+      { gender: 'masculine' },
     ]);
   });
 
-  it('forces axes the language cannot mark', () => {
-    const raw = JSON.stringify([
-      { i: 1, gender: 'feminine', politeness: 'polite' },
-    ]);
+  it('forces unmarked on a language that cannot mark the speaker', () => {
+    const raw = JSON.stringify([{ i: 1, gender: 'feminine' }]);
     expect(parseRenderingClassifications('tr', raw, 1)).toEqual([
-      { gender: 'unmarked', politeness: 'polite' },
+      { gender: 'unmarked' },
     ]);
   });
 
-  it('treats a politeness level the language never reports as unmarked', () => {
-    // A two-form language reports casual and polite; a "formal" verdict
-    // names no form of its own, so it must not be stamped as one.
-    expect(reportedPolitenessLevels('tr')).toEqual(['casual', 'polite']);
-    const raw = JSON.stringify([
-      { i: 1, gender: 'unmarked', politeness: 'formal' },
-      { i: 2, gender: 'unmarked', politeness: 'polite' },
-    ]);
-    expect(parseRenderingClassifications('tr', raw, 2)).toEqual([
-      { gender: 'unmarked', politeness: 'unmarked' },
-      { gender: 'unmarked', politeness: 'polite' },
-    ]);
-    // The gender verdict survives the rejected level.
-    expect(
-      parseRenderingClassifications(
-        'fr',
-        JSON.stringify([{ i: 1, gender: 'feminine', politeness: 'formal' }]),
-        1,
-      ),
-    ).toEqual([{ gender: 'feminine', politeness: 'unmarked' }]);
-  });
-
-  it('leaves bad entries null instead of guessing', () => {
-    const raw = JSON.stringify([
-      { i: 1, gender: 'female', politeness: 'polite' },
-      { i: 3, gender: 'masculine', politeness: 'polite' },
-    ]);
-    expect(parseRenderingClassifications('ja', raw, 2)).toEqual([null, null]);
+  it('degrades a bad reply to "not classified" for that row', () => {
     expect(parseRenderingClassifications('ja', 'not json', 2)).toEqual([
       null,
       null,
     ]);
-  });
-});
-
-describe('classificationLanguageForRow', () => {
-  it('resolves mixed dialects through the region variant', () => {
     expect(
-      classificationLanguageForRow({
-        targetLanguage: 'es_mixed',
-        regionVariant: 'es-US',
-      }),
-    ).toBe('es_latam');
-    expect(classificationLanguageForRow({ targetLanguage: 'es_mixed' })).toBe(
-      'es',
-    );
-    expect(classificationLanguageForRow({ targetLanguage: 'de' })).toBe('de');
+      parseRenderingClassifications('ja', JSON.stringify([{ i: 1 }]), 1),
+    ).toEqual([null]);
   });
 });

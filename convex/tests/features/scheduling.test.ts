@@ -163,17 +163,15 @@ describe('features/scheduling', () => {
       expect(res).toBeNull();
     });
 
-    // The chips travel through `translationValidator`, so a field the
+    // The chip travels through `translationValidator`, so a field the
     // content builder emits but the validator does not declare fails the
-    // QUERY, not the builder. The rendering suites assert on
-    // `buildTextContentBatchForLanguages` directly and never see that, which
-    // is how `formLanguage` shipped undeclared (2026-09-09).
-    it('returns the chip fields through the query validator', async () => {
+    // QUERY, not the builder.
+    it('returns the chip field through the query validator', async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedCardWithCourse(t);
       await t.run(async (ctx) => {
-        // A premade German text on the card, voiced male, with a keyed
-        // Japanese row in the polite form: the chip reads the key.
+        // A premade German text on the card, voiced male: the chip reads
+        // the sentence's voice.
         await ctx.db.patch(textId, {
           userCreated: false,
           userId: undefined,
@@ -184,14 +182,15 @@ describe('features/scheduling', () => {
           .query('cards')
           .withIndex('by_textId', (q) => q.eq('textId', textId))
           .first())!;
-        await ctx.db.patch(card._id, { followsCoursePreferences: true });
-        const course = (await ctx.db.get((await ctx.db.get(card.deckId))!.courseId))!;
+        const course = (await ctx.db.get(
+          (await ctx.db.get(card.deckId))!.courseId,
+        ))!;
         await ctx.db.patch(course._id, { targetLanguages: ['ja'] });
         await ctx.db.insert('translations', {
           textId,
           targetLanguage: 'ja',
           translatedText: '疲れました。',
-          variantKey: 'male|desu-masu',
+          variantKey: 'male',
           speakerGender: 'male',
         });
       });
@@ -201,8 +200,6 @@ describe('features/scheduling', () => {
         {},
       );
       const ja = res?.translations.find((tr) => tr.language === 'ja');
-      expect(ja?.politenessLevel).toBe('polite');
-      expect(ja?.formLanguage).toBe('ja');
       expect(ja?.voiceGender).toBe('male');
     });
 
@@ -3419,9 +3416,9 @@ describe('features/scheduling', () => {
       ).rejects.toThrow();
     });
 
-    it('wrong_gender: no retranslation, no quota; the override lands and the classifier is asked from the source', async () => {
+    it('wrong_gender moves the sentence voice, asks the classifier and retranslates', async () => {
       const t = convexTest(schema, modules);
-      const { cardId, textId, translationId } = await seedFlaggableCard(t);
+      const { cardId, textId } = await seedFlaggableCard(t);
       const asUser = t.withIdentity({ subject: 'user_A' });
       const res = await asUser.mutation(
         api.features.scheduling.flagTranslation,
@@ -3431,41 +3428,21 @@ describe('features/scheduling', () => {
           requestedGender: 'female',
         },
       );
-      expect(res).toEqual({
-        retranslated: false,
-        updatedToLatest: false,
-        creditsAwarded: 0,
-      });
-      expect(llmEnqueues()).toHaveLength(0);
-      // The counter still rose (QC), the quota was not charged.
-      expect((await t.run((ctx) => ctx.db.get(translationId)))?.flagCount).toBe(
-        1,
-      );
-      const quota = await t.run(async (ctx) =>
-        ctx.db
-          .query('usageQuotas')
-          .withIndex('by_userId', (q) => q.eq('userId', 'user_A'))
-          .first(),
-      );
-      expect(quota?.features.translation_flags.balance).toBe(10);
-      const card = await t.run((ctx) => ctx.db.get(cardId));
-      expect(card?.renderingGenderOverride).toBe('female');
-      expect(card?.renderingPolitenessOverride).toBeUndefined();
+      expect(res.retranslated).toBe(true);
+      // The learner's pick is the sentence's voice from now on, for every
+      // card on it: there is one translation, written for one speaker.
+      const text = await t.run((ctx) => ctx.db.get(textId));
+      expect(text?.audioSpeakerGender).toBe('female');
+      // The classifier is asked from the source sentence; its verdict
+      // outranks the pick when it lands.
       const classify = await pendingJobs(t, 'classifyCurriculumText');
       expect(classify).toHaveLength(1);
       expect(classify[0].args[0]).toMatchObject({
         textId,
         translations: [{ language: 'es', text: 'Hola mundo' }],
       });
-      expect(
-        (await t.run((ctx) => ctx.db.get(textId)))?.metadataRequestedAt,
-      ).toBeDefined();
-      const ensure = await pendingJobs(t, 'prepareCardContent');
-      expect(ensure).toHaveLength(1);
-      expect(ensure[0].args[0]).toMatchObject({
-        textId,
-        renderingCard: { renderingGenderOverride: 'female' },
-      });
+      expect(text?.metadataRequestedAt).toBeDefined();
+      expect(llmEnqueues()).toHaveLength(1);
     });
 
     it('wrong_gender on a text the current classifier already judged is not re-asked', async () => {
@@ -3485,10 +3462,10 @@ describe('features/scheduling', () => {
       expect(await pendingJobs(t, 'fetchSentenceMetadata')).toHaveLength(0);
     });
 
-    it('wrong_gender without a pick falls back to a retranslation, like wrong_politeness', async () => {
+    it('wrong_gender without a pick still retranslates', async () => {
       // Every flag under the cap attempts a fix (Paul, 2026-09-09). With no
-      // pick there is no override to write and, on a text the classifier
-      // already judged, nothing to ask it; the shared row is retranslated.
+      // pick the voice stays and, on a text the classifier already judged,
+      // there is nothing to ask it; the shared row is retranslated.
       const t = convexTest(schema, modules);
       const { cardId, textId } = await seedFlaggableCard(t);
       await t.run((ctx) =>
@@ -3503,32 +3480,6 @@ describe('features/scheduling', () => {
         .mutation(api.features.scheduling.flagTranslation, {
           cardId,
           reasons: ['wrong_gender'],
-        });
-      expect(llmEnqueues()).toHaveLength(1);
-    });
-
-    it('wrong_politeness with a level writes the override and skips the retranslation; without one it retranslates', async () => {
-      const t = convexTest(schema, modules);
-      const asUser = t.withIdentity({ subject: 'user_A' });
-      const { cardId } = await seedFlaggableCard(t);
-      await asUser.mutation(api.features.scheduling.flagTranslation, {
-        cardId,
-        reasons: ['wrong_politeness'],
-        requestedPolitenessLevel: 'polite',
-      });
-      expect(llmEnqueues()).toHaveLength(0);
-      expect(
-        (await t.run((ctx) => ctx.db.get(cardId)))?.renderingPolitenessOverride,
-      ).toBe('polite');
-
-      const t2 = convexTest(schema, modules);
-      const { cardId: cardId2 } = await seedFlaggableCard(t2);
-      vi.mocked(llmPool.enqueueAction).mockClear();
-      await t2
-        .withIdentity({ subject: 'user_A' })
-        .mutation(api.features.scheduling.flagTranslation, {
-          cardId: cardId2,
-          reasons: ['wrong_politeness'],
         });
       expect(llmEnqueues()).toHaveLength(1);
     });

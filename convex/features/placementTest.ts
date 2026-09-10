@@ -4,8 +4,8 @@ import type { Doc } from '../_generated/dataModel';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { PLACEMENT_SENTENCES_QUERY_CAP } from '../../lib/constants/onboarding';
 import {
-  primaryOrLegacyAudio,
-  primaryOrLegacyTranslation,
+  audioPointer,
+  resolveServedTranslation,
   servedSourceText,
 } from '../db/translationReads';
 
@@ -79,11 +79,11 @@ export const getPlacementSentence = query({
     // code when a Mixed English course serves an accent row.
     let sourceAudioLanguage = text.language;
     if (sourceLanguage && sourceLanguage !== text.language) {
-      const sourceTranslation = await primaryOrLegacyTranslation(
-        ctx,
-        text,
-        sourceLanguage,
-      );
+      const sourceTranslation = await resolveServedTranslation(ctx, {
+        textId: text._id,
+        targetLanguage: sourceLanguage,
+        pinAt: undefined,
+      });
       if (sourceTranslation) {
         resolvedSourceText = sourceTranslation.row.translatedText;
         resolvedSourceLanguage = sourceLanguage;
@@ -97,11 +97,7 @@ export const getPlacementSentence = query({
       sourceAudioLanguage = source.language;
     }
 
-    const sourceAudio = await primaryOrLegacyAudio(
-      ctx,
-      text,
-      sourceAudioLanguage,
-    );
+    const sourceAudio = await audioPointer(ctx, text._id, sourceAudioLanguage);
     const sourcePayload = sourceAudio
       ? await resolveAudioPayload(ctx, sourceAudio)
       : null;
@@ -113,14 +109,14 @@ export const getPlacementSentence = query({
     let targetRomanization: string | undefined;
     let targetAudio: Doc<'audioRecordings'> | null = null;
     if (targetLanguage && targetLanguage !== text.language) {
-      const translation = await primaryOrLegacyTranslation(
-        ctx,
-        text,
-        targetLanguage,
-      );
+      const translation = await resolveServedTranslation(ctx, {
+        textId: text._id,
+        targetLanguage: targetLanguage,
+        pinAt: undefined,
+      });
       targetText = translation?.row.translatedText;
       targetRomanization = translation?.row.romanizedText;
-      targetAudio = await primaryOrLegacyAudio(ctx, text, targetLanguage);
+      targetAudio = await audioPointer(ctx, text._id, targetLanguage);
     } else if (targetLanguage === text.language) {
       // Learning the text's own language (English on an English course):
       // the target side is the served source wording, accent row included,
@@ -128,7 +124,7 @@ export const getPlacementSentence = query({
       const source = await servedSourceText(ctx, text, null);
       targetText = source.text;
       targetRomanization = source.romanizedText;
-      targetAudio = await primaryOrLegacyAudio(ctx, text, source.language);
+      targetAudio = await audioPointer(ctx, text._id, source.language);
     }
     const targetPayload = targetAudio
       ? await resolveAudioPayload(ctx, targetAudio)
@@ -195,11 +191,11 @@ export const getPlacementPreviewSentences = query({
         // the stored English text so a sentence always shows.
         let resolvedSourceText = text.text;
         if (sourceLanguage && sourceLanguage !== text.language) {
-          const sourceTranslation = await primaryOrLegacyTranslation(
-            ctx,
-            text,
-            sourceLanguage,
-          );
+          const sourceTranslation = await resolveServedTranslation(ctx, {
+            textId: text._id,
+            targetLanguage: sourceLanguage,
+            pinAt: undefined,
+          });
           if (sourceTranslation) {
             resolvedSourceText = sourceTranslation.row.translatedText;
           }
@@ -210,11 +206,11 @@ export const getPlacementPreviewSentences = query({
         let targetText: string | undefined;
         let targetRomanization: string | undefined;
         if (targetLanguage && targetLanguage !== text.language) {
-          const translation = await primaryOrLegacyTranslation(
-            ctx,
-            text,
-            targetLanguage,
-          );
+          const translation = await resolveServedTranslation(ctx, {
+            textId: text._id,
+            targetLanguage: targetLanguage,
+            pinAt: undefined,
+          });
           targetText = translation?.row.translatedText;
           targetRomanization = translation?.row.romanizedText;
         } else if (targetLanguage === text.language) {

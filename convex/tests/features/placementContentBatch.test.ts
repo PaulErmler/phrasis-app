@@ -7,24 +7,22 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 // assert that the placement sweep bounds each transaction to one batch and
 // that the upfront-queued batch workers cover the whole corpus. The
 // primitive itself is exercised end-to-end in `collectionBrowseAdd.test.ts`.
-const { ensureTextContentSpy, defaultEnsureTextContent } = vi.hoisted(
-  () => {
-    const defaultEnsureTextContent = async () => ({
-      translationsScheduled: 1,
-      audioScheduled: 1,
-    });
-    return {
-      defaultEnsureTextContent,
-      // Declared with a rest signature so the poison tests can install
-      // per-textId implementations without fighting the inferred zero-arg type.
-      ensureTextContentSpy: vi.fn<
-        (
-          ...args: unknown[]
-        ) => Promise<{ translationsScheduled: number; audioScheduled: number }>
-      >(defaultEnsureTextContent),
-    };
-  },
-);
+const { ensureTextContentSpy, defaultEnsureTextContent } = vi.hoisted(() => {
+  const defaultEnsureTextContent = async () => ({
+    translationsScheduled: 1,
+    audioScheduled: 1,
+  });
+  return {
+    defaultEnsureTextContent,
+    // Declared with a rest signature so the poison tests can install
+    // per-textId implementations without fighting the inferred zero-arg type.
+    ensureTextContentSpy: vi.fn<
+      (
+        ...args: unknown[]
+      ) => Promise<{ translationsScheduled: number; audioScheduled: number }>
+    >(defaultEnsureTextContent),
+  };
+});
 vi.mock('../../lib/contentScheduling', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/contentScheduling')>()),
   ensureTextContent: ensureTextContentSpy,
@@ -176,9 +174,7 @@ describe('placement content sweep: upfront batch fan-out', () => {
     // Every text of the SECOND scheduled batch was processed even though the
     // first scheduled batch died mid-transaction.
     const processed = new Set(
-      ensureTextContentSpy.mock.calls.map(
-        (call) => call[1] as Id<'texts'>,
-      ),
+      ensureTextContentSpy.mock.calls.map((call) => call[1] as Id<'texts'>),
     );
     for (const id of textIds.slice(PLACEMENT_CONTENT_BATCH_SIZE * 2)) {
       expect(processed.has(id)).toBe(true);
@@ -250,9 +246,7 @@ describe('placement content sweep: batch self-retry', () => {
     // including the ones AFTER the poisoned text in the failed batch. Was
     // processed.
     const processed = new Set(
-      ensureTextContentSpy.mock.calls.map(
-        (call) => call[1] as Id<'texts'>,
-      ),
+      ensureTextContentSpy.mock.calls.map((call) => call[1] as Id<'texts'>),
     );
     expect(processed).toEqual(new Set(textIds));
     // Exactly one failed attempt + one successful re-run for the poisoned text.
@@ -291,9 +285,7 @@ describe('placement content sweep: batch self-retry', () => {
     // Inline page and the second scheduled batch are unaffected by the
     // doomed batch's retries.
     const processed = new Set(
-      ensureTextContentSpy.mock.calls.map(
-        (call) => call[1] as Id<'texts'>,
-      ),
+      ensureTextContentSpy.mock.calls.map((call) => call[1] as Id<'texts'>),
     );
     for (const id of [
       ...textIds.slice(0, PLACEMENT_CONTENT_BATCH_SIZE),

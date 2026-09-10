@@ -72,7 +72,10 @@ import {
   PROMPT_B_INSTRUCTIONS,
   type TranslationPromptArgs,
 } from '../convex/features/translationLLM';
-import { openrouterCostUsd, openrouterGenerationId } from '../convex/lib/posthogAi';
+import {
+  openrouterCostUsd,
+  openrouterGenerationId,
+} from '../convex/lib/posthogAi';
 import {
   argValue,
   Bench,
@@ -86,7 +89,10 @@ import {
 
 // ------------------------------------------------------------------- config
 
-const FLORES_DIR = resolve(process.cwd(), '.scratch/flores/flores200_dataset/devtest');
+const FLORES_DIR = resolve(
+  process.cwd(),
+  '.scratch/flores/flores200_dataset/devtest',
+);
 const SRC_FILE = resolve(FLORES_DIR, 'eng_Latn.devtest');
 const REF_FILE = resolve(FLORES_DIR, 'deu_Latn.devtest');
 const CATALOGUE_CSV = resolve(
@@ -95,7 +101,8 @@ const CATALOGUE_CSV = resolve(
 );
 
 type Dataset = 'flores' | 'catalogue';
-const outDirFor = (d: Dataset) => resolve(process.cwd(), `.scratch/translation-qc/${d}`);
+const outDirFor = (d: Dataset) =>
+  resolve(process.cwd(), `.scratch/translation-qc/${d}`);
 
 /** Longest source sentence admitted by `--dataset=catalogue`. */
 const DEFAULT_MAX_CHARS = 60;
@@ -277,7 +284,9 @@ function promptArgsFor(item: Item): TranslationPromptArgs {
         : undefined,
     addresseeGender: gender(m.addresseeGender),
     formality:
-      m.register === 'formal' || m.register === 'informal' || m.register === 'neutral'
+      m.register === 'formal' ||
+      m.register === 'informal' ||
+      m.register === 'neutral'
         ? m.register
         : 'neutral',
   };
@@ -296,7 +305,8 @@ function promptArgsFor(item: Item): TranslationPromptArgs {
  */
 function buildQcPrompt(args: TranslationPromptArgs, candidate: string): string {
   const fullName =
-    args.targetLangNativeName && args.targetLangNativeName !== args.targetLangName
+    args.targetLangNativeName &&
+    args.targetLangNativeName !== args.targetLangName
       ? `${args.targetLangName} (${args.targetLangNativeName})`
       : args.targetLangName;
   return [
@@ -330,7 +340,10 @@ async function qcCached(
   const hit = bench.cache[key];
   if (hit) return hit.text;
   const startedAt = Date.now();
-  const providerOptions = openrouterCallOptions(stage.reasoning, stage.provider);
+  const providerOptions = openrouterCallOptions(
+    stage.reasoning,
+    stage.provider,
+  );
   try {
     const res = await generateText({
       model: openrouter(stage.model),
@@ -355,7 +368,9 @@ async function qcCached(
     bench.cache[key] = { text, telemetry };
     return text;
   } catch (err) {
-    console.warn(`  qc failed: ${err instanceof Error ? err.message.slice(0, 140) : err}`);
+    console.warn(
+      `  qc failed: ${err instanceof Error ? err.message.slice(0, 140) : err}`,
+    );
     return null;
   }
 }
@@ -386,12 +401,16 @@ async function main(): Promise<void> {
   const qcModel = argValue(argv, 'qc-model') ?? 'sol';
   const qcStage = QC_STAGES[qcModel];
   if (!qcStage) {
-    console.error(`--qc-model must be one of ${Object.keys(QC_STAGES).join(', ')}`);
+    console.error(
+      `--qc-model must be one of ${Object.keys(QC_STAGES).join(', ')}`,
+    );
     process.exit(1);
   }
   const suffix = qcModel === 'sol' ? '' : `-${qcModel}`;
   if (dataset !== 'flores' && dataset !== 'catalogue') {
-    console.error(`--dataset must be "flores" or "catalogue", got "${dataset}"`);
+    console.error(
+      `--dataset must be "flores" or "catalogue", got "${dataset}"`,
+    );
     process.exit(1);
   }
   const outDir = outDirFor(dataset);
@@ -412,7 +431,7 @@ async function main(): Promise<void> {
   const bench = new Bench({
     outDir,
     budgetUsd,
-      budgetHint: `re-run ${RUN_HINT} to continue from the cache, or raise --budget`,
+    budgetHint: `re-run ${RUN_HINT} to continue from the cache, or raise --budget`,
   });
   const openrouter = createOpenRouterFromEnv(RUN_HINT);
   const items = loadItems(dataset, n, seed, maxChars);
@@ -446,7 +465,8 @@ async function main(): Promise<void> {
       );
     }
     done++;
-    if (done % 10 === 0) console.log(`  ${done}/${rows.length}  ${fmtUsd(bench.spentUsd)}`);
+    if (done % 10 === 0)
+      console.log(`  ${done}/${rows.length}  ${fmtUsd(bench.spentUsd)}`);
   });
   bench.save();
 
@@ -473,7 +493,10 @@ async function main(): Promise<void> {
   console.log('\n' + lines.slice(0, 12).join('\n'));
 
   mkdirSync(outDir, { recursive: true });
-  writeFileSync(resolve(outDir, `report${suffix}.txt`), lines.join('\n') + '\n');
+  writeFileSync(
+    resolve(outDir, `report${suffix}.txt`),
+    lines.join('\n') + '\n',
+  );
   writeFileSync(
     resolve(outDir, `results${suffix}.json`),
     JSON.stringify(
@@ -493,7 +516,9 @@ async function main(): Promise<void> {
       2,
     ),
   );
-  console.log(`\nWrote ${outDir}/report${suffix}.txt and results${suffix}.json`);
+  console.log(
+    `\nWrote ${outDir}/report${suffix}.txt and results${suffix}.json`,
+  );
 }
 
 main().catch((err) => {

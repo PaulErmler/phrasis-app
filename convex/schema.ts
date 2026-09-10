@@ -34,10 +34,8 @@ import {
   cardEditKindValidator,
   cardEditPathValidator,
   flagReasonValidator,
-  politenessLevelValidator,
   cardEditLanguageRoleValidator,
   retranslationStatusValidator,
-  politenessLevelsValidator,
 } from './types';
 
 // Field validators for the `courseSettings` table. Extracted so that queries
@@ -273,13 +271,6 @@ export const courseSettingsFields = {
   reconciledDatasetId: v.optional(v.id('datasets')), // Dataset version this course's progress has been cutover to (idempotency gate for datasetMigration_cutoverUser)
   // Source-of-content filter. See studyContentFilterValidator in types.ts.
   studyContentFilter: v.optional(studyContentFilterValidator),
-  // The politeness preference (lib/languageForms.ts). Undefined on every
-  // course from before the feature = each sentence's primary form; never
-  // backfilled. New courses get an explicit value from onboarding or the
-  // create-course dialog. Only curriculum cards created after the feature
-  // (`cards.followsCoursePreferences`) follow it; user-written sentences
-  // never do. Resolution: lib/preferenceResolution.ts.
-  politenessLevels: v.optional(politenessLevelsValidator),
   // Current "between celebrations" bucket id. Rotated by the client on
   // celebration dismiss (via `setCurrentSessionId`). Stored server-side so
   // the bucket survives the user closing the learn view OR moving to a
@@ -349,10 +340,6 @@ export const onboardingProgressFields = {
   currentLevel: v.optional(currentLevelValidator),
   targetLanguages: v.optional(v.array(v.string())),
   baseLanguages: v.optional(v.array(v.string())),
-  // The politeness step; copied onto courseSettings by `completeOnboarding`.
-  // Skipped (left undefined) when no target language marks politeness
-  // (`courseAsksPoliteness`).
-  politenessLevels: v.optional(politenessLevelsValidator),
   // Survey answers.
   acquisitionSource: v.optional(v.string()),
   acquisitionSourceFreeText: v.optional(v.string()),
@@ -657,13 +644,6 @@ export default defineSchema({
     // requested. Point reads pin all four index columns through
     // convex/db/translationReads.ts.
     variantKey: v.optional(v.string()),
-    // Rows the versioning prompt produced from the PRIMARY rendering of the
-    // same (text, language): the primary wording they were derived from.
-    // When the primary wording moves on (a flag, a curriculum fix, a version
-    // bump), the content sweep finds this differing from the primary row's
-    // `translatedText` and regenerates the row in place through the
-    // version-bump path, which archives the old wording for pinned cards.
-    versionedFromText: v.optional(v.string()),
     // The rendering classifier's verdict on this wording against its key,
     // taken right after generation (`verifyRendering`): true when the voice
     // and the form agree with the key, false when the model still
@@ -752,19 +732,6 @@ export default defineSchema({
     .index('by_text_language_supersededAt', [
       'textId',
       'targetLanguage',
-      'supersededAt',
-    ])
-    // Successor of the index above with the rendering variant pinned:
-    // canonical reads use `.eq('variantKey', undefined)`. NOT staged, and no
-    // deployment has it yet: the branch that declared it `staged: true`
-    // (`gender-choice`) was never pushed, so the first deploy carrying this
-    // schema backfills it inline and takes as long as that needs (~300k
-    // rows). Re-add `staged: true` and split the deploy if that wait is a
-    // problem. A later flagged deploy drops `by_text_language_supersededAt`.
-    .index('by_text_language_variant_supersededAt', [
-      'textId',
-      'targetLanguage',
-      'variantKey',
       'supersededAt',
     ])
     .index('by_audioAssetId', ['audioAssetId'])
@@ -895,10 +862,6 @@ export default defineSchema({
     // it (same rule as translations.by_text_and_language); the invariant
     // test forbids querying it.
     .index('by_text_and_language', ['textId', 'language'])
-    // Every pointer read pins all three columns through
-    // convex/db/translationReads.ts (`audioPointer`); a two-column prefix
-    // plus `.first()` would return whichever voice was stored first.
-    .index('by_text_language_variant', ['textId', 'language', 'variantKey'])
     // Reference counting for shared assets: an asset (and its blob) is deleted
     // only when no row points at it any more.
     .index('by_assetId', ['assetId']),
@@ -989,9 +952,7 @@ export default defineSchema({
   onboardingProgress: defineTable({
     ...onboardingProgressFields,
     ...transitionalFirstPersonForms,
-  }).index('by_userId', [
-    'userId',
-  ]),
+  }).index('by_userId', ['userId']),
 
   // Courses table - stores user language learning courses
   courses: defineTable({
@@ -1007,9 +968,7 @@ export default defineSchema({
   courseSettings: defineTable({
     ...courseSettingsFields,
     ...transitionalFirstPersonForms,
-  }).index('by_courseId', [
-    'courseId',
-  ]),
+  }).index('by_courseId', ['courseId']),
 
   // Decks table - one deck per course, auto-created
   decks: defineTable({
@@ -1093,24 +1052,6 @@ export default defineSchema({
     // not user-created. Cleared when an edit forks the text into a
     // user-owned copy. Never indexed.
     accentLanguage: v.optional(v.string()),
-    // Set on curriculum cards created after the sentence-form settings
-    // shipped. Such a card is served the rendering the course's CURRENT
-    // `politenessLevels` resolve to (lib/preferenceResolution.ts), so a
-    // later settings change re-renders it. Cards without the field (from
-    // before, or created from a user-written text) read the legacy rows for
-    // good, unless a Flag-dialog override moves them onto a keyed row. Never
-    // backfilled, never indexed. Cleared when an edit forks the text into a
-    // user-owned copy.
-    followsCoursePreferences: v.optional(v.literal(true)),
-    // Per-card corrections written by the Flag dialog ("wrong speaker
-    // gender" / "wrong politeness" with a pick). The resolver
-    // (lib/preferenceResolution.ts) reads them above the course settings
-    // and below a definitive `texts.speakerGender`, and they apply even to
-    // a card from before the sentence-form settings (an explicit gesture on
-    // one card, unlike a course-wide setting). Inert on user-written texts.
-    // Never indexed. Cleared when an edit forks the text.
-    renderingGenderOverride: v.optional(voiceGenderValidator),
-    renderingPolitenessOverride: v.optional(politenessLevelValidator),
   })
     // INDEX BUDGET — read before adding an index here. This table carries 23
     // database indexes (limit 32) and EVERY card write pays for updating all
@@ -1850,9 +1791,7 @@ export default defineSchema({
     // The rendering key the claimed clip speaks; absent = a legacy pointer.
     // Two learners with the same preference share one job.
     variantKey: v.optional(v.string()),
-  })
-    .index('by_text_and_language', ['textId', 'language'])
-    .index('by_text_language_variant', ['textId', 'language', 'variantKey']),
+  }).index('by_text_and_language', ['textId', 'language']),
 
   // Per-(textId, language) dedup claim. Atomically check-and-insert before
   // scheduling so two mutations can't enqueue the same translation twice.
@@ -1880,13 +1819,7 @@ export default defineSchema({
     // (llmTranslationQueue.ts), so a sentence the model refuses is not
     // re-bought on every card view. There is no Google fallback.
     variantFailedAt: v.optional(v.number()),
-  })
-    .index('by_text_and_language', ['textId', 'targetLanguage'])
-    .index('by_text_language_variant', [
-      'textId',
-      'targetLanguage',
-      'variantKey',
-    ]),
+  }).index('by_text_and_language', ['textId', 'targetLanguage']),
 
   // Daily per-language stats
   dailyLanguageStats: defineTable({

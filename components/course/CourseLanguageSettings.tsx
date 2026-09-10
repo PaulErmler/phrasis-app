@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useMutation, useQuery } from 'convex/react';
+import { useMutation } from 'convex/react';
 import { useTranslations, useLocale } from 'next-intl';
 import {
   AlertCircle,
@@ -35,12 +35,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { getLocalizedLanguageNameByCode } from '@/lib/languages';
 import { convexErrorMessage } from '@/lib/utils';
-import {
-  courseAsksPoliteness,
-  type PolitenessLevel,
-  coursePolitenessRows,
-} from '@/lib/languageForms';
-import { PolitenessRows } from '@/components/course/PolitenessRows';
 import { DualLanguageEditor } from '@/components/course/DualLanguageEditor';
 import { useFeatureQuota } from '@/components/feature_tracking/useFeatureQuota';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
@@ -94,58 +88,6 @@ export function CourseLanguageSettings({
   );
 
   const archiveCourse = useMutation(api.features.courses.archiveCourse);
-  // The politeness setting (lib/languageForms.ts). Read per course, not
-  // from the active-course cache: this sheet edits any course in the menu.
-  const courseSettings = useQuery(
-    api.features.courses.getCourseSettingsForCourse,
-    course ? { courseId: course._id } : 'skip',
-  );
-  // Optimistic: the ticked rows follow the tap at once, and the server
-  // result (or a failure's rollback) replaces the local value when it lands.
-  const updateCourseSettings = useMutation(
-    api.features.courses.updateCourseSettings,
-  ).withOptimisticUpdate((localStore, args) => {
-    const { courseId, ...patch } = args;
-    const current = localStore.getQuery(
-      api.features.courses.getCourseSettingsForCourse,
-      { courseId },
-    );
-    if (current) {
-      localStore.setQuery(
-        api.features.courses.getCourseSettingsForCourse,
-        { courseId },
-        { ...current, ...patch },
-      );
-    }
-  });
-  const asksPoliteness = course
-    ? courseAsksPoliteness(course.targetLanguages)
-    : false;
-  const politenessRows = useMemo(
-    () =>
-      course
-        ? coursePolitenessRows([
-            ...course.targetLanguages,
-            ...course.baseLanguages,
-          ])
-        : [],
-    [course],
-  );
-  // Undefined on a course from before the feature = today's behaviour,
-  // displayed as every level, never written back unless changed.
-  const shownLevels: PolitenessLevel[] = courseSettings?.politenessLevels ?? [
-    'casual',
-    'polite',
-    'formal',
-  ];
-  const savePoliteness = async (politenessLevels: PolitenessLevel[]) => {
-    if (!course) return;
-    try {
-      await updateCourseSettings({ courseId: course._id, politenessLevels });
-    } catch (err) {
-      setError(convexErrorMessage(err) ?? t('saveFailed'));
-    }
-  };
   const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
 
@@ -358,28 +300,6 @@ export function CourseLanguageSettings({
                     )}
                     {t('confirmButton')}
                   </Button>
-                </div>
-              )}
-
-              {courseSettings !== undefined && asksPoliteness && (
-                <div className="space-y-4 pt-2" data-testid="course-forms">
-                  <div>
-                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                      {t('politeness')}
-                    </p>
-                    <PolitenessRows
-                      rows={politenessRows}
-                      selected={shownLevels}
-                      onChange={(levels) => {
-                        if (levels.length === 0) return;
-                        void savePoliteness(levels);
-                      }}
-                      compact
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {t('formsNote')}
-                  </p>
                 </div>
               )}
             </div>

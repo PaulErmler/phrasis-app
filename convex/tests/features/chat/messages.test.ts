@@ -289,7 +289,6 @@ describe('features/chat/messages', () => {
         baseLanguages: ['en'],
         targetLanguages: ['es', 'fr'],
         difficulty: null,
-        renderingSettings: null,
       });
     });
 

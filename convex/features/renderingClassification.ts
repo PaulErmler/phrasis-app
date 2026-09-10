@@ -15,25 +15,19 @@ import {
   renderingAxesFor,
   type RenderingClassification,
 } from '../lib/renderingClassifier';
-import {
-  getPolitenessConfig,
-  NO_FORM,
-  unmarkedIsAcceptable,
-} from '../../lib/languageForms';
 import { axisOf, parseRenderingKey } from '../../lib/preferenceResolution';
 
 /**
  * The rendering classifier as a VERIFIER: does a freshly generated wording
- * carry the voice and the politeness form its rendering key asked for?
- * Called by the LLM worker right after generation
- * (docs/architecture/rendering-keys.md); the key is the truth about the row,
- * and this is the check that the model honoured it. Prompt and parser live
- * in convex/lib/renderingClassifier.ts.
+ * carry the voice its rendering key asked for? Called by the LLM worker
+ * right after generation (docs/architecture/rendering-keys.md); the key is
+ * the truth about the row, and this is the check that the model honoured
+ * it. Prompt and parser live in convex/lib/renderingClassifier.ts.
  *
- * The verdict is `ok` when every axis the language marks agrees with the
- * key, `mismatch` when one contradicts it, and `unknown` when the model
- * gave no usable answer (the row is then stored unverified rather than
- * rejected: a classifier hiccup must not block a translation).
+ * The verdict is `ok` when the wording agrees with the key, `mismatch` when
+ * it contradicts it, and `unknown` when the model gave no usable answer
+ * (the row is then stored unverified rather than rejected: a classifier
+ * hiccup must not block a translation).
  */
 export type RenderingVerdict = 'ok' | 'mismatch' | 'unknown';
 
@@ -44,28 +38,20 @@ export function verdictForClassification(
 ): RenderingVerdict {
   if (classification === null) return 'unknown';
   const axes = renderingAxesFor(language);
-  const { voice, formId } = parseRenderingKey(key);
-  // 'unmarked' on the gender axis is fine: the sentence has no first-person
-  // form to disagree with the voice ("It is raining").
+  const { voice } = parseRenderingKey(key);
+  // 'unmarked' is fine: the sentence has no first-person form to disagree
+  // with the voice ("It is raining").
   const genderOk =
     !axes.gender ||
     classification.gender === 'unmarked' ||
     classification.gender === axisOf(voice);
-  let politenessOk = true;
-  if (formId !== NO_FORM && axes.politeness) {
-    const config = getPolitenessConfig(language);
-    if (classification.politeness === 'unmarked') {
-      politenessOk = unmarkedIsAcceptable(language);
-    } else if (config) {
-      politenessOk = config.forms[classification.politeness].id === formId;
-    }
-  }
-  return genderOk && politenessOk ? 'ok' : 'mismatch';
+  return genderOk ? 'ok' : 'mismatch';
 }
 
 /**
  * Verify one wording against its rendering key with one classifier call.
- * Languages that mark neither axis are `ok` without a call.
+ * A language whose wording does not change with the speaker is `ok`
+ * without a call.
  */
 export async function verifyRendering(
   ctx: ActionCtx,
@@ -77,9 +63,11 @@ export async function verifyRendering(
     /** Attribution for the cost event; absent = the content-pipeline bucket. */
     userId?: string;
   },
-): Promise<{ verdict: RenderingVerdict; classification: RenderingClassification | null }> {
-  const axes = renderingAxesFor(args.language);
-  if (!axes.gender && !axes.politeness) {
+): Promise<{
+  verdict: RenderingVerdict;
+  classification: RenderingClassification | null;
+}> {
+  if (!renderingAxesFor(args.language).gender) {
     return { verdict: 'ok', classification: null };
   }
   try {
@@ -110,7 +98,11 @@ export async function verifyRendering(
       1,
     );
     return {
-      verdict: verdictForClassification(args.language, args.key, classification),
+      verdict: verdictForClassification(
+        args.language,
+        args.key,
+        classification,
+      ),
       classification,
     };
   } catch (error) {

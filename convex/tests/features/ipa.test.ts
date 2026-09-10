@@ -18,7 +18,7 @@ import {
 import { getRomanizationSource } from '../../lib/localRomanization';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { liveTranslation, renderingTextOf } from '../../db/translationReads';
-import { primaryRenderingKey } from '../../../lib/preferenceResolution';
+import { textRenderingKey } from '../../../lib/preferenceResolution';
 import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
 
 const modules = import.meta.glob('/convex/**/*.ts');
@@ -272,10 +272,9 @@ describe('preview-path scheduling gate', () => {
       });
       // A keyed row, as the pipeline writes them: the preview reads the
       // row at its key and annotates that one.
-      const key = primaryRenderingKey({
+      const key = textRenderingKey({
         text: renderingTextOf((await ctx.db.get(textId))!),
         textId,
-        code: 'el',
       });
       // Current translation with romanization already present, IPA missing:
       // the gate must schedule ONLY the missing kind.
@@ -772,7 +771,10 @@ describe('annotation requests are claimed for a cooldown', () => {
         (j) => j.name.includes('processRomanizationForTranslation'),
       ),
     );
-  const schedule = (t: ReturnType<typeof convexTest>, rowId: Id<'translations'>) =>
+  const schedule = (
+    t: ReturnType<typeof convexTest>,
+    rowId: Id<'translations'>,
+  ) =>
     t.run(async (ctx) => {
       const row = (await ctx.db.get(rowId))!;
       return scheduleTranslationAnnotations(ctx, row, undefined);
@@ -798,9 +800,9 @@ describe('annotation requests are claimed for a cooldown', () => {
         annotationRequestedAt: Date.now() - ANNOTATION_REQUEST_COOLDOWN_MS - 1,
       }),
     );
-    expect(annotationsDue('th', (await t.run((ctx) => ctx.db.get(rowId)))!)).toBe(
-      true,
-    );
+    expect(
+      annotationsDue('th', (await t.run((ctx) => ctx.db.get(rowId)))!),
+    ).toBe(true);
     expect(await schedule(t, rowId)).toEqual(['romanization']);
     expect(await jobs(t)).toHaveLength(2);
   });

@@ -112,24 +112,16 @@ const TTS_WARM_TOKEN_MAX_WAIT_MS = 1_000;
  */
 const STT_TOKEN_MAX_WAIT_MS = 15_000;
 
-/**
- * Point-read the (textId, language, key) TTS generation claim, if any.
- * `variantKey` undefined is the legacy clip; a rendering key's audio
- * (docs/architecture/rendering-keys.md) holds its own claim.
- */
+/** Point-read the (textId, language) TTS generation claim, if any. */
 async function getTtsClaim(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   language: string,
-  variantKey?: string,
 ): Promise<Doc<'ttsGenerationClaims'> | null> {
   return await ctx.db
     .query('ttsGenerationClaims')
-    .withIndex('by_text_language_variant', (q) =>
-      q
-        .eq('textId', textId)
-        .eq('language', language)
-        .eq('variantKey', variantKey),
+    .withIndex('by_text_and_language', (q) =>
+      q.eq('textId', textId).eq('language', language),
     )
     .first();
 }
@@ -177,9 +169,8 @@ export async function claimTtsIfAvailable(
   textId: Id<'texts'>,
   language: string,
   priority?: TtsPriority,
-  variantKey?: string,
 ): Promise<Id<'ttsGenerationClaims'> | null> {
-  const existing = await getTtsClaim(ctx, textId, language, variantKey);
+  const existing = await getTtsClaim(ctx, textId, language);
 
   if (existing) {
     if (ttsClaimBlocksPriority(existing, priority)) {
@@ -199,7 +190,6 @@ export async function claimTtsIfAvailable(
     language,
     claimedAt: Date.now(),
     priority,
-    ...(variantKey !== undefined ? { variantKey } : {}),
   });
 }
 
@@ -233,9 +223,8 @@ export async function hasBlockingTtsClaim(
   textId: Id<'texts'>,
   language: string,
   priority: TtsPriority | undefined,
-  variantKey?: string,
 ): Promise<boolean> {
-  const existing = await getTtsClaim(ctx, textId, language, variantKey);
+  const existing = await getTtsClaim(ctx, textId, language);
   return existing !== null && ttsClaimBlocksPriority(existing, priority);
 }
 
@@ -247,9 +236,8 @@ export async function hasActiveTtsClaim(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   language: string,
-  variantKey?: string,
 ): Promise<boolean> {
-  const existing = await getTtsClaim(ctx, textId, language, variantKey);
+  const existing = await getTtsClaim(ctx, textId, language);
   if (!existing) return false;
   return Date.now() - existing.claimedAt < TTS_CLAIM_STALE_MS;
 }
@@ -709,12 +697,7 @@ export const enqueueTtsJob = internalMutation({
     ctx: MutationCtx,
     { provider, args }: { provider: TtsProvider; args: TtsJobArgs },
   ) => {
-    const claim = await getTtsClaim(
-      ctx,
-      args.textId,
-      args.language,
-      args.variantKey,
-    );
+    const claim = await getTtsClaim(ctx, args.textId, args.language);
     // A fresh claim already stamped with another job's workId means a live
     // pool job owns this (textId, language): enqueueing again would synthesize
     // twice and hijack that job's claim. Unreachable from the claim-then-
@@ -805,12 +788,7 @@ export const onTtsJobComplete = internalMutation({
         },
       );
     }
-    const claim = await getTtsClaim(
-      ctx,
-      context.textId,
-      context.language,
-      context.variantKey,
-    );
+    const claim = await getTtsClaim(ctx, context.textId, context.language);
     if (claim && (claim.workId === undefined || claim.workId === workId)) {
       await ctx.db.delete(claim._id);
     }
@@ -849,12 +827,7 @@ export const updateAudioRecordingQuality = internalMutation({
       const revision = await ctx.db.get(args.supersededTranslationId);
       assetId = revision?.audioAssetId;
     } else {
-      const record = await audioPointer(
-        ctx,
-        args.textId,
-        args.language,
-        args.variantKey,
-      );
+      const record = await audioPointer(ctx, args.textId, args.language);
       assetId = record?.assetId;
     }
     if (assetId === undefined) return null;
@@ -1129,7 +1102,6 @@ export const backfillWordTimings = internalAction({
       await ctx.runMutation(internal.features.ttsProcessing.releaseTtsClaim, {
         textId: args.textId,
         language: args.language,
-        variantKey: args.variantKey,
       });
     }
     return null;
@@ -1236,17 +1208,10 @@ export const releaseTtsClaim = internalMutation({
   args: {
     textId: v.id('texts'),
     language: v.string(),
-    /** The rendering variant this claim belongs to; absent = canonical. */
-    variantKey: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const claim = await getTtsClaim(
-      ctx,
-      args.textId,
-      args.language,
-      args.variantKey,
-    );
+    const claim = await getTtsClaim(ctx, args.textId, args.language);
     if (claim && claim.workId === undefined) {
       await ctx.db.delete(claim._id);
     }

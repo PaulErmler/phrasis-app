@@ -411,21 +411,8 @@ export function useCollectionDetail({
             // Complete translations can still lack an annotation line
             // (IPA/romanization); requesting the row runs the server's
             // annotation backfill without touching the translations.
-            row.needsAnnotationBackfill ||
-            // ... or the wording the course's politeness setting asks for.
-            // Same trap as the annotation flag above: these rows have every
-            // canonical translation, so without this they were never sent
-            // and the "updating" chip never cleared.
-            row.needsRenderingRewrite) &&
-          // A rendering rewrite takes TWO server passes: the first asks the
-          // classifier to stamp the canonical row, and only once the stamp
-          // lands can the second ask for the rewrite. The one-shot ref below
-          // would spend the single allowed request on the stamp and leave the
-          // chip up for the rest of the session, so a row still reporting
-          // `needsRenderingRewrite` is let through again. The server's
-          // per-variant claims dedup the actual work.
-          (row.needsRenderingRewrite ||
-            !requestedTranslationsRef.current.has(row._id)),
+            row.needsAnnotationBackfill) &&
+          !requestedTranslationsRef.current.has(row._id),
       )
       .map((row) => row._id);
     if (pending.length === 0) return;

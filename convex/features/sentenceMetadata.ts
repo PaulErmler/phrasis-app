@@ -25,7 +25,10 @@ import {
 import { resolveAudioSpeakerGender, seededIndex } from '../../lib/languages';
 import { isUserCreatedText } from '../../lib/translationProvenance';
 import { deleteAudioRow } from '../lib/audio';
-import { parseRenderingKey, renderingKey } from '../../lib/preferenceResolution';
+import {
+  parseRenderingKey,
+  renderingKey,
+} from '../../lib/preferenceResolution';
 import { retrier } from '../retrier';
 import { stripJsonFences } from '../lib/llmJson';
 
@@ -492,10 +495,10 @@ export async function applyTextMetadata(
         }
         continue;
       }
-      const { voice, formId } = parseRenderingKey(translation.variantKey);
+      const { voice } = parseRenderingKey(translation.variantKey);
       if (voice !== previousVoice) continue;
       await ctx.db.patch(translation._id, {
-        variantKey: renderingKey(audioSpeakerGender, formId),
+        variantKey: renderingKey(audioSpeakerGender),
         speakerGender: audioSpeakerGender,
       });
     }

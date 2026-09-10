@@ -14,17 +14,7 @@ import {
 } from './textAnnotations';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { classificationLanguageForRow } from './renderingClassifier';
-import {
-  parseRenderingKey,
-  type LanguageRendering,
-  type RenderingText,
-  type RenderingSettings,
-} from '../../lib/preferenceResolution';
-import {
-  distinctPolitenessForms,
-  NO_FORM,
-  type PolitenessLevel,
-} from '../../lib/languageForms';
+import { type RenderingText } from '../../lib/preferenceResolution';
 import { getLlmClaim, isClaimFresh } from '../features/llmTranslationQueue';
 import { appendSearchSegments } from '../../lib/wordTokenize';
 import {
@@ -41,14 +31,9 @@ import {
   type ServedTranslation,
   type SourceView,
   audioPointer,
-  renderingForView,
-  sourceRenderingForView,
-  dialectForRendering,
-  viewAcceptsLegacyRow,
-  renderingSettingsOf,
-  renderingTextOf,
+  renderingOfText,
+  type TextRendering,
 } from '../db/translationReads';
-import { getCourseSettings } from '../db/courseSettings';
 
 type ContentCtx = QueryCtx | MutationCtx;
 
@@ -104,21 +89,6 @@ export interface CardTranslationContent {
    * pass no `renderingText`.
    */
   voiceGender?: 'male' | 'female';
-  /**
-   * The politeness level of the served row's rendering key
-   * (docs/architecture/rendering-keys.md): the lowest global level the
-   * key's form covers. Present only for a keyed row whose form is not
-   * `none`; a legacy row shows no politeness chip. `formLanguage` is the
-   * code whose config names it (the row's own dialect on a mixed code).
-   */
-  politenessLevel?: PolitenessLevel;
-  formLanguage?: string;
-  /**
-   * The view's keyed row has not landed yet, so `text` is a legacy
-   * placeholder that will change when it does. Surfaces render it as
-   * pending rather than presenting the current sentence as the answer.
-   */
-  formPending?: boolean;
 }
 
 export interface CardAudioContent {
@@ -148,13 +118,6 @@ export interface TextContentResult {
    * rows through `requestPreviewTranslations`).
    */
   hasMissingAnnotation: boolean;
-  /**
-   * The keyed row (or its clip) the view resolves to has not landed: the
-   * card shows a legacy placeholder meanwhile. Counted into
-   * `hasMissingContent` only with `opts.includeVariantGaps`, so a reader
-   * that never triggers generation does not ask forever.
-   */
-  hasMissingVariant: boolean;
   /**
    * Course languages whose translation entry is empty or, with
    * `markVersionStale`, version-stale, plus the text's own language when
@@ -254,12 +217,6 @@ export async function buildTextContentBatchForLanguages(
      * query does not treat legacy timing-less audio as a content gap.
      */
     ignoreMissingWordTimings?: boolean;
-    /**
-     * Count a missing keyed row (wording or audio) as missing content, so
-     * the client self-heal asks the ensure path for it. Only for readers
-     * whose heal generates rows (the review query).
-     */
-    includeVariantGaps?: boolean;
   },
 ): Promise<Map<string, TextContentResult>> {
   const allLanguages = getCourseLanguages(baseLanguages, targetLanguages);
@@ -274,24 +231,18 @@ export async function buildTextContentBatchForLanguages(
     userCreated: boolean;
     pinAt: number | undefined;
     /**
-     * The rendering the slot reads (docs/architecture/rendering-keys.md),
-     * resolved once the legacy row is in hand (a mixed code's form depends
-     * on the row's dialect). Null for a reader without rendering fields,
-     * which reads legacy rows only.
+     * The rendering the slot reads: the text's voice and the key its row
+     * carries. Null for a reader that passed no rendering fields.
      */
-    rendering: LanguageRendering | null;
-    /** Whether a legacy row is THE rendering for this view. */
-    acceptsLegacy: boolean;
+    rendering: TextRendering | null;
     isSource: boolean;
   }> = [];
   const audioFetches: Array<{
     slot: string;
     rowLang: string;
     textId: Id<'texts'>;
-    /** The rendering key the slot plays under; undefined = legacy only. */
+    /** The rendering key the slot's clip carries. */
     variantKey: string | undefined;
-    /** Whether the legacy pointer stands in when the keyed one is missing. */
-    legacyFallback: boolean;
   }> = [];
   // `${key}:${lang}` -> accent code, for the source slots that read an
   // accent row. Such a slot fetches the accent row's audio under the slot
@@ -302,9 +253,9 @@ export async function buildTextContentBatchForLanguages(
   for (const input of inputs) {
     const pinAt = input.view?.pinAt;
     const hasRendering = input.renderingText !== undefined;
-    const acceptsLegacy = hasRendering
-      ? viewAcceptsLegacyRow(input.view ?? null, input.renderingText!)
-      : true;
+    const rendering = hasRendering
+      ? renderingOfText(input.renderingText!, input.textId)
+      : null;
     for (const lang of allLanguages) {
       const slot = `${input.key}:${lang}`;
       if (lang !== input.sourceLanguage) {
@@ -315,24 +266,15 @@ export async function buildTextContentBatchForLanguages(
           textId: input.textId,
           userCreated: input.userCreated,
           pinAt,
-          rendering: null,
-          acceptsLegacy,
+          rendering,
           isSource: false,
         });
         continue;
       }
       // Every language of the card is spoken in one voice, the source
-      // included: its clip (and the accent row's) is read under the voice
-      // key. A legacy view plays the legacy clip, which is the text's
-      // voice, so no keyed clip is missing for it.
-      const sourceRendering = hasRendering
-        ? sourceRenderingForView(
-            input.view ?? null,
-            input.renderingText!,
-            input.textId,
-          )
-        : null;
-      const sourceAudioKey = acceptsLegacy ? undefined : sourceRendering?.key;
+      // included: its clip (and the accent row's) carries the same key.
+      const sourceRendering = rendering;
+      const sourceAudioKey = sourceRendering?.key;
       const accent = servedAccentRow(
         {
           _id: input.textId,
@@ -351,7 +293,6 @@ export async function buildTextContentBatchForLanguages(
           userCreated: input.userCreated,
           pinAt,
           rendering: sourceRendering,
-          acceptsLegacy,
           isSource: true,
         });
         audioFetches.push({
@@ -359,7 +300,6 @@ export async function buildTextContentBatchForLanguages(
           rowLang: accent,
           textId: input.textId,
           variantKey: sourceAudioKey,
-          legacyFallback: true,
         });
       }
       audioFetches.push({
@@ -367,75 +307,22 @@ export async function buildTextContentBatchForLanguages(
         rowLang: lang,
         textId: input.textId,
         variantKey: sourceAudioKey,
-        legacyFallback: true,
       });
     }
   }
 
-  // The legacy rows first: they carry the dialect pin a target slot's key
-  // depends on, and they are the rows a legacy card reads.
-  const legacyResults = await Promise.all(
+  const rows = await Promise.all(
     translationFetches.map((item) =>
       liveTranslation(ctx, item.textId, item.rowLang),
     ),
   );
-  const inputByKey = new Map(inputs.map((input) => [input.key, input]));
-  translationFetches.forEach((item, idx) => {
-    if (item.isSource) return;
-    const input = inputByKey.get(item.key)!;
-    if (input.renderingText !== undefined) {
-      item.rendering = renderingForView(
-        input.view ?? null,
-        input.renderingText,
-        input.textId,
-        item.lang,
-        dialectForRendering(item.lang, item.textId, legacyResults[idx]),
-      );
-    }
-  });
-
-  // The keyed rows: read for every slot that has a key, except a legacy
-  // view that already has its legacy row (which never reads the keyed
-  // range).
-  const keyedResults = await Promise.all(
-    translationFetches.map((item, idx) =>
-      item.rendering && !(item.acceptsLegacy && legacyResults[idx])
-        ? liveTranslation(ctx, item.textId, item.rowLang, item.rendering.key)
-        : Promise.resolve(null),
-    ),
-  );
-
-  // Which row the slot shows: a legacy view's legacy row (else its keyed
-  // row where it has no legacy one), every other view's keyed row (else
-  // the legacy row as a placeholder). Then the pin within that row's key.
-  const chosen = translationFetches.map((item, idx) => {
-    const legacy = legacyResults[idx];
-    const keyed = keyedResults[idx];
-    const row = item.acceptsLegacy ? (legacy ?? keyed) : (keyed ?? legacy);
-    const servedKeyed = row !== null && row === keyed;
-    return {
-      row,
-      servedKeyed,
-      textPending: item.rendering !== null && !item.acceptsLegacy && !keyed,
-      // The "Retranslating" pill keys off the LLM claim of the row the
-      // card reads: the legacy claim for a legacy row, the key's claim
-      // for a keyed row or for the keyed row a placeholder waits for. A
-      // non-stale claim means a job for that row is in flight; it does NOT
-      // fire on "regenerate audio" (no LLM phase, no claim).
-      claimKey:
-        row !== null && !servedKeyed && item.acceptsLegacy
-          ? undefined
-          : item.rendering?.key,
-    };
-  });
+  const chosen = rows.map((row) => ({ row }));
+  // The "Retranslating" pill keys off the LLM claim of the row the card
+  // reads. A non-stale claim means a job for that row is in flight; it does
+  // NOT fire on "regenerate audio" (no LLM phase, no claim).
   const claimResults = await Promise.all(
-    chosen.map((c, idx) =>
-      getLlmClaim(
-        ctx,
-        translationFetches[idx].textId,
-        translationFetches[idx].rowLang,
-        c.claimKey,
-      ),
+    translationFetches.map((item) =>
+      getLlmClaim(ctx, item.textId, item.rowLang),
     ),
   );
   const servedResults: (ServedTranslation | null)[] = await Promise.all(
@@ -445,34 +332,19 @@ export async function buildTextContentBatchForLanguages(
         : Promise.resolve(null),
     ),
   );
-  // Target slots play the clip of the row they show: the keyed pointer for
-  // a keyed row, the legacy pointer for a legacy row or a placeholder.
-  translationFetches.forEach((item, idx) => {
+  // Target slots play the clip of the row they show.
+  translationFetches.forEach((item) => {
     if (item.isSource) return;
     audioFetches.push({
       slot: `${item.key}:${item.lang}`,
       rowLang: item.lang,
       textId: item.textId,
-      variantKey: chosen[idx].servedKeyed ? item.rendering!.key : undefined,
-      legacyFallback: !chosen[idx].servedKeyed,
+      variantKey: item.rendering?.key,
     });
   });
-  const [audioResults, keyedAudioResults] = await Promise.all([
-    Promise.all(
-      audioFetches.map((item) =>
-        item.legacyFallback
-          ? audioPointer(ctx, item.textId, item.rowLang)
-          : Promise.resolve(null),
-      ),
-    ),
-    Promise.all(
-      audioFetches.map((item) =>
-        item.variantKey
-          ? audioPointer(ctx, item.textId, item.rowLang, item.variantKey)
-          : Promise.resolve(null),
-      ),
-    ),
-  ]);
+  const audioResults = await Promise.all(
+    audioFetches.map((item) => audioPointer(ctx, item.textId, item.rowLang)),
+  );
 
   type TranslationEntry = {
     text: string;
@@ -489,10 +361,6 @@ export async function buildTextContentBatchForLanguages(
      * by the sweep like a live row's, so its gaps count as missing content.
      */
     archived: boolean;
-    /** The politeness level of the served row's key, for the chip. */
-    politenessLevel: PolitenessLevel | undefined;
-    /** The view's keyed row has not landed; `text` is a placeholder. */
-    textPending: boolean;
     /**
      * The code whose politeness config describes this row, which is the
      * row's own dialect on a mixed code (`classificationLanguageForRow`).
@@ -541,11 +409,6 @@ export async function buildTextContentBatchForLanguages(
         archived || versionStale ? null : (claim?.claimedAt ?? null),
       versionStale: !archived && versionStale,
       archived,
-      politenessLevel:
-        chosen[idx].servedKeyed && row?.variantKey
-          ? politenessLevelOfKey(formLanguage, row.variantKey)
-          : undefined,
-      textPending: chosen[idx].textPending,
     });
     if (served?.archived && served.audioAssetId) {
       archivedAudioByKeyAndLang.set(
@@ -561,7 +424,6 @@ export async function buildTextContentBatchForLanguages(
   const assetIds = [
     ...new Set([
       ...audioResults.flatMap((row) => (row ? [row.assetId] : [])),
-      ...keyedAudioResults.flatMap((row) => (row ? [row.assetId] : [])),
       ...archivedAudioByKeyAndLang.values(),
     ]),
   ];
@@ -569,22 +431,10 @@ export async function buildTextContentBatchForLanguages(
   const assetById = new Map(assetIds.map((id, i) => [id, assetDocs[i]]));
 
   const payloadByKeyAndLang = new Map<string, ResolvedAudioPayload | null>();
-  // Slots whose keyed clip has not landed (a legacy clip may play meanwhile).
-  const audioVariantMissing = new Set<string>();
   audioFetches.forEach((item, idx) => {
     const keyAndLang = item.slot;
     const entry = translationMap.get(keyAndLang);
-    const keyedRow = keyedAudioResults[idx];
-    // An archived revision plays its own asset whatever the voice: the pin
-    // outranks the voice, so no keyed clip is missing for it.
-    if (item.variantKey && !keyedRow && !entry?.archived) {
-      audioVariantMissing.add(keyAndLang);
-    }
-    // The keyed clip when it exists, else the legacy one where the slot
-    // allows it: a keyed row plays only its own clip (the legacy clip may
-    // speak another wording), a legacy row or a placeholder plays the
-    // legacy clip.
-    const row = keyedRow ?? (item.legacyFallback ? audioResults[idx] : null);
+    const row = audioResults[idx];
     // An archived revision plays its own asset, or nothing: the live
     // pointer's audio speaks a wording this card does not show.
     const assetId = entry?.archived
@@ -674,11 +524,7 @@ export async function buildTextContentBatchForLanguages(
     // that pass no rendering fields (none of the card surfaces) get none.
     const voiceGender =
       input.renderingText !== undefined
-        ? sourceRenderingForView(
-            input.view ?? null,
-            input.renderingText,
-            input.textId,
-          ).voiceGender
+        ? renderingOfText(input.renderingText, input.textId).voiceGender
         : undefined;
     const translations = allLanguages.map((lang) => {
       // Gate each stored annotation on its kind's CURRENT language set
@@ -732,22 +578,8 @@ export async function buildTextContentBatchForLanguages(
         ...(opts?.markVersionStale
           ? { versionStale: entry?.versionStale ?? false }
           : {}),
-        // The chips: the card's voice always, and the politeness level of a
-        // keyed row's key. A placeholder shows no level: the wording is
-        // about to change.
+        // The chip: the sentence's voice, on every surface that shows a card.
         ...(voiceGender ? { voiceGender } : {}),
-        ...(entry?.politenessLevel && !entry.textPending
-          ? {
-              politenessLevel: entry.politenessLevel,
-              formLanguage: entry.formLanguage,
-            }
-          : {}),
-        // The wording the view asks for is still being written. Only
-        // meaningful once there is something to show: a language with no
-        // text at all is already rendered as loading.
-        ...(entry?.textPending && translatedText.length > 0
-          ? { formPending: true }
-          : {}),
       };
     });
 
@@ -829,51 +661,24 @@ export async function buildTextContentBatchForLanguages(
         !backfillExhausted(audio.language),
     );
 
-    // The source slot counts too: its wording never varies, but its clip
-    // (the one that renders, accent row or source) follows the card's voice.
-    const hasMissingVariant = allLanguages.some(
-      (lang) =>
-        (translationMap.get(`${input.key}:${lang}`)?.textPending ?? false) ||
-        audioVariantMissing.has(resolution(input, lang).audioSlot),
-    );
-
     result.set(input.key, {
       translations,
       audioRecordings,
       missingTranslationLanguages,
       hasMissingAnnotation,
-      hasMissingVariant,
       hasMissingContent:
         hasMissingTranslation ||
         hasMissingAudio ||
         hasMissingAnnotation ||
         hasUncheckedAudio ||
-        (!opts?.ignoreMissingWordTimings && hasMissingWordTimings) ||
-        (opts?.includeVariantGaps === true && hasMissingVariant),
+        (!opts?.ignoreMissingWordTimings && hasMissingWordTimings),
     });
   }
 
   return result;
 }
 
-/**
- * The politeness level a rendering key's form is reported as: the lowest
- * global level the form covers on `formLanguage` (du -> casual, Sie ->
- * polite, keigo -> formal). Undefined when the key's form is `none` or the
- * language names no such form.
- */
-export function politenessLevelOfKey(
-  formLanguage: string,
-  key: string,
-): PolitenessLevel | undefined {
-  const { formId } = parseRenderingKey(key);
-  if (formId === NO_FORM) return undefined;
-  return distinctPolitenessForms(formLanguage).find(
-    (entry) => entry.form.id === formId,
-  )?.levels[0];
-}
-
-/** The live LEGACY translation rows for a text, in course-language order. */
+/** The live translation rows for a text, in course-language order. */
 async function loadLiveTranslationRows(
   ctx: ContentCtx,
   textId: Id<'texts'>,
@@ -961,7 +766,7 @@ function composeSearchableText(
  * Pass `text` when the caller already has the doc. Avoids a redundant
  * `ctx.db.get` on the review hot path.
  *
- * `view` is the card's (`viewOfCard(card, renderingSettings)`). Its pin
+ * `view` is the card's (`viewOfCard(card)`). Its pin
  * makes the string hold the words the learner's card actually shows when
  * the card is pinned to a superseded revision, its `accentLanguage` picks
  * the accent row the source words come from on a Mixed English course, and
@@ -978,20 +783,10 @@ export async function buildCardSearchableText(
   courseLanguages: string[],
   opts: { text?: Doc<'texts'> | null; view: SourceView | null },
 ): Promise<{ searchableText: string; searchableTextLanguages: string[] }> {
-  const [resolvedText, legacyRows] = await Promise.all([
+  const [resolvedText, liveRows] = await Promise.all([
     opts.text !== undefined ? Promise.resolve(opts.text) : ctx.db.get(textId),
     loadLiveTranslationRows(ctx, textId, courseLanguages),
   ]);
-  const liveRows = resolvedText
-    ? await servedRenderingRows(
-        ctx,
-        textId,
-        resolvedText,
-        courseLanguages,
-        legacyRows,
-        opts.view,
-      )
-    : legacyRows;
   // The source-language words a Mixed English card shows are its accent
   // row's (`servedSourceText`), so those are the ones searched.
   const [source, { entries }] = await Promise.all([
@@ -1007,64 +802,10 @@ export async function buildCardSearchableText(
   );
 }
 
-/**
- * The live row each language of a card is served, aligned with
- * `languages`: the row at the view's rendering key, or the legacy row for a
- * view that accepts legacy rows (`viewAcceptsLegacyRow`) and as a
- * placeholder while the keyed row is missing. The source language and a
- * reader without rendering fields keep the legacy row. Resolved through the
- * legacy row's own dialect like every other reader (a mixed code maps the
- * levels onto different forms per dialect). `cache` memoizes the keyed
- * reads by (text, language, key) across the cards of one rebuild pass:
- * every card of a text in one deck resolves the same key.
- *
- * Shared by both search builders, so a card added after the preview had
- * already generated its "Sie" row is found by "Sie" and not by "du", and
- * two builders never disagree about the same card.
- */
-export async function servedRenderingRows(
-  ctx: ContentCtx,
-  textId: Id<'texts'>,
-  text: Doc<'texts'>,
-  languages: string[],
-  legacyRows: (Doc<'translations'> | null)[],
-  view: SourceView | null,
-  cache?: Map<string, (Doc<'translations'> | null)[]>,
-): Promise<(Doc<'translations'> | null)[]> {
-  const renderingText = renderingTextOf(text);
-  const acceptsLegacy = viewAcceptsLegacyRow(view, renderingText);
-  return Promise.all(
-    languages.map(async (lang, i) => {
-      const legacy = legacyRows[i];
-      if (lang === text.language) return legacy;
-      if (acceptsLegacy && legacy) return legacy;
-      const rendering = renderingForView(
-        view,
-        renderingText,
-        textId,
-        lang,
-        dialectForRendering(lang, textId, legacy),
-      );
-      const key = `${textId}|${lang}|${rendering.key}`;
-      let rows = cache?.get(key);
-      if (!rows) {
-        rows = [await liveTranslation(ctx, textId, lang, rendering.key)];
-        cache?.set(key, rows);
-      }
-      return rows[0] ?? legacy;
-    }),
-  );
-}
-
 /** Caches for `buildSearchableTextPatchForCard`, scoped by the caller. */
 export interface SearchableTextRebuildCaches {
   /** deck → course languages (null when the deck/course no longer resolves). */
   deckLanguages: Map<Id<'decks'>, string[] | null>;
-  /**
-   * deck → the course's sentence-form settings. One read per deck, shared by
-   * every card in it, so the index can follow the rendering the card shows.
-   */
-  deckRenderingSettings: Map<Id<'decks'>, RenderingSettings | undefined>;
   /**
    * Optional memo of the live translation rows keyed by (textId, languages).
    * Every card of a text shares them; only the pin-dependent revision choice
@@ -1109,7 +850,6 @@ export async function buildSearchableTextPatchForCard(
   { searchableText: string; searchableTextLanguages: string[] } | undefined
 > {
   let languages = caches.deckLanguages.get(card.deckId);
-  let renderingSettings = caches.deckRenderingSettings.get(card.deckId);
   if (languages === undefined) {
     const deck = await ctx.db.get(card.deckId);
     const course = deck ? await ctx.db.get(deck.courseId) : null;
@@ -1117,10 +857,6 @@ export async function buildSearchableTextPatchForCard(
       ? [...course.baseLanguages, ...course.targetLanguages]
       : null;
     caches.deckLanguages.set(card.deckId, languages);
-    renderingSettings = course
-      ? renderingSettingsOf(await getCourseSettings(ctx, course._id))
-      : undefined;
-    caches.deckRenderingSettings.set(card.deckId, renderingSettings);
   }
   if (!languages) return undefined;
 
@@ -1130,20 +866,11 @@ export async function buildSearchableTextPatchForCard(
     liveRows = await loadLiveTranslationRows(ctx, card.textId, languages);
     caches.liveRows?.set(liveKey, liveRows);
   }
-  const view = viewOfCard(card, renderingSettings);
-  const servedRows = await servedRenderingRows(
-    ctx,
-    card.textId,
-    text,
-    languages,
-    liveRows,
-    view,
-    caches.liveRows,
-  );
+  const view = viewOfCard(card);
   const { entries, revisionKey } = await servedSearchableEntries(
     ctx,
     languages,
-    servedRows,
+    liveRows,
     view.pinAt,
   );
   // Same rule as `buildCardSearchableText`: a Mixed English card searches

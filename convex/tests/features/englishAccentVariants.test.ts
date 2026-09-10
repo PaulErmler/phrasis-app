@@ -60,7 +60,7 @@ async function seedEnglishText(t: TestConvex<typeof schema>, text: string) {
 }
 
 /** The text's rendering key on every accent sibling (no form, its voice). */
-const KEY = 'female|none';
+const KEY = 'female';
 
 async function sweep(
   t: TestConvex<typeof schema>,
@@ -90,9 +90,7 @@ describe('English accent variants', () => {
 
       await sweep(t, textId, ['en_us'], ['es']);
 
-      const row = await t.run((ctx) =>
-        liveTranslation(ctx, textId, 'en_us', KEY),
-      );
+      const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_us'));
       expect(row).toMatchObject({
         translatedText: 'Hello world',
         translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
@@ -150,7 +148,7 @@ describe('English accent variants', () => {
       expect(ttsEnqueues().map((e) => e.language)).toEqual(['en']);
     });
 
-    it('an old verbatim copy on a UK course is left to its cards; the keyed row is a fresh rewrite', async () => {
+    it('an old verbatim copy on a UK course is regenerated in place', async () => {
       const t = convexTest(schema, modules);
       const textId = await seedEnglishText(t, 'The color of the elevator');
       const rowId = await t.run((ctx) =>
@@ -166,17 +164,13 @@ describe('English accent variants', () => {
 
       await sweep(t, textId, ['en_gb'], []);
 
-      // The legacy row is never regenerated (the cards on it keep it), and
-      // a version-stale wording is not adopted under the key either: the
-      // keyed row is rendered afresh.
+      // The row keeps serving its wording until the replacement lands; the
+      // sweep regenerates it in place through the version-bump path.
       const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_gb'));
       expect(row?._id).toBe(rowId);
       expect(llmEnqueues()).toMatchObject([
-        { targetLanguage: 'en_gb', renderingKeys: [KEY] },
+        { targetLanguage: 'en_gb', renderingKey: KEY, replaceExisting: true },
       ]);
-      expect(
-        (llmEnqueues()[0] as { replaceExisting?: boolean }).replaceExisting,
-      ).toBeUndefined();
     });
 
     it('a custom German sentence with an en_gb target is still translated by a model', async () => {
@@ -228,9 +222,7 @@ describe('English accent variants', () => {
 
       await sweep(t, textId, ['en'], ['es']);
 
-      const row = await t.run((ctx) =>
-        liveTranslation(ctx, textId, 'en', KEY),
-      );
+      const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en'));
       expect(row).toMatchObject({
         translatedText: 'Mind the gap',
         translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,

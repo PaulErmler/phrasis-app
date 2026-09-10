@@ -219,7 +219,7 @@ export function CardShell({
         </div>
         <div className="ml-auto flex pl-2">
           <CardActionsMenu
-              isFavorite={isFavorite}
+            isFavorite={isFavorite}
             isMastered={masterActive}
             isHidden={hideActive}
             onFavorite={onFavorite}

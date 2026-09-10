@@ -1,10 +1,4 @@
 import { languageName } from '../../../lib/languages';
-import type { RenderingSettings } from '../../../lib/preferenceResolution';
-import {
-  concreteLanguageCodes,
-  selectedPolitenessForms,
-} from '../../../lib/languageForms';
-import { studiedFormsInstruction } from '../../../lib/renderingPrompts';
 
 /**
  * Dynamic prompt sections injected (uncached) after the agent's static
@@ -137,39 +131,6 @@ RULES:
 createCard order (one entry per code, exactly this order): ${allLangs.join(', ')}
 Each entry's "text" must be written in the language named above — ${perCodeTextRule}. Never copy one entry's text into another slot.
 Schematic: [${schematic}]`;
-}
-
-/**
- * The course's sentence-form settings (lib/languageForms.ts), so the tutor
- * writes its examples and cards in the forms the learner studies. Empty when
- * the course has none (every course from before the feature).
- */
-export function buildFormsSection(
-  settings: RenderingSettings | null | undefined,
-  languages: { baseLanguages: string[]; targetLanguages: string[] },
-): string | undefined {
-  if (!settings) return undefined;
-  const lines: string[] = [];
-  const levels = settings.politenessLevels;
-  if (levels && levels.length > 0) {
-    const codes = [
-      ...new Set([...languages.baseLanguages, ...languages.targetLanguages]),
-    ];
-    for (const code of codes) {
-      for (const concrete of concreteLanguageCodes(code)) {
-        const forms = selectedPolitenessForms(concrete, levels);
-        const studied = studiedFormsInstruction(languageName(concrete), forms);
-        if (!studied) continue;
-        lines.push(
-          forms.length === 1
-            ? `- ${studied} Use it in your examples and createCard entries unless the user asks for another form.`
-            : `- ${studied} Use either in examples, and say which one a sentence is in when it matters.`,
-        );
-      }
-    }
-  }
-  if (lines.length === 0) return undefined;
-  return `Sentence-form settings of this course:\n${lines.join('\n')}`;
 }
 
 export type LearnerDifficulty = {

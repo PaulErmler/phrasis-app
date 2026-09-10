@@ -40,7 +40,6 @@
     "eval:metadata": "tsx --env-file=.env.local scripts/eval-sentence-metadata.mjs",
     "eval:rendering": "tsx --env-file=.env.local scripts/eval-rendering-detection.ts",
     "eval:gender-relevance": "tsx --env-file=.env.local scripts/eval-gender-relevance.ts",
-    "eval:adherence": "tsx --env-file=.env.local scripts/eval-adherence.ts",
     "eval:stt": "tsx --env-file=.env.local scripts/eval-stt.ts",
     "eval:rom": "tsx --env-file=.env.local scripts/eval-rom.ts",
     "eval:swiss": "tsx --env-file=.env.local scripts/eval-swiss-german.mts",

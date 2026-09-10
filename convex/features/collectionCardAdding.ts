@@ -41,7 +41,6 @@ import {
   listMarksForCollection,
 } from '../db/collectionTextMarks';
 import { buildCardSearchableText } from '../lib/cardContent';
-import { renderingSettingsOf } from '../db/translationReads';
 
 /**
  * Collection selection + card adding: which collection the course studies
@@ -312,7 +311,6 @@ export async function createCardsFromTexts(
   const settingsForSeed = await getCourseSettings(ctx, course._id);
   const seedWritingTrack = settingsForSeed?.separateModeTracking === true;
   // The sentence-form settings the new cards follow, for their search index.
-  const renderingSettings = renderingSettingsOf(settingsForSeed);
 
   for (const text of texts) {
     if (text.collectionRank > newLastRank) {
@@ -342,23 +340,13 @@ export async function createCardsFromTexts(
           // exists (the collection preview generates them ahead of the
           // add). Without these the index held the canonical words and
           // nothing rebuilt it: the only rebuild trigger is a variant WRITE.
-          view: {
-            accentLanguage,
-            settings: renderingSettings,
-            card: text.userCreated ? null : { followsCoursePreferences: true },
-          },
+          view: { accentLanguage },
         });
 
       await insertCard(ctx, {
         deckId: deck._id,
         textId: text._id,
         ...(accentLanguage !== undefined ? { accentLanguage } : {}),
-        // A curriculum card follows the course's sentence-form settings
-        // from now on (`cards.followsCoursePreferences` in schema.ts); a
-        // user's own sentence never does.
-        ...(text.userCreated
-          ? {}
-          : { followsCoursePreferences: true as const }),
         collectionId,
         collectionOrigin,
         dueDate: dueBase + cardsInserted,

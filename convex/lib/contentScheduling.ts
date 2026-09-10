@@ -15,15 +15,8 @@ import {
   pickAccentForText,
   usesSourceTextVerbatim,
 } from '../../lib/languages';
-import {
-  GOOGLE_TRANSLATE_SOURCE,
-  mayRegenerateTranslation,
-  SOURCE_VERBATIM_TRANSLATION_SOURCE,
-} from '../../lib/translationProvenance';
-import {
-  definitiveSpeakerGender,
-  hasCurrentSentenceMetadata,
-} from '../../lib/sentenceMetadataSource';
+import { mayRegenerateTranslation } from '../../lib/translationProvenance';
+import { hasCurrentSentenceMetadata } from '../../lib/sentenceMetadataSource';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
   annotationRequestInFlight,
@@ -63,26 +56,14 @@ import {
   splitRevisions,
   translationRevisions,
   audioPointer,
-  liveTranslation,
   previewView,
-  renderingForView,
+  renderingOfText,
   renderingTextOf,
   servedAccentRow,
-  sourceRenderingForView,
-  viewAcceptsLegacyRow,
-  dialectForRendering,
   type SourceView,
   type SweepCard,
-  primaryKeyForLanguage,
+  type TextRendering,
 } from '../db/translationReads';
-import {
-  NO_FORM,
-  parseRenderingKey,
-  type LanguageRendering,
-  type RenderingSettings,
-} from '../../lib/preferenceResolution';
-import { classificationLanguageForRow } from './renderingClassifier';
-import { languageMarksFirstPerson } from '../../lib/languageForms';
 
 /**
  * Content-scheduling helpers: the "make this text's content complete" sweep
@@ -159,40 +140,30 @@ export type RenderingJobOpts = {
   replaceExisting?: boolean;
   /** Why the translation is requested; see translationReasonValidator. */
   translationReason?: TranslationReason;
-  /**
-   * Adoption: verify the legacy row's wording against the key and store a
-   * copy of it when it passes, generating afresh only when it does not.
-   */
-  adoptLegacy?: boolean;
 };
 
 /**
- * Claim + enqueue ONE rendering job for (text, language) producing the given
- * keys: the primary key first when it is in the list (a fresh translation),
- * then every other key as a versioning of the primary wording. Every key is
- * claimed here, in the mutation, so nothing inside the job ever waits for
- * another job; keys already held by a fresh claim are dropped from the list.
- * An accent-only sibling of the text's own language with no rewrite of its
- * own (an `en` sentence on an `en_us` course) is stored verbatim under each
- * key without any LLM. Returns true iff a job was enqueued (or a verbatim
- * row written); in probe mode throws ProbeNeedsWork iff it would.
+ * Claim + enqueue ONE rendering job for (text, language), producing the row
+ * under `key` (the text's voice). The claim is taken here, in the mutation,
+ * so nothing inside the job ever waits for another job. An accent-only
+ * sibling of the text's own language with no rewrite of its own (an `en`
+ * sentence on an `en_us` course) is stored verbatim without any LLM.
+ * Returns true iff a job was enqueued (or a verbatim row written); in probe
+ * mode throws ProbeNeedsWork iff it would.
  */
 export async function enqueueRenderingJob(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   targetLanguage: string,
-  keys: string[],
+  key: string,
   opts: RenderingJobOpts,
 ): Promise<boolean> {
-  if (keys.length === 0) return false;
   if (usesSourceTextVerbatim(targetLanguage, text.language)) {
     if (opts.probe) throw new ProbeNeedsWork();
-    for (const key of keys) {
-      await storeTranslationAndScheduleTTSHandler(
-        ctx,
-        verbatimTranslationArgs(text, targetLanguage, key, opts),
-      );
-    }
+    await storeTranslationAndScheduleTTSHandler(
+      ctx,
+      verbatimTranslationArgs(text, targetLanguage, key, opts),
+    );
     return true;
   }
   if (opts.probe) {
@@ -201,33 +172,25 @@ export async function enqueueRenderingJob(
     // a fresh 'background' claim probed at interactive priority IS needy,
     // because the real run would take it over (cancel the warm job,
     // re-enqueue on llmPool), which is a write.
-    for (const key of keys) {
-      if (
-        !(await hasBlockingLlmClaim(
-          ctx,
-          text._id,
-          targetLanguage,
-          opts.llmPriority,
-          key,
-        ))
-      ) {
-        throw new ProbeNeedsWork();
-      }
+    if (
+      !(await hasBlockingLlmClaim(
+        ctx,
+        text._id,
+        targetLanguage,
+        opts.llmPriority,
+      ))
+    ) {
+      throw new ProbeNeedsWork();
     }
     return false;
   }
-  const claimed: string[] = [];
-  for (const key of keys) {
-    const claimId = await claimLlmTranslationIfAvailable(
-      ctx,
-      text._id,
-      targetLanguage,
-      opts.llmPriority,
-      key,
-    );
-    if (claimId) claimed.push(key);
-  }
-  if (claimed.length === 0) return false;
+  const claimId = await claimLlmTranslationIfAvailable(
+    ctx,
+    text._id,
+    targetLanguage,
+    opts.llmPriority,
+  );
+  if (!claimId) return false;
   await ctx.runMutation(
     internal.features.llmTranslationQueue.enqueueLlmTranslation,
     {
@@ -236,7 +199,7 @@ export async function enqueueRenderingJob(
         sourceLanguage: text.language,
         targetLanguage,
         text: text.text,
-        renderingKeys: claimed,
+        renderingKey: key,
         preferredRegionVariant: opts.preferredRegionVariant,
         skipTts: opts.skipTts,
         priority: opts.priority,
@@ -244,7 +207,6 @@ export async function enqueueRenderingJob(
         requestedByUserId: opts.requestedByUserId,
         replaceExisting: opts.replaceExisting,
         translationReason: opts.translationReason,
-        adoptLegacy: opts.adoptLegacy,
       },
     },
   );
@@ -259,16 +221,15 @@ export async function enqueueRenderingJob(
  * that reference the text before replacing it (see `supersededAt` in
  * schema.ts). Nothing is deleted up front, so a learner never sees a gap and
  * never sees their card's wording change. Two triggers share it: a language
- * `translationVersion` bump, and derivation staleness (a versioned row
- * whose primary wording moved on). Legacy rows are never regenerated: a
- * card still on one keeps it, and a new card gets a keyed row instead.
- * Returns true iff a job was enqueued; in probe mode throws ProbeNeedsWork
- * iff it would.
+ * `translationVersion` bump, and a voice the row was not written for (a
+ * flag moved the sentence's speaker). Returns true iff a job was enqueued;
+ * in probe mode throws ProbeNeedsWork iff it would.
  */
 export async function enqueueVersionBumpRegen(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   translation: Doc<'translations'>,
+  key: string,
   opts: {
     skipTts?: boolean;
     priority?: TtsPriority;
@@ -277,21 +238,14 @@ export async function enqueueVersionBumpRegen(
     requestedByUserId?: string;
   },
 ): Promise<boolean> {
-  if (translation.variantKey === undefined) return false;
-  return enqueueRenderingJob(
-    ctx,
-    text,
-    translation.targetLanguage,
-    [translation.variantKey],
-    {
-      ...opts,
-      // The row survives, so its dialect pin is still on it; forwarding it
-      // keeps a swept-then-refilled race on the same variant either way.
-      preferredRegionVariant: translation.regionVariant,
-      replaceExisting: true,
-      translationReason: 'version_bump',
-    },
-  );
+  return enqueueRenderingJob(ctx, text, translation.targetLanguage, key, {
+    ...opts,
+    // The row survives, so its dialect pin is still on it; forwarding it
+    // keeps a swept-then-refilled race on the same variant either way.
+    preferredRegionVariant: translation.regionVariant,
+    replaceExisting: true,
+    translationReason: 'version_bump',
+  });
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -404,15 +358,7 @@ export async function scheduleAudioForLanguage(
     // the real run would take it over (cancel the warm job, re-enqueue on
     // the interactive pool) — a write. Anything else (cache attach or
     // claim + enqueue) would write too.
-    if (
-      await hasBlockingTtsClaim(
-        ctx,
-        text._id,
-        language,
-        opts?.priority,
-        variantKey,
-      )
-    ) {
+    if (await hasBlockingTtsClaim(ctx, text._id, language, opts?.priority)) {
       return false;
     }
     throw new ProbeNeedsWork();
@@ -448,7 +394,6 @@ export async function scheduleAudioForLanguage(
     text._id,
     language,
     opts?.priority,
-    variantKey,
   );
   if (!claimed) return false;
   await enqueueTtsForVoice(ctx, {
@@ -608,15 +553,11 @@ export type ContentSweepOpts = {
    */
   skipTts?: boolean;
   /**
-   * The card the sweep runs for, when the caller has one, so a per-card
-   * correction (`cards.renderingGenderOverride` /
-   * `renderingPolitenessOverride`) renders and the source clip voiced is
-   * the one the card plays (its accent row). Absent or null = the rendering
-   * a card created now would get.
+   * The card the sweep runs for, when the caller has one, so the source clip
+   * voiced is the one the card plays (its accent row). Absent or null = what
+   * a card created now would be served.
    */
   card?: SweepCard | null;
-  /** The course's politeness setting; absent = each sentence's primary form. */
-  settings?: RenderingSettings;
   /**
    * Forced regeneration (regenerateCardAudio): audio enqueues bypass the
    * `audioAssets` cache (a hit would make the regenerate button a no-op)
@@ -659,139 +600,64 @@ type ResolvedAudioPayload = NonNullable<
 >;
 
 /**
- * The sweep's view of one language of the text: the rendering the view
- * resolves to, the rows that exist for it, and which of them the view is
- * served. Built once by `loadContentState` and mutated in place by the
- * invalidation sweeps (a detached pointer becomes `null` so the fill loop
- * refills the slot).
+ * The sweep's view of one language of the text: the key its rows and clips
+ * carry, the row that exists for it, and its pointer and claim. Built once
+ * by `loadContentState` and mutated in place by the invalidation sweeps (a
+ * detached pointer becomes `null` so the fill loop refills the slot).
  */
 type LanguageSlot = {
   lang: string;
-  /** The key, voice and form this view reads for `lang`. */
-  rendering: LanguageRendering;
-  /** The primary key of (text, lang) on the row's dialect. */
-  primaryKey: string;
-  /** The live LEGACY row (no key), when one exists. */
-  legacy: Doc<'translations'> | null;
-  /** The live row at `rendering.key`, when one exists. */
-  keyed: Doc<'translations'> | null;
-  /**
-   * The row this view is served and maintains: the keyed row, or the legacy
-   * row for a view that accepts legacy rows. Null when the view is waiting
-   * for its keyed row (a placeholder legacy row is not this view's to
-   * maintain).
-   */
+  /** The key this language's row and clip carry: the text's voice. */
+  key: string;
+  voiceGender: 'male' | 'female';
+  /** The live row of (text, lang), when one exists. */
   served: Doc<'translations'> | null;
-  servedKeyed: boolean;
-  /** The superseded revisions of the served row's key range, oldest first. */
+  /** The superseded revisions of (text, lang), oldest first. */
   superseded: Doc<'translations'>[];
-  /** The pointer key the served rendering plays under; undefined = legacy. */
-  audioKey: string | undefined;
   audio: Doc<'audioRecordings'> | null;
-  /** The LLM claim at `rendering.key`. */
   llmClaim: Doc<'llmTranslationClaims'> | null;
 };
-
-/** The key of the LLM claim that would replace the row a slot reads. */
-function slotClaimKey(slot: LanguageSlot): string | undefined {
-  return slot.served !== null && !slot.servedKeyed
-    ? undefined
-    : slot.rendering.key;
-}
 
 type ContentSweepState = {
   slots: Map<string, LanguageSlot>;
   /** Resolved payloads for the pointers that SURVIVED the validity sweep. */
   audioPayloadMap: Map<string, ResolvedAudioPayload>;
-  acceptsLegacy: boolean;
 };
 
 /**
- * Batch load the rows, pointers and claims of every required language: the
- * legacy rows first (they carry the dialect pin the key depends on), then
- * the keyed rows, the pointers and the claims in one parallel round each.
+ * Batch load the rows, pointers and claims of every required language, in
+ * one parallel round each.
  */
 async function loadContentState(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   text: Doc<'texts'>,
-  view: SourceView,
   allRequiredLanguages: string[],
 ): Promise<ContentSweepState> {
-  const acceptsLegacy = viewAcceptsLegacyRow(view, text);
-  const renderingText = renderingTextOf(text);
+  const rendering = renderingOfText(renderingTextOf(text), textId);
   const targets = allRequiredLanguages.filter((l) => l !== text.language);
-  const legacyRevisions = await Promise.all(
+  const revisions = await Promise.all(
     targets.map((lang) => translationRevisions(ctx, textId, lang)),
   );
-  const legacySplit = legacyRevisions.map(splitRevisions);
-  const renderings = targets.map((lang, i) =>
-    renderingForView(
-      view,
-      renderingText,
-      textId,
-      lang,
-      dialectForRendering(lang, textId, legacySplit[i].live),
-    ),
-  );
-  const primaryKeys = targets.map((lang, i) =>
-    primaryKeyForLanguage(
-      text,
-      lang,
-      dialectForRendering(lang, textId, legacySplit[i].live),
-    ),
-  );
-  // A view on its legacy row never reads the keyed range; every other view
-  // reads it, and the legacy row is only its placeholder.
-  const keyedRevisions = await Promise.all(
-    targets.map((lang, i) =>
-      acceptsLegacy && legacySplit[i].live
-        ? Promise.resolve([] as Doc<'translations'>[])
-        : translationRevisions(ctx, textId, lang, renderings[i].key),
-    ),
-  );
-  const keyedSplit = keyedRevisions.map(splitRevisions);
+  const split = revisions.map(splitRevisions);
 
   const slots = new Map<string, LanguageSlot>();
-  const sourceRendering = sourceRenderingForView(view, renderingText, textId);
   slots.set(text.language, {
     lang: text.language,
-    rendering: sourceRendering,
-    primaryKey: sourceRendering.key,
-    legacy: null,
-    keyed: null,
+    key: rendering.key,
+    voiceGender: rendering.voiceGender,
     served: null,
-    servedKeyed: false,
     superseded: [],
-    // A view on legacy rows plays the legacy source clip; every other view
-    // plays the clip keyed by its voice.
-    audioKey: acceptsLegacy ? undefined : sourceRendering.key,
     audio: null,
     llmClaim: null,
   });
   targets.forEach((lang, i) => {
-    const legacy = legacySplit[i].live;
-    const keyed = keyedSplit[i].live;
-    const served = acceptsLegacy ? (legacy ?? keyed) : keyed;
-    const servedKeyed = served !== null && served === keyed;
     slots.set(lang, {
       lang,
-      rendering: renderings[i],
-      primaryKey: primaryKeys[i],
-      legacy,
-      keyed,
-      served,
-      servedKeyed,
-      superseded: servedKeyed
-        ? keyedSplit[i].superseded
-        : served
-          ? legacySplit[i].superseded
-          : [],
-      // The pointer this view maintains: a legacy view's legacy pointer
-      // while it reads a legacy row, else the key's. A view waiting for
-      // its keyed row leaves the legacy clip to the legacy cards.
-      audioKey:
-        acceptsLegacy && !servedKeyed ? undefined : renderings[i].key,
+      key: rendering.key,
+      voiceGender: rendering.voiceGender,
+      served: split[i].live,
+      superseded: split[i].superseded,
       audio: null,
       llmClaim: null,
     });
@@ -799,19 +665,12 @@ async function loadContentState(
 
   const slotList = [...slots.values()];
   const [pointers, claims] = await Promise.all([
-    Promise.all(
-      slotList.map((slot) =>
-        audioPointer(ctx, textId, slot.lang, slot.audioKey),
-      ),
-    ),
+    Promise.all(slotList.map((slot) => audioPointer(ctx, textId, slot.lang))),
     Promise.all(
       slotList.map((slot) =>
         slot.lang === text.language
           ? Promise.resolve(null)
-          : // The claim of the row this view reads: a flag on a legacy row
-            // claims the legacy slot (`replacesLegacyRow`), everything
-            // else the key.
-            getLlmClaim(ctx, textId, slot.lang, slotClaimKey(slot)),
+          : getLlmClaim(ctx, textId, slot.lang),
       ),
     ),
   ]);
@@ -819,7 +678,7 @@ async function loadContentState(
     slot.audio = pointers[i];
     slot.llmClaim = claims[i];
   });
-  return { slots, audioPayloadMap: new Map(), acceptsLegacy };
+  return { slots, audioPayloadMap: new Map() };
 }
 
 /**
@@ -857,7 +716,7 @@ async function sweepInvalidAudio(
     if (!payload) {
       // Dangling pointer (asset gone), no usable audio behind this row.
       // Remove it so the enqueue loop below refills the language.
-      if (await hasActiveTtsClaim(ctx, textId, lang, slot.audioKey)) continue;
+      if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
       if (opts?.probe) throw new ProbeNeedsWork();
       await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
       slot.audio = null;
@@ -868,7 +727,7 @@ async function sweepInvalidAudio(
     // signed URL — this loop runs per (card × language) on the ensure path.
     const blobExists = (await ctx.db.system.get(payload.storageId)) !== null;
     if (!blobExists) {
-      if (await hasActiveTtsClaim(ctx, textId, lang, slot.audioKey)) {
+      if (await hasActiveTtsClaim(ctx, textId, lang)) {
         continue;
       }
       if (opts?.probe) throw new ProbeNeedsWork();
@@ -886,22 +745,15 @@ async function sweepInvalidAudio(
     // captured it; a byte-identical restamp leaves the mismatch to the next
     // sweep, which no longer sees the language as corrected.
     if (correctedLanguages.has(lang)) continue;
-    // A keyed pointer speaks the voice its key names, so any other voice is
-    // wrong for it. A legacy pointer speaks the text's own voice; it is
-    // re-voiced only when that voice is the sentence's own (a user-written
-    // text, or a verdict that fixes the speaker), never over a coin flip.
-    const wantedVoice =
-      slot.audioKey !== undefined
-        ? parseRenderingKey(slot.audioKey).voice
-        : text.userCreated || definitiveSpeakerGender(text) !== null
-          ? textVoice
-          : undefined;
-    const genderMismatch =
-      wantedVoice !== undefined && payload.voiceGender !== wantedVoice;
-    // A keyed pointer whose asset speaks another sentence is not this
-    // rendering's clip (a late synthesis after the wording moved on).
+    // The clip speaks the voice the slot's key names, so any other voice is
+    // wrong for it.
+    const genderMismatch = payload.voiceGender !== slot.voiceGender;
+    // A pointer whose asset speaks another sentence is not this row's clip
+    // (a late synthesis after the wording moved on). Only for a pointer
+    // this pipeline stamped: an unstamped one predates the rule, and its
+    // asset's `spokenText` is not a reliable claim about the wording.
     const wordingMismatch =
-      slot.audioKey !== undefined &&
+      audio.variantKey !== undefined &&
       slot.lang !== text.language &&
       slot.served !== null &&
       payload.asset.spokenText !== slot.served.translatedText;
@@ -942,20 +794,19 @@ async function sweepInvalidAudio(
 }
 
 /**
- * Regenerate served KEYED rows that are stale, in place, through the
- * version-bump path. Two triggers:
+ * Regenerate stale rows in place, through the version-bump path. Two
+ * triggers:
  *
  *  1. Version-stale: the language's `translationVersion` config was bumped
  *     above the row's stamp (a new model or prompt).
- *  2. Derivation-stale: a row the versioning prompt produced whose
- *     `versionedFromText` no longer equals the primary row's wording (a
- *     flag, a curriculum fix or a bump moved the primary on).
+ *  2. Voice-stale: the row was written for the other speaker (a flag moved
+ *     the sentence's voice). A row with no key is from before the stamp
+ *     existed and is left alone.
  *
- * Legacy rows are never regenerated (a card still on one keeps it; a new
- * card gets a keyed row). Content we may not touch is skipped
- * (`mayRegenerateTranslation`). Skipped too while TTS is in flight or an
- * LLM job already owns the key. Returns the languages whose replacement is
- * now in flight, so the audio sweep leaves their clip for the archive.
+ * Content we may not touch is skipped (`mayRegenerateTranslation`). Skipped
+ * too while TTS is in flight or an LLM job already owns the row. Returns
+ * the languages whose replacement is now in flight, so the audio sweep
+ * leaves their clip for the archive.
  */
 async function sweepStaleTranslations(
   ctx: MutationCtx,
@@ -968,41 +819,40 @@ async function sweepStaleTranslations(
   let regenScheduled = 0;
   for (const slot of state.slots.values()) {
     const { lang, served } = slot;
-    if (!served || !slot.servedKeyed) continue;
+    if (!served || lang === text.language) continue;
     if (!mayRegenerateTranslation(text, served)) continue;
     const isVersionStale = isTranslationVersionStale(
       lang,
       served.translationVersion,
     );
-    let derivationStale = false;
-    if (served.versionedFromText !== undefined) {
-      const primary =
-        served.variantKey === slot.primaryKey
-          ? served
-          : await liveTranslation(ctx, textId, lang, slot.primaryKey);
-      derivationStale =
-        primary !== null && primary.translatedText !== served.versionedFromText;
-    }
-    if (!isVersionStale && !derivationStale) continue;
-    if (await hasActiveTtsClaim(ctx, textId, lang, slot.audioKey)) continue;
+    const voiceStale =
+      served.variantKey !== undefined && served.variantKey !== slot.key;
+    if (!isVersionStale && !voiceStale) continue;
+    if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
     // Defer while a job for this key is in flight. It will overwrite the
     // row anyway, so a second one would race the pending write.
     if (slot.llmClaim && isClaimFresh(slot.llmClaim)) continue;
 
-    const enqueued = await enqueueVersionBumpRegen(ctx, text, served, {
-      skipTts: opts?.skipTts,
-      priority: opts?.priority,
-      llmPriority: opts?.llmPriority,
-      probe: opts?.probe,
-      requestedByUserId: opts?.requestedByUserId,
-    });
+    const enqueued = await enqueueVersionBumpRegen(
+      ctx,
+      text,
+      served,
+      slot.key,
+      {
+        skipTts: opts?.skipTts,
+        priority: opts?.priority,
+        llmPriority: opts?.llmPriority,
+        probe: opts?.probe,
+        requestedByUserId: opts?.requestedByUserId,
+      },
+    );
     if (enqueued) {
       regenScheduled++;
       correctedLanguages.add(lang);
       // The fresh claim makes `scheduleLanguageContent` defer this pass's
       // TTS for the language, so no audio is synthesized for the wording
       // about to be replaced.
-      slot.llmClaim = await getLlmClaim(ctx, textId, lang, served.variantKey);
+      slot.llmClaim = await getLlmClaim(ctx, textId, lang);
     }
   }
   return { regenScheduled, correctedLanguages };
@@ -1041,20 +891,12 @@ async function scheduleTimingsBackfillIfNeeded(
     // Claim-held = a job (synthesis or backfill) already owns the slot —
     // unless it's a background claim the real (priority-less, hence
     // interactive) claim below would take over, which is a write.
-    if (
-      await hasBlockingTtsClaim(ctx, textId, lang, undefined, slot.audioKey)
-    ) {
+    if (await hasBlockingTtsClaim(ctx, textId, lang, undefined)) {
       return;
     }
     throw new ProbeNeedsWork();
   }
-  const claimed = await claimTtsIfAvailable(
-    ctx,
-    textId,
-    lang,
-    undefined,
-    slot.audioKey,
-  );
+  const claimed = await claimTtsIfAvailable(ctx, textId, lang, undefined);
   if (!claimed) return;
   await ctx.scheduler.runAfter(
     0,
@@ -1064,7 +906,7 @@ async function scheduleTimingsBackfillIfNeeded(
       language: lang,
       storageId: payload.storageId,
       requestedByUserId: opts?.requestedByUserId,
-      variantKey: slot.audioKey,
+      variantKey: slot.key,
     },
   );
 }
@@ -1167,183 +1009,24 @@ async function scheduleMissingSourceAnnotations(
   }
 }
 
-/** Copy of `value` with every `undefined` property dropped, for inserts. */
-function defined<T extends Record<string, unknown>>(value: T): T {
-  return Object.fromEntries(
-    Object.entries(value).filter(([, v]) => v !== undefined),
-  ) as T;
-}
-
 /**
- * Whether a legacy row may stand in for a key without a model call: the
- * wording cannot carry either axis (an unmarked language, or a form-free
- * key on a language that does not mark the first person), so there is
- * nothing to verify.
- */
-function legacyNeedsVerification(
-  legacy: Pick<Doc<'translations'>, 'targetLanguage' | 'regionVariant'>,
-  key: string,
-): boolean {
-  const concrete = classificationLanguageForRow(legacy);
-  return (
-    languageMarksFirstPerson(concrete) ||
-    parseRenderingKey(key).formId !== NO_FORM
-  );
-}
-
-/**
- * Whether a legacy row may stand in for the PRIMARY key at all: not
- * version-stale (a bump means the wording is to be redone, and a new card
- * must not inherit it; a human wording the pipeline never regenerates,
- * `mayRegenerateTranslation`, has no version to be stale against), and,
- * when the wording could carry an axis, written by a model that was told
- * the voice (never machine translation, never a verbatim copy).
- */
-function legacyAdoptable(
-  text: Doc<'texts'>,
-  legacy: Doc<'translations'>,
-  key: string,
-): boolean {
-  if (
-    mayRegenerateTranslation(text, legacy) &&
-    isTranslationVersionStale(legacy.targetLanguage, legacy.translationVersion)
-  ) {
-    return false;
-  }
-  if (!legacyNeedsVerification(legacy, key)) return true;
-  return (
-    legacy.translationSource !== GOOGLE_TRANSLATE_SOURCE &&
-    legacy.translationSource !== SOURCE_VERBATIM_TRANSLATION_SOURCE
-  );
-}
-
-/**
- * Copy a legacy row under a key: the same wording, annotations, provenance
- * and version stamp, so a version-stale legacy wording is never frozen
- * under a key and the copy's annotations need no regeneration. The audio
- * ensure finds the same asset by string, voice and setup, so no clip is
- * synthesized for it.
- */
-async function copyLegacyRowUnderKey(
-  ctx: MutationCtx,
-  legacy: Doc<'translations'>,
-  key: string,
-  voice: 'male' | 'female',
-): Promise<Doc<'translations'>> {
-  const id = await ctx.db.insert(
-    'translations',
-    defined({
-      textId: legacy.textId,
-      targetLanguage: legacy.targetLanguage,
-      translatedText: legacy.translatedText,
-      romanizedText: legacy.romanizedText,
-      romanizationSource: legacy.romanizationSource,
-      ipaText: legacy.ipaText,
-      ipaSource: legacy.ipaSource,
-      furiganaText: legacy.furiganaText,
-      furiganaSource: legacy.furiganaSource,
-      translationSource: legacy.translationSource,
-      regionVariant: legacy.regionVariant,
-      translationVersion: legacy.translationVersion,
-      speakerGender: voice,
-      variantKey: key,
-    }),
-  );
-  return (await ctx.db.get(id))!;
-}
-
-/**
- * Make the row at the slot's key exist: adopt the legacy row when it may
- * stand in for the primary key (a copy with no call when the wording
- * cannot carry an axis, a verifying job otherwise), else claim and enqueue
- * one job for the key, together with the primary key when the primary row
- * is missing (a versioned key is derived from it). Returns true iff a job
- * was enqueued (a copy is complete on return); throws ProbeNeedsWork in
- * probe mode where it would write.
+ * Make the row of (text, language) exist: claim and enqueue one job for the
+ * text's voice. Returns true iff a job was enqueued; throws ProbeNeedsWork
+ * in probe mode where it would write.
  */
 async function ensureRenderingRow(
   ctx: MutationCtx,
   text: Doc<'texts'>,
-  textId: Id<'texts'>,
   slot: LanguageSlot,
-  gate: MetadataGate,
   opts: ContentSweepOpts | undefined,
 ): Promise<boolean> {
-  const { lang, legacy, primaryKey } = slot;
-  const key = slot.rendering.key;
-  // Every branch below writes a row or a claim under a key: none of it
-  // before the metadata the key is computed from is in.
-  if (!(await gate.ready())) return false;
-  const jobOpts: RenderingJobOpts = {
-    preferredRegionVariant: legacy?.regionVariant,
+  return enqueueRenderingJob(ctx, text, slot.lang, slot.key, {
     skipTts: opts?.skipTts,
     priority: opts?.priority,
     llmPriority: opts?.llmPriority,
     probe: opts?.probe,
     requestedByUserId: opts?.requestedByUserId,
-  };
-  if (legacy && key === primaryKey && legacyAdoptable(text, legacy, key)) {
-    if (!legacyNeedsVerification(legacy, key)) {
-      if (opts?.probe) throw new ProbeNeedsWork();
-      const copied = await copyLegacyRowUnderKey(
-        ctx,
-        legacy,
-        key,
-        slot.rendering.voiceGender,
-      );
-      // The copy is this view's row from now on: the caller goes on to
-      // its annotations and audio in this same pass. Nothing is in flight
-      // for it, so it is not counted as scheduled work.
-      slot.keyed = copied;
-      slot.served = copied;
-      slot.servedKeyed = true;
-      slot.superseded = [];
-      slot.audioKey = key;
-      slot.audio = null;
-      return false;
-    }
-    return enqueueRenderingJob(ctx, text, lang, [key], {
-      ...jobOpts,
-      adoptLegacy: true,
-    });
-  }
-  // A versioned key is derived from the primary row. When that row is
-  // missing and the legacy row can stand in for it with no call, copy it
-  // first, so the job versions from it instead of translating the primary
-  // afresh; otherwise the job renders both.
-  let primaryExists =
-    key === primaryKey ||
-    (await liveTranslation(ctx, textId, lang, primaryKey)) !== null;
-  if (
-    !primaryExists &&
-    legacy &&
-    legacyAdoptable(text, legacy, primaryKey) &&
-    !legacyNeedsVerification(legacy, primaryKey)
-  ) {
-    if (opts?.probe) throw new ProbeNeedsWork();
-    await copyLegacyRowUnderKey(
-      ctx,
-      legacy,
-      primaryKey,
-      parseRenderingKey(primaryKey).voice,
-    );
-    primaryExists = true;
-  }
-  // The primary rendered with the key is offered the legacy wording for
-  // adoption like a primary-only job would be.
-  return enqueueRenderingJob(
-    ctx,
-    text,
-    lang,
-    primaryExists ? [key] : [primaryKey, key],
-    {
-      ...jobOpts,
-      adoptLegacy:
-        !primaryExists &&
-        legacy !== null &&
-        legacyAdoptable(text, legacy, primaryKey),
-    },
-  );
+  });
 }
 
 function audioOptsOf(slot: LanguageSlot, opts: ContentSweepOpts | undefined) {
@@ -1352,7 +1035,7 @@ function audioOptsOf(slot: LanguageSlot, opts: ContentSweepOpts | undefined) {
     priority: opts?.priority,
     probe: opts?.probe,
     requestedByUserId: opts?.requestedByUserId,
-    variantKey: slot.audioKey,
+    variantKey: slot.key,
   };
 }
 
@@ -1369,27 +1052,20 @@ async function scheduleLanguageContent(
   slot: LanguageSlot,
   textVoice: 'male' | 'female',
   state: ContentSweepState,
-  gate: MetadataGate,
   opts: ContentSweepOpts | undefined,
 ): Promise<{ translationScheduled: boolean; audioScheduled: boolean }> {
   const scheduled = { translationScheduled: false, audioScheduled: false };
   const { lang } = slot;
 
   if (lang === text.language) {
-    // Source language, no translation needed, maybe TTS in the view's voice.
+    // Source language, no translation needed, maybe TTS in the text's voice.
     if (opts?.skipTts) return scheduled;
     if (slot.audio == null) {
-      // A keyed source clip is voiced by its key; not before the metadata
-      // that fixes the voice is in. The legacy clip speaks the text's
-      // voice as it stands.
-      if (slot.audioKey !== undefined && !(await gate.ready())) {
-        return scheduled;
-      }
       scheduled.audioScheduled = await scheduleAudioForLanguage(
         ctx,
         text,
         lang,
-        slot.rendering.voiceGender,
+        slot.voiceGender,
         null,
         audioOptsOf(slot, opts),
       );
@@ -1403,29 +1079,21 @@ async function scheduleLanguageContent(
     scheduled.translationScheduled = await ensureRenderingRow(
       ctx,
       text,
-      textId,
       slot,
-      gate,
       opts,
     );
-    // A legacy row copied under the key is served from here on; anything
-    // else (a job, a wait) leaves the language to a later pass.
-    if (!slot.served) return scheduled;
+    return scheduled;
   }
   const translation = slot.served;
   const hasAudio = slot.audio != null;
 
   // The row exists. Backfill missing annotations (romanization, IPA,
-  // furigana), by the row's own id so a keyed row's wording is the one
+  // furigana), by the row's own id so the wording served is the one
   // annotated. Same `=== undefined` sentinel semantics as the source loop.
   if (opts?.probe && annotationsDue(lang, translation)) {
     throw new ProbeNeedsWork();
   }
-  await scheduleTranslationAnnotations(
-    ctx,
-    translation,
-    slot.servedKeyed ? translation._id : undefined,
-  );
+  await scheduleTranslationAnnotations(ctx, translation, translation._id);
   if (opts?.skipTts) return scheduled;
   if (!hasAudio) {
     // Defer TTS while a job for this key is in flight: it will overwrite
@@ -1433,14 +1101,13 @@ async function scheduleLanguageContent(
     // audio for the wording it lands. Without this guard a flag's
     // retranslation raced a concurrent sweep into synthesizing the OLD
     // wording just before the new one landed.
-    const jobInFlight =
-      slot.llmClaim !== null && isClaimFresh(slot.llmClaim);
+    const jobInFlight = slot.llmClaim !== null && isClaimFresh(slot.llmClaim);
     if (!jobInFlight) {
       scheduled.audioScheduled = await scheduleAudioForLanguage(
         ctx,
         text,
         lang,
-        slot.servedKeyed ? slot.rendering.voiceGender : textVoice,
+        slot.voiceGender,
         translation,
         audioOptsOf(slot, opts),
       );
@@ -1460,16 +1127,12 @@ async function scheduleLanguageContent(
 }
 
 /**
- * Make a text's content complete for one view: decide the voice, make
- * sure the source metadata is in (curriculum texts), resolve the rendering
- * key per language, then fill each language's gaps (the row at the key,
- * annotations, audio, timings) and repair what went stale. One entry point
- * for every caller: the card surfaces pass their card and the course
- * settings, the warm and browse surfaces pass the settings alone, and the
- * guard "which rendering does this view read" is applied once, inside.
+ * Make a text's content complete: decide the voice, then fill each
+ * language's gaps (the row, its annotations, audio, timings) and repair
+ * what went stale. One entry point for every caller; the card surfaces pass
+ * their card so the source clip voiced is the accent row the card plays.
  *
- * Returns how many translation and audio jobs were scheduled; a text whose
- * metadata was just requested reports one translation and returns early.
+ * Returns how many translation and audio jobs were scheduled.
  */
 export async function ensureTextContent(
   ctx: MutationCtx,
@@ -1491,22 +1154,9 @@ export async function ensureTextContent(
     text = { ...text, ...genderPatch };
   }
 
-  // The metadata precondition: a curriculum text is classified from its
-  // source sentence BEFORE its first keyed row or clip, so no key is ever
-  // computed from a voice or a register a verdict can later overturn. The
-  // gate is asked only where a keyed write is due: legacy rows and clips
-  // are repaired without it. The verdict re-runs this sweep
-  // (`applyTextMetadata`). A text the classifier keeps failing on renders
-  // from defaults after `MAX_METADATA_ATTEMPTS`.
-  const gate = metadataGate(ctx, text, baseLanguages, targetLanguages, opts);
-
   const view: SourceView = opts?.card
-    ? {
-        settings: opts.settings,
-        card: opts.card,
-        accentLanguage: opts.card.accentLanguage,
-      }
-    : previewView(opts?.settings);
+    ? { accentLanguage: opts.card.accentLanguage }
+    : previewView();
 
   // Always include the text's own language (`sourceLanguage`) so the
   // source-language branch of `scheduleLanguageContent` queues audio for it
@@ -1533,13 +1183,7 @@ export async function ensureTextContent(
     ]),
   ];
 
-  const state = await loadContentState(
-    ctx,
-    textId,
-    text,
-    view,
-    allRequiredLanguages,
-  );
+  const state = await loadContentState(ctx, textId, text, allRequiredLanguages);
 
   // Translations first, audio second. The wording sweep decides whether a
   // replacement is coming, and the audio sweep needs that answer before it
@@ -1574,14 +1218,11 @@ export async function ensureTextContent(
       slot,
       textVoice,
       state,
-      gate,
       opts,
     );
     if (scheduled.translationScheduled) translationsScheduled++;
     if (scheduled.audioScheduled) audioScheduled++;
   }
-  // A classifier call scheduled by the gate is work on the way too.
-  if (gate.requested) translationsScheduled++;
   return { translationsScheduled, audioScheduled };
 }
 
@@ -1595,25 +1236,25 @@ export async function ensureRenderingAudio(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   spoken: { language: string; text: string; regionVariant: string | undefined },
-  rendering: LanguageRendering,
+  rendering: TextRendering,
   opts: { priority?: TtsPriority; requestedByUserId?: string },
 ): Promise<boolean> {
   const lang = spoken.language;
   const key = rendering.key;
-  const pointer = await audioPointer(ctx, textId, lang, key);
+  const pointer = await audioPointer(ctx, textId, lang);
   if (pointer) {
     const payload = await resolveAudioPayload(ctx, pointer);
     const blobGone =
       payload === null || (await ctx.db.system.get(payload.storageId)) === null;
     if (!blobGone && payload.asset.spokenText === spoken.text) return false;
-    if (await hasActiveTtsClaim(ctx, textId, lang, key)) return false;
+    if (await hasActiveTtsClaim(ctx, textId, lang)) return false;
     await deleteAudioRow(
       ctx,
       pointer,
       blobGone ? { blobAlreadyGone: true } : { keepAsset: true },
     );
   }
-  if (await hasBlockingTtsClaim(ctx, textId, lang, opts.priority, key)) {
+  if (await hasBlockingTtsClaim(ctx, textId, lang, opts.priority)) {
     return false;
   }
   const voiceName = getVoiceForText(
@@ -1632,13 +1273,7 @@ export async function ensureRenderingAudio(
     await upsertAudioPointer(ctx, textId, lang, asset._id, key);
     return true;
   }
-  const claimed = await claimTtsIfAvailable(
-    ctx,
-    textId,
-    lang,
-    opts.priority,
-    key,
-  );
+  const claimed = await claimTtsIfAvailable(ctx, textId, lang, opts.priority);
   if (!claimed) return false;
   await enqueueTtsForVoice(ctx, {
     textId,
@@ -1679,7 +1314,10 @@ export type MetadataState = 'current' | 'exhausted' | 'in_flight' | 'needed';
 export function metadataState(
   text: Pick<
     Doc<'texts'>,
-    'userCreated' | 'metadataSource' | 'metadataRequestedAt' | 'metadataAttempts'
+    | 'userCreated'
+    | 'metadataSource'
+    | 'metadataRequestedAt'
+    | 'metadataAttempts'
   >,
 ): MetadataState {
   if (text.userCreated) return 'current';
@@ -1698,68 +1336,28 @@ export function metadataState(
 }
 
 /**
- * The metadata precondition as one sweep sees it: `ready()` is true when a
- * keyed write may go ahead (the text is classified, or the classifier has
- * given up on it), else false, after scheduling the classifier the first
- * time it is asked. Asked lazily so a pass that writes nothing keyed never
- * pays a call.
- */
-export type MetadataGate = {
-  ready(): Promise<boolean>;
-  /** Whether this sweep scheduled the classifier. */
-  readonly requested: boolean;
-};
-
-export function metadataGate(
-  ctx: MutationCtx,
-  text: Doc<'texts'>,
-  baseLanguages: string[],
-  targetLanguages: string[],
-  opts: Parameters<typeof requestSentenceMetadataIfNeeded>[4],
-): MetadataGate {
-  let state = metadataState(text);
-  let requested = false;
-  return {
-    get requested() {
-      return requested;
-    },
-    async ready() {
-      if (state === 'current' || state === 'exhausted') return true;
-      if (state === 'needed') {
-        const result = await requestSentenceMetadataIfNeeded(
-          ctx,
-          text,
-          baseLanguages,
-          targetLanguages,
-          opts,
-        );
-        requested = result === 'requested';
-        state = 'in_flight';
-      }
-      return false;
-    },
-  };
-}
-
-/**
  * Claim the text and schedule the classifier on its SOURCE sentence alone
- * when it still needs one. The custom-card path sends every rendering,
- * because a gendered form in any translation fixes the sentence's gender;
- * on a curriculum text the translations were generated for whatever voice
- * was known at the time, so they get no vote. The verdict lands through
- * `applyTextMetadata`, which stamps `metadataSource` and re-runs the sweep.
- * Returns the text's state after this call (`requested` when a call was
- * scheduled); in probe mode throws ProbeNeedsWork iff it would schedule.
+ * when it still needs one. Reached from the FLAG path only (Paul,
+ * 2026-09-11): a learner reporting the wrong speaker asks the classifier
+ * about that one sentence. No sweep classifies a curriculum text up front.
+ * The verdict lands through `applyTextMetadata`, which stamps
+ * `metadataSource` and re-runs the sweep. `metadataRequestedAt` and
+ * `metadataAttempts` keep two learners flagging the same sentence from
+ * buying two calls. Returns the text's state after this call (`requested`
+ * when a call was scheduled); in probe mode throws ProbeNeedsWork iff it
+ * would schedule.
  */
 export async function requestSentenceMetadataIfNeeded(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   baseLanguages: string[],
   targetLanguages: string[],
-  opts: Pick<
-    ContentSweepOpts,
-    'probe' | 'requestedByUserId' | 'priority' | 'llmPriority'
-  > | undefined,
+  opts:
+    | Pick<
+        ContentSweepOpts,
+        'probe' | 'requestedByUserId' | 'priority' | 'llmPriority'
+      >
+    | undefined,
 ): Promise<MetadataState | 'requested'> {
   const state = metadataState(text);
   if (state !== 'needed') return state;

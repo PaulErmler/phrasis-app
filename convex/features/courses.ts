@@ -960,13 +960,6 @@ export const completeOnboarding = mutation({
       activeCollectionId: collection?._id,
       reviewMode: progress.reviewMode,
       writingInputMode: progress.writingInputMode,
-      // The politeness answer (lib/languageForms.ts). Only when present: an
-      // absent key must not clear a stored value on a re-onboarded course
-      // (`patch` removes fields set to undefined), and it is absent whenever
-      // the wizard never asked (an unmarked course).
-      ...(progress.politenessLevels !== undefined
-        ? { politenessLevels: progress.politenessLevels }
-        : {}),
       autoAddCards: true,
       // Match the onboarding seed batch so the auto-add fired mid-first-lesson
       // pulls the same number of cards the initial seed did. See

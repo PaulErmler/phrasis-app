@@ -24,7 +24,6 @@ import type {
   PriorApp,
   DailyTimeGoalMinutes,
 } from './types';
-import type { PolitenessLevel } from '@/lib/languageForms';
 import { EMPTY_ONBOARDING_DATA } from './types';
 import { CURRENT_PLACEMENT_STRATEGY_VERSION } from './lib/placementStrategies';
 import { OnboardingWizard, reportOnboardingFailure } from './OnboardingWizard';
@@ -34,9 +33,7 @@ import { OnboardingWizard, reportOnboardingFailure } from './OnboardingWizard';
  * moment it ends.
  *
  * Step / id / next:
- *   1.  language-pair         → politeness | acquisition
- *   1b. politeness            → acquisition (Japanese / Korean targets only;
- *                               every other target starts on every level)
+ *   1.  language-pair         → acquisition
  *   2.  acquisition           → prior-apps
  *   3.  prior-apps            → goal
  *   4.  goal                  → daily-time
@@ -53,8 +50,8 @@ import { OnboardingWizard, reportOnboardingFailure } from './OnboardingWizard';
  *                               job, see lib/tutorials/use-milestone-tips.ts),
  *                               no plan-pick step.
  *
- * Persisted step numbers follow PROGRESS_STEP_ORDER (append-only), the
- * walking order FLOW_ORDER; see lib/resumeStep.ts.
+ * Persisted step numbers follow PROGRESS_STEP_ORDER (append-only), which
+ * the walking order FLOW_ORDER now equals; see lib/resumeStep.ts.
  *
  * `hasCompletedOnboarding` is the single source of truth for the auto-redirect
  * It stays false until `finalizeOnboarding`, so mid-flow reloads resume
@@ -231,8 +228,6 @@ function OnboardingContent() {
           dailyTimeGoalMinutes:
             (onboardingProgress.dailyTimeGoalMinutes as DailyTimeGoalMinutes) ??
             null,
-          politenessLevels:
-            (onboardingProgress.politenessLevels as PolitenessLevel[]) ?? [],
           placementTest:
             onboardingProgress.placementTest &&
             onboardingProgress.placementTest.strategyVersion ===

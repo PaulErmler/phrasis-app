@@ -1,7 +1,6 @@
 import {
   viewOfCard,
   renderingCardOf,
-  renderingSettingsOf,
   renderingTextOf,
 } from '../db/translationReads';
 import { v } from 'convex/values';
@@ -23,7 +22,6 @@ import {
   fsrsStateValidator,
   schedulingPhaseValidator,
 } from '../types';
-import { getCourseSettings } from '../db/courseSettings';
 import { ensureTextContent } from '../lib/contentScheduling';
 
 // ============================================================================
@@ -345,9 +343,6 @@ export const getLibraryCards = query({
       collectionIds.map((id, i) => [id, collectionDocs[i]]),
     );
 
-    const renderingSettings = renderingSettingsOf(
-      await getCourseSettings(ctx, course._id),
-    );
     const inputs = cards
       .map((card, i) => {
         const text = texts[i];
@@ -362,7 +357,7 @@ export const getLibraryCards = query({
           sourceAnnotations: annotationFieldsOf(text),
           userCreated: text.userCreated,
           renderingText: renderingTextOf(text),
-          view: viewOfCard(card, renderingSettings),
+          view: viewOfCard(card),
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
@@ -440,9 +435,6 @@ export const requestLibraryRenderings = mutation({
     const deck = await getDeckByCourseId(ctx, course._id);
     if (!deck) return { translationsScheduled: 0 };
 
-    const renderingSettings = renderingSettingsOf(
-      await getCourseSettings(ctx, course._id),
-    );
     let translationsScheduled = 0;
     for (const cardId of args.cardIds.slice(0, MAX_LIBRARY_RENDERING_CARDS)) {
       const card = await ctx.db.get(cardId);
@@ -459,7 +451,6 @@ export const requestLibraryRenderings = mutation({
         {
           skipTts: true,
           card: renderingCardOf(card),
-          settings: renderingSettings,
           requestedByUserId: userId,
         },
       );

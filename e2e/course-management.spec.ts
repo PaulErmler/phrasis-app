@@ -186,18 +186,8 @@ test.describe('course management', () => {
       .click();
     await page.getByTestId('course-dialog-next').first().click();
 
-    // Step 4: daily goal. The dialog ends here for a target that marks no
-    // politeness; otherwise step 5 asks it, every level preselected.
+    // Step 4: daily goal, the dialog's last step.
     await page.getByTestId('course-dialog-goal-20').first().click();
-    const next = page.getByTestId('course-dialog-next').first();
-    if (await next.isVisible().catch(() => false)) {
-      await next.click();
-      await expect(
-        page
-          .locator('[data-testid^="politeness-"][role="checkbox"]')
-          .first(),
-      ).toHaveAttribute('aria-checked', 'true', { timeout: 10_000 });
-    }
     await page.getByTestId('course-dialog-create').first().click();
 
     await expect(async () => {

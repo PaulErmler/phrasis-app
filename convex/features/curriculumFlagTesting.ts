@@ -1,14 +1,10 @@
 import { v } from 'convex/values';
 import { internalMutation, internalQuery } from '../_generated/server';
-import {
-  activeCourseForEmail,
-  assertTestHooksEnabled,
-} from '../lib/testHooks';
+import { activeCourseForEmail, assertTestHooksEnabled } from '../lib/testHooks';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
 import { FLAG_AUTO_RETRANSLATION_MAX } from '../../lib/languages';
-import { politenessLevelValidator, voiceGenderValidator } from '../types';
 import {
-  primaryOrLegacyTranslation,
+  resolveServedTranslation,
   liveTranslationsForText,
 } from '../db/translationReads';
 
@@ -138,7 +134,11 @@ export const readTranslation = internalQuery({
     assertTestHooksEnabled();
     const text = await ctx.db.get(args.textId);
     const served = text
-      ? await primaryOrLegacyTranslation(ctx, text, args.targetLanguage)
+      ? await resolveServedTranslation(ctx, {
+          textId: text._id,
+          targetLanguage: args.targetLanguage,
+          pinAt: undefined,
+        })
       : null;
     if (!served) return null;
     return {
@@ -203,7 +203,11 @@ export const restoreProbe = internalMutation({
     assertTestHooksEnabled();
     const text = await ctx.db.get(args.textId);
     const served = text
-      ? await primaryOrLegacyTranslation(ctx, text, args.targetLanguage)
+      ? await resolveServedTranslation(ctx, {
+          textId: text._id,
+          targetLanguage: args.targetLanguage,
+          pinAt: undefined,
+        })
       : null;
     if (served) {
       await ctx.db.patch(served.live._id, {
@@ -215,43 +219,19 @@ export const restoreProbe = internalMutation({
 });
 
 /**
- * The per-card rendering corrections the Flag dialog writes
- * (`cards.renderingGenderOverride` / `renderingPolitenessOverride`), so the
- * spec can prove the dialog's politeness pick reached the mutation.
+ * The voice a text is rendered in, so a spec can prove the Flag dialog's
+ * speaker pick reached the mutation.
  */
-export const readCardRendering = internalQuery({
-  args: { cardId: v.id('cards') },
+export const readTextVoice = internalQuery({
+  args: { textId: v.id('texts') },
   returns: v.union(
     v.null(),
-    v.object({
-      renderingGenderOverride: v.optional(voiceGenderValidator),
-      renderingPolitenessOverride: v.optional(politenessLevelValidator),
-    }),
+    v.object({ audioSpeakerGender: v.optional(v.string()) }),
   ),
   handler: async (ctx, args) => {
     assertTestHooksEnabled();
-    const card = await ctx.db.get(args.cardId);
-    if (!card) return null;
-    return {
-      renderingGenderOverride: card.renderingGenderOverride,
-      renderingPolitenessOverride: card.renderingPolitenessOverride,
-    };
-  },
-});
-
-/** Drop the corrections a spec's flag wrote, so repeat runs start clean. */
-export const clearCardRendering = internalMutation({
-  args: { cardId: v.id('cards') },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    assertTestHooksEnabled();
-    const card = await ctx.db.get(args.cardId);
-    if (card) {
-      await ctx.db.patch(card._id, {
-        renderingGenderOverride: undefined,
-        renderingPolitenessOverride: undefined,
-      });
-    }
-    return null;
+    const text = await ctx.db.get(args.textId);
+    if (!text) return null;
+    return { audioSpeakerGender: text.audioSpeakerGender };
   },
 });

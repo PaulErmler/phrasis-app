@@ -19,10 +19,7 @@ import { Id } from '../../_generated/dataModel';
 // ('test-llm-work-N'), so tests can assert claim→workId stamping and drive
 // the onComplete handlers by hand.
 import { llmPool, llmWarmPool } from '@/convex/lib/workpools';
-import {
-  claimLlmTranslationIfAvailable,
-  versioningChanges,
-} from '../../features/llmTranslationQueue';
+import { claimLlmTranslationIfAvailable } from '../../features/llmTranslationQueue';
 import type { WorkId } from '@convex-dev/workpool';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import {
@@ -74,22 +71,18 @@ async function seedText(t: TestConvex<typeof schema>) {
 }
 
 /** The primary key of the seeded text in German: male voice, T form. */
-const KEY = 'male|t';
+const KEY = 'male';
 
 const getClaim = (
   t: TestConvex<typeof schema>,
   textId: Id<'texts'>,
   targetLanguage = 'de',
-  variantKey: string | undefined = KEY,
 ) =>
   t.run(async (ctx) =>
     ctx.db
       .query('llmTranslationClaims')
-      .withIndex('by_text_language_variant', (q) =>
-        q
-          .eq('textId', textId)
-          .eq('targetLanguage', targetLanguage)
-          .eq('variantKey', variantKey),
+      .withIndex('by_text_and_language', (q) =>
+        q.eq('textId', textId).eq('targetLanguage', targetLanguage),
       )
       .first(),
   );
@@ -99,7 +92,7 @@ const baseArgs = (textId: Id<'texts'>) => ({
   sourceLanguage: 'en',
   targetLanguage: 'de',
   text: 'Have you looked in the glove compartment?',
-  renderingKeys: [KEY],
+  renderingKey: KEY,
 });
 
 describe('features/llmTranslationQueue', () => {
@@ -110,13 +103,7 @@ describe('features/llmTranslationQueue', () => {
       priority?: 'interactive' | 'background',
     ) =>
       t.run(async (ctx) =>
-        claimLlmTranslationIfAvailable(
-          ctx as any,
-          textId,
-          'de',
-          priority,
-          KEY,
-        ),
+        claimLlmTranslationIfAvailable(ctx as any, textId, 'de', priority),
       );
 
     it("stamps the caller's tier onto the new claim", async () => {
@@ -251,7 +238,7 @@ describe('features/llmTranslationQueue', () => {
       expect(call[2]).toEqual({
         ...baseArgs(textId),
         replaceExisting: true,
-        claimIds: [{ key: KEY, claimId }],
+        claimId,
       });
       const opts = call[3] as any;
       expect(getFunctionName(opts.onComplete)).toBe(
@@ -263,7 +250,7 @@ describe('features/llmTranslationQueue', () => {
         sourceLanguage: 'en',
         targetLanguage: 'de',
         text: 'Have you looked in the glove compartment?',
-        renderingKeys: [KEY],
+        renderingKey: KEY,
         replaceExisting: true,
       });
 
@@ -302,7 +289,7 @@ describe('features/llmTranslationQueue', () => {
       // makes no scheduling decisions of its own.
       expect(call[2]).toEqual({
         ...baseArgs(textId),
-        claimIds: [{ key: KEY, claimId }],
+        claimId,
       });
       // It does ride in the completion context.
       const opts = call[3] as any;
@@ -331,19 +318,15 @@ describe('features/llmTranslationQueue', () => {
         await ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'de',
-          variantKey: 'male|v',
           claimedAt: Date.now() - 60_000,
           workId: 'live-owner',
         });
       });
       await t.mutation(
         internal.features.llmTranslationQueue.enqueueLlmTranslation,
-        { args: { ...baseArgs(textId), renderingKeys: [KEY, 'male|v'] } },
+        { args: baseArgs(textId) },
       );
-      expect(mockEnqueue).toHaveBeenCalledTimes(1);
-      expect((mockEnqueue.mock.calls[0][2] as any).renderingKeys).toEqual([
-        KEY,
-      ]);
+      expect(mockEnqueue).not.toHaveBeenCalled();
     });
 
     it('skips enqueueing when a fresh claim is owned by another live job', async () => {
@@ -420,7 +403,7 @@ describe('features/llmTranslationQueue', () => {
             sourceLanguage: 'en',
             targetLanguage: 'de',
             text: 'Hi.',
-            renderingKeys: [KEY],
+            renderingKey: KEY,
             llmPriority,
           },
           result,
@@ -538,25 +521,22 @@ describe('features/llmTranslationQueue', () => {
       expect(claim?.variantFailedAt).toBeGreaterThan(claimedBefore);
       // The held claim blocks a new attempt for the cooldown.
       const again = await t.run((ctx) =>
-        claimLlmTranslationIfAvailable(ctx as any, textId, 'de', undefined, KEY),
+        claimLlmTranslationIfAvailable(ctx as any, textId, 'de', undefined),
       );
       expect(again).toBeNull();
     });
 
-    it('failed marks every key the job rendered', async () => {
+    it('failed holds the job claim for the cooldown', async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
-      for (const key of [KEY, 'male|v']) {
-        await t.run((ctx) =>
-          ctx.db.insert('llmTranslationClaims', {
-            textId,
-            targetLanguage: 'de',
-            variantKey: key,
-            claimedAt: Date.now() - 60_000,
-            workId: 'llm-w-2',
-          }),
-        );
-      }
+      await t.run((ctx) =>
+        ctx.db.insert('llmTranslationClaims', {
+          textId,
+          targetLanguage: 'de',
+          claimedAt: Date.now() - 60_000,
+          workId: 'llm-w-2',
+        }),
+      );
       await t.mutation(
         internal.features.llmTranslationQueue.onLlmTranslationComplete,
         {
@@ -566,15 +546,13 @@ describe('features/llmTranslationQueue', () => {
             sourceLanguage: 'en',
             targetLanguage: 'de',
             text: 'Hi.',
-            renderingKeys: [KEY, 'male|v'],
+            renderingKey: KEY,
           },
           result: { kind: 'failed', error: 'stage chain failed' },
         },
       );
-      expect((await getClaim(t, textId, 'de', KEY))?.variantFailedAt).toBeDefined();
-      expect(
-        (await getClaim(t, textId, 'de', 'male|v'))?.variantFailedAt,
-      ).toBeDefined();
+      expect((await getClaim(t, textId, 'de'))?.variantFailedAt).toBeDefined();
+      expect((await getClaim(t, textId, 'de'))?.variantFailedAt).toBeDefined();
     });
 
     it('failed on a superseded job (mismatched workId) leaves the foreign claim untouched', async () => {
@@ -668,7 +646,7 @@ describe('features/llmTranslationQueue', () => {
       // Sol default is a single call, no sampling, no judge), then one
       // classifier call verified it.
       const translations = await t.run(async (ctx) =>
-        translationRevisions(ctx, textId, 'de', KEY),
+        translationRevisions(ctx, textId, 'de'),
       );
       expect(translations.length).toBe(1);
       expect(translations[0].translatedText).toBe(
@@ -728,7 +706,7 @@ describe('features/llmTranslationQueue', () => {
       // the failure belongs to onLlmTranslationComplete after the pool's
       // retry budget is spent.
       const translations = await t.run(async (ctx) =>
-        translationRevisions(ctx, textId, 'de', KEY),
+        translationRevisions(ctx, textId, 'de'),
       );
       expect(translations.length).toBe(0);
       expect(mockEnqueue).not.toHaveBeenCalled();
@@ -770,7 +748,7 @@ describe('features/llmTranslationQueue', () => {
       expect(vi.mocked(generateText)).toHaveBeenCalledTimes(6);
 
       const translations = await t.run(async (ctx) =>
-        translationRevisions(ctx, textId, 'de', KEY),
+        translationRevisions(ctx, textId, 'de'),
       );
       expect(translations.length).toBe(0);
     });
@@ -802,7 +780,7 @@ describe('features/llmTranslationQueue', () => {
       // Two translation calls, then the verification.
       expect(vi.mocked(generateText)).toHaveBeenCalledTimes(3);
       const translations = await t.run(async (ctx) =>
-        translationRevisions(ctx, textId, 'de', KEY),
+        translationRevisions(ctx, textId, 'de'),
       );
       expect(translations.length).toBe(1);
       expect(translations[0].translatedText).toBe(
@@ -813,9 +791,9 @@ describe('features/llmTranslationQueue', () => {
     it('verifies the wording against its key and retries once on a mismatch', async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedText(t);
-      const classified = (gender: string, politeness: string) =>
+      const classified = (gender: string) =>
         ({
-          text: JSON.stringify([{ i: 1, gender, politeness }]),
+          text: JSON.stringify([{ i: 1, gender }]),
           finishReason: 'stop',
           usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
         }) as any;
@@ -826,12 +804,12 @@ describe('features/llmTranslationQueue', () => {
           usage: { inputTokens: 120, outputTokens: 15, totalTokens: 135 },
         }) as any;
       vi.mocked(generateText)
-        // The first wording came back in the Sie form for a T key.
-        .mockResolvedValueOnce(translated('Haben Sie nachgeschaut?'))
-        .mockResolvedValueOnce(classified('unmarked', 'polite'))
+        // The first wording came back written for a woman, on a male key.
+        .mockResolvedValueOnce(translated('Ich bin müde geworden.'))
+        .mockResolvedValueOnce(classified('feminine'))
         // The retry honours the key.
         .mockResolvedValueOnce(translated('Hast du nachgeschaut?'))
-        .mockResolvedValueOnce(classified('unmarked', 'casual'));
+        .mockResolvedValueOnce(classified('masculine'));
 
       await t.action(
         internal.features.llmTranslationQueue.processLlmTranslationForCard,
@@ -841,8 +819,8 @@ describe('features/llmTranslationQueue', () => {
       expect(vi.mocked(generateText)).toHaveBeenCalledTimes(4);
       const retryPrompt = (vi.mocked(generateText).mock.calls[2][0] as any)
         .prompt as string;
-      expect(retryPrompt).toContain('<prior>Haben Sie nachgeschaut?</prior>');
-      const row = await t.run((ctx) => liveTranslation(ctx, textId, 'de', KEY));
+      expect(retryPrompt).toContain('<prior>Ich bin müde geworden.</prior>');
+      const row = await t.run((ctx) => liveTranslation(ctx, textId, 'de'));
       expect(row).toMatchObject({
         translatedText: 'Hast du nachgeschaut?',
         renderingVerified: true,
@@ -864,7 +842,7 @@ describe('features/llmTranslationQueue', () => {
           usage: { inputTokens: 120, outputTokens: 15, totalTokens: 135 },
         } as any)
         .mockResolvedValueOnce({
-          text: JSON.stringify([{ i: 1, gender: 'unmarked', politeness: 'polite' }]),
+          text: JSON.stringify([{ i: 1, gender: 'feminine' }]),
           finishReason: 'stop',
           usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
         } as any)
@@ -874,7 +852,7 @@ describe('features/llmTranslationQueue', () => {
           usage: { inputTokens: 120, outputTokens: 15, totalTokens: 135 },
         } as any)
         .mockResolvedValueOnce({
-          text: JSON.stringify([{ i: 1, gender: 'unmarked', politeness: 'polite' }]),
+          text: JSON.stringify([{ i: 1, gender: 'feminine' }]),
           finishReason: 'stop',
           usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
         } as any);
@@ -883,94 +861,10 @@ describe('features/llmTranslationQueue', () => {
         internal.features.llmTranslationQueue.processLlmTranslationForCard,
         baseArgs(textId),
       );
-      const row = await t.run((ctx) => liveTranslation(ctx, textId, 'de', KEY));
+      const row = await t.run((ctx) => liveTranslation(ctx, textId, 'de'));
       expect(row).toMatchObject({
         translatedText: 'Haben Sie nachgeschaut?',
         renderingVerified: false,
-      });
-    });
-
-    it('renders the primary first and versions the other key from its wording, in one job', async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      const translated = (text: string) =>
-        ({
-          text,
-          finishReason: 'stop',
-          usage: { inputTokens: 120, outputTokens: 15, totalTokens: 135 },
-        }) as any;
-      const ok = (politeness: string) =>
-        ({
-          text: JSON.stringify([{ i: 1, gender: 'unmarked', politeness }]),
-          finishReason: 'stop',
-          usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
-        }) as any;
-      vi.mocked(generateText)
-        .mockResolvedValueOnce(translated('Hast du nachgeschaut?'))
-        .mockResolvedValueOnce(ok('casual'))
-        .mockResolvedValueOnce(translated('Haben Sie nachgeschaut?'))
-        .mockResolvedValueOnce(ok('polite'));
-
-      await t.action(
-        internal.features.llmTranslationQueue.processLlmTranslationForCard,
-        // The versioned key first in the list: the worker still renders
-        // the primary before it.
-        { ...baseArgs(textId), renderingKeys: ['male|v', KEY] },
-      );
-
-      const versioningPrompt = (vi.mocked(generateText).mock.calls[2][0] as any)
-        .prompt as string;
-      expect(versioningPrompt).toContain(
-        '<translation>Hast du nachgeschaut?</translation>',
-      );
-      expect(versioningPrompt).toContain('Polite · Sie');
-      const primary = await t.run((ctx) =>
-        liveTranslation(ctx, textId, 'de', KEY),
-      );
-      const versioned = await t.run((ctx) =>
-        liveTranslation(ctx, textId, 'de', 'male|v'),
-      );
-      expect(primary?.translatedText).toBe('Hast du nachgeschaut?');
-      expect(primary?.versionedFromText).toBeUndefined();
-      expect(versioned).toMatchObject({
-        translatedText: 'Haben Sie nachgeschaut?',
-        versionedFromText: 'Hast du nachgeschaut?',
-        renderingVerified: true,
-      });
-    });
-
-    it('adopts the legacy row for the primary key when it verifies, without translating', async () => {
-      const t = convexTest(schema, modules);
-      const { textId } = await seedText(t);
-      await t.run((ctx) =>
-        ctx.db.insert('translations', {
-          textId,
-          targetLanguage: 'de',
-          translatedText: 'Hast du ins Handschuhfach geschaut?',
-          romanizedText: '',
-          translationSource: 'openai/gpt-5.6-sol:floor-minimal',
-          speakerGender: 'male',
-          translationVersion: 99,
-        }),
-      );
-      vi.mocked(generateText).mockResolvedValueOnce({
-        text: JSON.stringify([{ i: 1, gender: 'unmarked', politeness: 'casual' }]),
-        finishReason: 'stop',
-        usage: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
-      } as any);
-
-      await t.action(
-        internal.features.llmTranslationQueue.processLlmTranslationForCard,
-        { ...baseArgs(textId), adoptLegacy: true },
-      );
-
-      expect(vi.mocked(generateText)).toHaveBeenCalledTimes(1);
-      const row = await t.run((ctx) => liveTranslation(ctx, textId, 'de', KEY));
-      expect(row).toMatchObject({
-        translatedText: 'Hast du ins Handschuhfach geschaut?',
-        translationSource: 'openai/gpt-5.6-sol:floor-minimal',
-        renderingVerified: true,
-        variantKey: KEY,
       });
     });
 
@@ -1009,7 +903,7 @@ describe('features/llmTranslationQueue', () => {
             targetLanguage: 'en_gb',
             text: 'What is your favorite color?',
             ruleOverride: 'retranslation_high',
-            renderingKeys: ['male|none'],
+            renderingKey: 'male',
           },
         );
 
@@ -1025,9 +919,7 @@ describe('features/llmTranslationQueue', () => {
         });
         // An accent rewrite marks no axis, so no classifier call follows.
         expect(vi.mocked(generateText)).toHaveBeenCalledTimes(1);
-        const row = await t.run((ctx) =>
-          liveTranslation(ctx, textId, 'en_gb', 'male|none'),
-        );
+        const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_gb'));
         expect(row).toMatchObject({
           translatedText: 'What is your favourite colour?',
           translationSource: 'openai/gpt-5.6-luna:nitro-none',
@@ -1046,13 +938,11 @@ describe('features/llmTranslationQueue', () => {
             sourceLanguage: 'en',
             targetLanguage: 'en_gb',
             text: 'Good afternoon.',
-            renderingKeys: ['male|none'],
+            renderingKey: 'male',
           },
         );
 
-        const row = await t.run((ctx) =>
-          liveTranslation(ctx, textId, 'en_gb', 'male|none'),
-        );
+        const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_gb'));
         expect(row).toMatchObject({
           translatedText: 'Good afternoon.',
           translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
@@ -1085,16 +975,14 @@ describe('features/llmTranslationQueue', () => {
             sourceLanguage: 'de',
             targetLanguage: 'en_gb',
             text: 'Guten Morgen',
-            renderingKeys: ['male|none'],
+            renderingKey: 'male',
           },
         );
 
         const call = vi.mocked(generateText).mock.calls[0][0] as any;
         expect(call.prompt).toContain('translator');
         expect(call.prompt).not.toContain('British readers');
-        const row = await t.run((ctx) =>
-          liveTranslation(ctx, textId, 'en_gb', 'male|none'),
-        );
+        const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_gb'));
         expect(row?.translationSource).not.toBe(
           SOURCE_VERBATIM_TRANSLATION_SOURCE,
         );
@@ -1107,7 +995,7 @@ describe('features/llmTranslationQueue', () => {
           ctx.db.insert('llmTranslationClaims', {
             textId,
             targetLanguage: 'en_gb',
-            variantKey: 'female|none',
+            variantKey: 'female',
             claimedAt: Date.now(),
             workId: 'llm-w-accent',
           }),
@@ -1123,16 +1011,14 @@ describe('features/llmTranslationQueue', () => {
               sourceLanguage: 'en',
               targetLanguage: 'en_gb',
               text: 'Hello world',
-              renderingKeys: ['female|none'],
+              renderingKey: 'female',
             },
             result: { kind: 'failed', error: 'stage chain failed' },
           },
         );
 
         expect(mockEnqueue).not.toHaveBeenCalled();
-        const row = await t.run((ctx) =>
-          liveTranslation(ctx, textId, 'en_gb', 'female|none'),
-        );
+        const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_gb'));
         expect(row).toMatchObject({
           translatedText: 'Hello world',
           translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
@@ -1172,7 +1058,7 @@ describe('features/llmTranslationQueue', () => {
           sourceLanguage: 'en',
           targetLanguage: 'de',
           text: 'It is raining today.',
-          renderingKeys: ['male|none'],
+          renderingKey: 'male',
         },
       );
 
@@ -1273,7 +1159,7 @@ describe('features/llmTranslationQueue', () => {
             sourceLanguage: 'en',
             targetLanguage: 'de',
             text: 'Hi.',
-            renderingKeys: [KEY],
+            renderingKey: KEY,
             retranslationAuditId: auditId,
           },
           result,
@@ -1348,30 +1234,6 @@ describe('features/llmTranslationQueue', () => {
       });
 
       expect(await getStatus(t, auditId)).toBe('failed');
-    });
-  });
-});
-
-describe('versioningChanges', () => {
-  it('names only the axes the key changes on a language that marks them', () => {
-    // Turkish: the voice changes but the wording never does.
-    expect(versioningChanges('tr', 'female|v', 'male|v')).toEqual({
-      form: false,
-      gender: false,
-    });
-    // French inflects the first person: the voice change is a rewrite.
-    expect(versioningChanges('fr', 'female|v', 'male|v')).toEqual({
-      form: false,
-      gender: true,
-    });
-    // Japanese: another form, the same voice.
-    expect(versioningChanges('ja', 'male|plain', 'male|desu-masu')).toEqual({
-      form: true,
-      gender: false,
-    });
-    expect(versioningChanges('tr', 'female|none', 'male|none')).toEqual({
-      form: false,
-      gender: false,
     });
   });
 });

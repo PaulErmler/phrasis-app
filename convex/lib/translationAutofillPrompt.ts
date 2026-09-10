@@ -11,14 +11,7 @@ import {
 // Type-only, so this module stays free of the Convex runtime at import time.
 import type { ReasoningEffort } from '../features/translationLLM';
 import type { JSONValue } from 'ai';
-import {
-  pickPolitenessForm,
-  type RenderingSettings,
-} from '../../lib/preferenceResolution';
-import {
-  politenessInstruction,
-  speakerInstruction,
-} from '../../lib/renderingPrompts';
+import { speakerInstruction } from '../../lib/renderingPrompts';
 
 /**
  * Everything the translation auto-fill needs to build a request and read a
@@ -172,15 +165,6 @@ export function buildAutofillUserPrompt(args: {
   texts: { language: string; text: string }[];
   resolvedTargets: string[];
   /**
-   * The course's sentence-form settings (lib/languageForms.ts). When set,
-   * the block below overrides the "neutral default" halves of rules 2 and
-   * 3: a marked source still wins, an unmarked one takes the course's form
-   * and gender. `politenessSeed` picks one form per request when several
-   * levels are selected, so an import alternates like curriculum cards.
-   */
-  settings?: RenderingSettings;
-  politenessSeed?: string;
-  /**
    * The speaker every target is written for when no source rendering
    * marks one (Thai ครับ/ค่ะ, Romance adjectives, Slavic past tense all
    * force a choice the source may not make). The caller draws it per
@@ -195,48 +179,22 @@ export function buildAutofillUserPrompt(args: {
   const targetList = args.resolvedTargets
     .map(describeTargetLanguage)
     .join('\n');
-  const settingsBlock = buildAutofillSettingsBlock(
-    args.settings,
-    args.resolvedTargets,
-    args.politenessSeed ?? args.texts.map((t) => t.text).join('|'),
-    args.speakerGender,
-  );
+  const settingsBlock = buildAutofillSettingsBlock(args.speakerGender);
   return `Source text(s):\n${sourceDescription}\n\nTranslate into these languages:\n${targetList}${settingsBlock}`;
 }
 
 /**
- * The course-settings block of the user prompt. Politeness is stated per
- * target that marks it, in that language's own form (lib/languageForms.ts
- * prompt text), and it replaces rule 2's neutral default: a source
- * rendering that marks register explicitly still wins, since the user
- * typed it. The speaker replaces rule 3's default for unmarked sources:
- * there is no course gender choice, so the caller draws one per request
- * and the model reports it as the sentence's speaker, which is what the
- * text is then voiced in.
+ * The speaker block of the user prompt. It replaces rule 3's default for
+ * unmarked sources: the caller draws a speaker per request and the model
+ * reports it as the sentence's speaker, which is what the text is then
+ * voiced in.
  */
 export function buildAutofillSettingsBlock(
-  settings: RenderingSettings | undefined,
-  resolvedTargets: string[],
-  seed: string,
   speakerGender?: 'male' | 'female',
 ): string {
-  const lines: string[] = [];
-  if (speakerGender) {
-    lines.push(
-      `- Speaker: unless a source rendering marks the speaker's gender, ${speakerInstruction(speakerGender)} Report speakerGender as "${speakerGender}" (the metadata describes the sentence as written, so the voice and the grader agree with it).`,
-    );
-  }
-  if (settings?.politenessLevels && settings.politenessLevels.length > 0) {
-    for (const code of resolvedTargets) {
-      const form = pickPolitenessForm(code, settings.politenessLevels, seed);
-      if (!form) continue;
-      lines.push(
-        `- ${formatLangLabel(code)}: unless a source rendering marks register explicitly, ${politenessInstruction(form)} Report register as the level you applied ("informal" for a casual form, "formal" for a polite or formal one), so the metadata describes the sentence as written.`,
-      );
-    }
-  }
-  if (lines.length === 0) return '';
-  return `\n\nCourse settings (these replace the "neutral default" of rules 2 and 3 and the "neutral" fallback of the metadata rules; an explicitly marked source rendering still wins):\n${lines.join('\n')}`;
+  if (!speakerGender) return '';
+  const line = `- Speaker: unless a source rendering marks the speaker's gender, ${speakerInstruction(speakerGender)} Report speakerGender as "${speakerGender}" (the metadata describes the sentence as written, so the voice and the grader agree with it).`;
+  return `\n\nCourse settings (these replace the "neutral default" of rule 3 and the "neutral" fallback of the metadata rules; an explicitly marked source rendering still wins):\n${line}`;
 }
 
 export type ParsedAutofill = {

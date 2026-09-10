@@ -1,13 +1,8 @@
 import { ConvexError } from 'convex/values';
-import { getCourseSettings } from '../db/courseSettings';
 import { MutationCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
 import { asVoiceGender } from '../types';
-import {
-  renderingKey,
-  type LanguageRendering,
-} from '../../lib/preferenceResolution';
-import { NO_FORM } from '../../lib/languageForms';
+import { renderingKey } from '../../lib/preferenceResolution';
 import {
   carriedAnnotationFields,
   clearedAnnotationFields,
@@ -26,12 +21,11 @@ import { buildCardSearchableText } from '../lib/cardContent';
 import {
   cardPinAt,
   cardRowLanguage,
+  renderingTextOf,
   viewOfCard,
   type ServedTranslation,
   audioPointer,
-  sourceRenderingForView,
-  renderingSettingsOf,
-  renderingTextOf,
+  type TextRendering,
   resolveServedRendering,
   type SourceView,
 } from '../db/translationReads';
@@ -90,7 +84,7 @@ export type CardEditPlan = {
    * forms per dialect (Spain tú at "polite", Latin American usted), so a
    * re-derivation without the dialect computes a key the card never reads.
    */
-  renderingMap: Map<string, LanguageRendering>;
+  renderingMap: Map<string, TextRendering>;
   /**
    * The wording the card shows for a course language. The served row, or
    * the source text for the source slot, also while the accent row it
@@ -155,10 +149,7 @@ export async function resolveCardEditPlan(
   // What the card shows: its pin, its accent row and, when it follows the
   // course's sentence-form settings, its rendering variant. The fork copies
   // the wording the learner has been studying.
-  const view = viewOfCard(
-    card,
-    renderingSettingsOf(await getCourseSettings(ctx, course._id)),
-  );
+  const view = viewOfCard(card);
   const rowLanguages = new Map(
     allLanguages.map((lang) => [lang, cardRowLanguage(text, view, lang)]),
   );
@@ -182,7 +173,7 @@ export async function resolveCardEditPlan(
   );
   const existingTranslationMap = new Map<string, Doc<'translations'>>();
   const servedTranslationMap = new Map<string, ServedTranslation>();
-  const renderingMap = new Map<string, LanguageRendering>();
+  const renderingMap = new Map<string, TextRendering>();
   rowBackedLanguages.forEach(([lang], i) => {
     renderingMap.set(lang, servedRenderings[i].rendering);
     const served = servedRenderings[i].served;
@@ -406,7 +397,7 @@ export async function applyInPlaceTextEdit(
         ...(audioGenderStamp
           ? {
               speakerGender: audioGenderStamp,
-              variantKey: renderingKey(audioGenderStamp, NO_FORM),
+              variantKey: renderingKey(audioGenderStamp),
             }
           : {}),
       });
@@ -521,7 +512,7 @@ export async function forkSharedTextForEdit(
       // The copy is a user-written text: one rendering per language, keyed
       // by the copy's voice.
       ...(audioGenderStamp
-        ? { variantKey: renderingKey(audioGenderStamp, NO_FORM) }
+        ? { variantKey: renderingKey(audioGenderStamp) }
         : {}),
       ...(changed
         ? { translationSource: USER_PROVIDED_TRANSLATION_SOURCE }
@@ -569,7 +560,7 @@ export async function forkSharedTextForEdit(
           language: lang,
           assetId: served.audioAssetId,
           ...(audioGenderStamp
-            ? { variantKey: renderingKey(audioGenderStamp, NO_FORM) }
+            ? { variantKey: renderingKey(audioGenderStamp) }
             : {}),
         });
       }
@@ -586,21 +577,8 @@ export async function forkSharedTextForEdit(
     // dialect. Recomputing it here without one resolved a mixed code under
     // its default dialect (es_mixed → es) while the served row had resolved
     // under the row's own (es_latam), so the keyed lookup missed and the copy
-    // paired a variant wording with the canonical clip. The source slot of a card with no accent row is backed
-    // by no row, so it has no entry: its wording is the text and only the
-    // voice can vary.
-    const rendering =
-      plan.renderingMap.get(lang) ??
-      sourceRenderingForView(plan.view, renderingTextOf(text), card.textId);
-    // The clip of the row the card shows: the keyed pointer when the card
-    // reads a keyed row, else the legacy pointer. Copying the other one
-    // would pair this wording with a clip of another sentence for good.
-    const servesKeyedRow =
-      served !== undefined && served.row.variantKey !== undefined;
-    const row = servesKeyedRow
-      ? await audioPointer(ctx, card.textId, rowLang, rendering.key)
-      : ((await audioPointer(ctx, card.textId, rowLang, rendering.key)) ??
-        (await audioPointer(ctx, card.textId, rowLang)));
+    // The clip of the row the card shows.
+    const row = await audioPointer(ctx, card.textId, rowLang);
     if (row) {
       // The copy shares the same asset, under the copy's own key (its
       // voice, no form). Staleness (the asset's ttsVersion stamp) travels
@@ -610,7 +588,7 @@ export async function forkSharedTextForEdit(
         language: lang,
         assetId: row.assetId,
         ...(audioGenderStamp
-          ? { variantKey: renderingKey(audioGenderStamp, NO_FORM) }
+          ? { variantKey: renderingKey(audioGenderStamp) }
           : {}),
       });
     }
@@ -671,12 +649,6 @@ export async function repointCardAtEditedText(
     {
       textId: resolvedTextId,
       accentLanguage: undefined,
-      // A user-owned copy never follows the course's sentence-form
-      // settings (schema.ts), and a per-card correction was a correction of
-      // the shared rendering the copy no longer reads.
-      followsCoursePreferences: undefined,
-      renderingGenderOverride: undefined,
-      renderingPolitenessOverride: undefined,
       searchableText,
       searchableTextLanguages,
       // Backfill defaults for cards predating these fields, applied on
