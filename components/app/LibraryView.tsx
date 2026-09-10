@@ -36,6 +36,13 @@ import {
 import { reportError } from '@/lib/report-error';
 import { resolveShowFurigana } from '@/lib/furigana';
 
+/**
+ * Cards per `requestLibraryRenderings` call. Matches the collection
+ * preview's translation batch: each needy card is a claim, a nested
+ * mutation and a workpool enqueue inside one transaction.
+ */
+const LIBRARY_RENDERING_REQUEST_BATCH = 25;
+
 type ActiveFilter = 'mastered' | 'hidden' | 'favorites' | null;
 type SourceFilter = 'custom' | 'premade' | null;
 
@@ -106,6 +113,36 @@ export function LibraryView({
     activeFilter: activeFilter ?? undefined,
     sourceFilter: sourceFilter ?? undefined,
   });
+
+  // Ask for the rendering the course's sentence-form settings want, for the
+  // cards this page is showing. The library is a query and cannot schedule,
+  // so without this a learner who set a politeness level saw the canonical
+  // wording here until the review path happened to reach the card
+  // (2026-09-08 review). Text only, claim-deduped, so a re-render while jobs
+  // are in flight is a no-op. Keyed on the card ids so it fires once per
+  // distinct page rather than on every render.
+  const requestLibraryRenderings = useMutation(
+    api.features.library.requestLibraryRenderings,
+  );
+  const renderingRequestKey = result?.map((card) => card._id).join(',') ?? '';
+  useEffect(() => {
+    if (renderingRequestKey === '') return;
+    const cardIds = renderingRequestKey.split(',') as Id<'cards'>[];
+    // Chunked like the collection preview's translation requests. Each needy
+    // card costs the mutation a claim insert, a nested `runMutation` and a
+    // workpool enqueue, so a full page after a first politeness switch would
+    // put ~100 of those in one transaction, the shape that failed with "too
+    // many system operations" before (2026-07-15). A failed request
+    // schedules nothing; smaller ones fail independently.
+    for (let i = 0; i < cardIds.length; i += LIBRARY_RENDERING_REQUEST_BATCH) {
+      void requestLibraryRenderings({
+        cardIds: cardIds.slice(i, i + LIBRARY_RENDERING_REQUEST_BATCH),
+      }).catch(() => {
+        // Best-effort warm: the page still renders what exists today, and
+        // the next visit asks again.
+      });
+    }
+  }, [renderingRequestKey, requestLibraryRenderings]);
 
   const masterCard = useMutation(api.features.scheduling.masterCard);
   const unmasterCard = useMutation(api.features.scheduling.unmasterCard);
@@ -518,7 +555,12 @@ export function LibraryView({
                         (tr) => tr.isTargetLanguage,
                       );
                       if (!hasTarget) return undefined;
-                      return () => cardActions.requestFlag(card._id);
+                      return () =>
+                        cardActions.requestFlag(card._id, {
+                          userCreated:
+                            card.collectionOrigin === 'custom' ||
+                            card.collectionOrigin === 'chat',
+                        });
                     })(),
                     pinnedActions: pinnedCardActions,
                     onUpdatePinnedActions: cardActions.updatePinnedActions as (

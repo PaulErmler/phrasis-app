@@ -1,3 +1,4 @@
+import type { Doc } from '../_generated/dataModel';
 import type { QueryCtx } from '../_generated/server';
 
 /**
@@ -34,4 +35,33 @@ export async function requireUserIdByEmail(
     .first();
   if (!profile) throw new Error(`No userProfiles row for "${email}"`);
   return profile.userId;
+}
+
+/**
+ * The user's active course, resolved from their email. Every hook that acts
+ * on "the fixture user's deck" needs this same three-hop lookup (profile →
+ * userSettings.activeCourseId → course), and drift between copies is not
+ * hypothetical: `curriculumFlagTesting.armProbe` scoped itself to the active
+ * course while `userCardCountForText` counted across every course the user
+ * owned, so the arm step and its inverse assertion disagreed.
+ *
+ * Structurally typed on the db handle, like `requireUserIdByEmail`, so
+ * queries and mutations share it. Throws rather than returning null: a
+ * fixture user with no active course means the setup step failed, and a
+ * silent zero would read as a legitimate result.
+ */
+export async function activeCourseForEmail(
+  ctx: { db: QueryCtx['db'] },
+  email: string,
+): Promise<{ userId: string; course: Doc<'courses'> }> {
+  const userId = await requireUserIdByEmail(ctx, email);
+  const settings = await ctx.db
+    .query('userSettings')
+    .withIndex('by_userId', (q) => q.eq('userId', userId))
+    .first();
+  const courseId = settings?.activeCourseId;
+  if (!courseId) throw new Error(`No active course for "${email}"`);
+  const course = await ctx.db.get(courseId);
+  if (!course) throw new Error(`Active course ${courseId} is missing`);
+  return { userId, course };
 }

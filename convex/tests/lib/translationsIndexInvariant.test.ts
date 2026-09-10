@@ -26,7 +26,15 @@ const ALLOWED = new Set(['schema.ts', 'db/translationReads.ts', THIS_FILE]);
 const INDEX_LITERALS = [
   "'by_text_language_supersededAt'",
   "'by_textId_supersededAt'",
+  // Rendering variants (docs/architecture/rendering-keys.md): every
+  // point read pins the variant column too, and only the accessor module
+  // knows that.
+  "'by_text_language_variant_supersededAt'",
 ];
+// `audioRecordings.by_text_language_variant` shares its name with the
+// claims tables' indexes, so it is checked as a table + index pair below.
+const AUDIO_VARIANT_INDEX =
+  /\.query\(\s*'audioRecordings'\s*\)\s*\.withIndex\(\s*'by_text_language_variant'/;
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -53,6 +61,25 @@ describe('translations index invariant', () => {
   it('only schema.ts and db/translationReads.ts name the indexes', () => {
     const offenders = sources()
       .filter(({ src }) => INDEX_LITERALS.some((lit) => src.includes(lit)))
+      .map(({ rel }) => rel);
+    expect(offenders).toEqual([]);
+  });
+
+  it('only db/translationReads.ts queries audioRecordings through the variant index', () => {
+    const offenders = sources()
+      .filter(({ src }) => AUDIO_VARIANT_INDEX.test(src))
+      .map(({ rel }) => rel);
+    expect(offenders).toEqual([]);
+  });
+
+  it('no production code queries audioRecordings through the legacy two-column index', () => {
+    // Tests seed and inspect pointer rows directly and may use any index;
+    // the rule is for the code that serves cards.
+    const legacy =
+      /\.query\(\s*'audioRecordings'\s*\)\s*\.withIndex\(\s*'by_text_and_language'/;
+    const offenders = sources()
+      .filter(({ rel }) => !rel.startsWith('tests/'))
+      .filter(({ src }) => legacy.test(src))
       .map(({ rel }) => rel);
     expect(offenders).toEqual([]);
   });

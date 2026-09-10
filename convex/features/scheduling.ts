@@ -10,12 +10,22 @@ import {
 import {
   type ServedTranslation,
   cardRowLanguages,
-  liveTranslation,
-  resolveServedFromLive,
-  resolveServedTranslation,
   servedSourceText,
   viewOfCard,
+  renderingSettingsOf,
+  renderingTextOf,
+  audioPointer,
+  renderingCardOf,
+  resolveServedRendering,
+  sourceRenderingForView,
+  primaryKeyForLanguage,
+  viewAcceptsLegacyRow,
 } from '../db/translationReads';
+import {
+  TEXT_ANNOTATIONS,
+  annotationFieldsOf,
+  type AnnotationKind,
+} from '../lib/textAnnotations';
 import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, getUserSettings, requireAuthUserId } from '../db/users';
 import { studyDayFromSettings } from '../lib/dueSlots';
@@ -64,6 +74,10 @@ import {
   type StudyContentFilter,
   type FreePlayFace,
   type CardEditLanguageRole,
+  type FlagReason,
+  flagReasonValidator,
+  politenessLevelValidator,
+  voiceGenderValidator,
 } from '../types';
 import { cardOriginPillFields, originsForFilter } from '../lib/collections';
 import {
@@ -73,23 +87,26 @@ import {
 } from '../lib/freePlay';
 import { getTodayInTimezone, resolveClientNow } from '../lib/dateUtils';
 import { dateInTimezone } from '../../lib/dateStrings';
-import { deleteAudioRow, deleteAudioRowsForTextLanguage } from '../lib/audio';
+import { deleteAudioRow } from '../lib/audio';
 import { normalizeForComparison } from '../lib/textComparison';
 import {
   FLAG_AUTO_RETRANSLATION_MAX,
+  FLAG_REWARD_CREDITS,
+  FLAG_REWARDS_PER_MONTH,
   usesSourceTextVerbatim,
 } from '../../lib/languages';
 import {
   isUserCreatedText,
   mayRegenerateTranslation,
 } from '../../lib/translationProvenance';
-import { consumeQuota } from '../usage/helpers';
+import { consumeQuota, grantCredits } from '../usage/helpers';
 import { FEATURE_IDS } from './featureIds';
 import {
+  ensureTextContent,
   regenerateSupersededRevisionAudio,
-  scheduleMissingContent,
+  requestSentenceMetadataIfNeeded,
 } from '../lib/contentScheduling';
-import { fetchTrackDueCards } from '../lib/dueQueue';
+import { fetchTrackDueCards, fetchTrackEarliestDue } from '../lib/dueQueue';
 import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
 import { WRITING_ALTERNATIVES_MAX } from '../../lib/constants/learning';
 import {
@@ -315,6 +332,7 @@ export const getCardForReview = query({
       settings?.initialReviewCount ?? DEFAULT_INITIAL_REVIEW_COUNT;
     const studyContext = studyContextFromSettings(settings);
     const { schedulingMode, studyContentFilter } = studyContext;
+    const renderingSettings = renderingSettingsOf(settings);
 
     const now = resolveClientNow(args.now);
 
@@ -354,21 +372,28 @@ export const getCardForReview = query({
               textId: card.textId,
               sourceText: text.text,
               sourceLanguage: text.language,
-              sourceRomanization: text.romanizedText ?? undefined,
-              sourceIpa: text.ipaText ?? undefined,
-              sourceFurigana: text.furiganaText ?? undefined,
+              // Values and engine tags together: see sourceAnnotations in
+              // convex/lib/cardContent.ts.
+              sourceAnnotations: annotationFieldsOf(text),
               userCreated: text.userCreated,
-              view: viewOfCard(card),
+              renderingText: renderingTextOf(text),
+              view: viewOfCard(card, renderingSettings),
             },
           ]
         : [];
     });
+    // Review is the one reader whose self-heal generates rendering
+    // variants (wording and voice), so their gaps count as missing content.
     const contentByKey = await buildTextContentBatchForLanguages(
       ctx,
       contentInputs,
       course.baseLanguages,
       course.targetLanguages,
-      { rawRomanization: true, ignoreMissingWordTimings: true },
+      {
+        rawRomanization: true,
+        ignoreMissingWordTimings: true,
+        includeVariantGaps: true,
+      },
     );
 
     // AI-feedback accepted alternatives, card-scoped (unlike the shared text
@@ -393,12 +418,22 @@ export const getCardForReview = query({
                 const asset = r.audioAssetId
                   ? await ctx.db.get(r.audioAssetId)
                   : null;
+                // Same two gates as the card projection (lib/cardContent.ts):
+                // '' is the attempted-and-failed sentinel, and the kind's
+                // CURRENT language set decides whether a stored value is
+                // served at all. Without the second one, an alternative
+                // written before a language lost support keeps rendering.
+                const supports = (kind: AnnotationKind) =>
+                  TEXT_ANNOTATIONS[kind].supports(lang);
                 return {
                   text: r.text,
-                  // '' is the attempted-and-failed sentinel; hide it.
-                  ...(r.romanizedText ? { romanization: r.romanizedText } : {}),
-                  ...(r.ipaText ? { ipa: r.ipaText } : {}),
-                  ...(r.furiganaText ? { furigana: r.furiganaText } : {}),
+                  ...(supports('romanization') && r.romanizedText
+                    ? { romanization: r.romanizedText }
+                    : {}),
+                  ...(supports('ipa') && r.ipaText ? { ipa: r.ipaText } : {}),
+                  ...(supports('furigana') && r.furiganaText
+                    ? { furigana: r.furiganaText }
+                    : {}),
                   ...(asset
                     ? { audioUrl: await ctx.storage.getUrl(asset.storageId) }
                     : {}),
@@ -537,10 +572,17 @@ export const getCardForReviewEmptyReason = query({
       currentSourceHasAnyCards: v.boolean(),
       availableInOtherSource: v.boolean(),
       customCardsPendingAdd: v.boolean(),
+      nextDueDate: v.union(v.number(), v.null()),
     }),
     v.object({
       reason: v.literal('all_caught_up'),
       customCardsPendingAdd: v.boolean(),
+      /** When the earliest still-scheduled card comes due, for the "next
+       * review in X" countdown. `null` when there is nothing to count down to:
+       * free play (served from the rotation, not the due queue), Learn-new mode
+       * with every card graduated, or a card already due, which means this
+       * screen is one subscription tick behind the serving query. */
+      nextDueDate: v.union(v.number(), v.null()),
     }),
     // separateModeTracking: the enable-time writing seed is still in flight
     // (or stalled and awaiting a re-kick), so an empty writing queue says
@@ -600,8 +642,34 @@ export const getCardForReviewEmptyReason = query({
       settings?.activeCustomCollectionIds,
     );
 
+    // When the next card comes due, for the countdown on this screen. Shares
+    // `fetchTrackDueCards`'s mode/filter/origin branching, so it can never name
+    // a card the serving path would refuse to hand over. Free play serves from
+    // `fetchFreePlayRotation`, which ignores due dates, so there is nothing to
+    // count down to there.
+    const earliestDue =
+      face === null
+        ? await fetchTrackEarliestDue(
+            ctx,
+            deck._id,
+            schedulingMode,
+            studyContentFilter,
+            track,
+          )
+        : null;
+    // An already-due card means this screen is one subscription tick stale (the
+    // serving query keys on `timezone` too, so the two update independently).
+    // Report no countdown rather than a negative one; the state resolves itself
+    // on the next minute tick.
+    const nextDueDate =
+      earliestDue !== null && earliestDue > now ? earliestDue : null;
+
     if (studyContentFilter === 'both') {
-      return { reason: 'all_caught_up' as const, customCardsPendingAdd };
+      return {
+        reason: 'all_caught_up' as const,
+        customCardsPendingAdd,
+        nextDueDate,
+      };
     }
 
     // Filter is active. Two probes:
@@ -651,6 +719,7 @@ export const getCardForReviewEmptyReason = query({
       currentSourceHasAnyCards,
       availableInOtherSource: otherCards.length > 0,
       customCardsPendingAdd,
+      nextDueDate,
     };
   },
 });
@@ -729,6 +798,7 @@ export const reviewCard = mutation({
       ctx,
       card,
       course,
+      renderingSettingsOf(reviewSettings),
     );
 
     // Record stats first so we can fold the new wordsTrackedLanguages stamp
@@ -1465,6 +1535,14 @@ async function enqueueFlagRetranslation(
     /** Why this retranslation was asked for. Threaded to the worker, which
      * branches on it for the "the user says this is wrong" prompt block. */
     reason: 'flag' | 'curriculum_fix';
+    /**
+     * The live row the card reads for this language, which the new wording
+     * replaces: a keyed row under its key, a legacy row under the legacy
+     * slot (`replacesLegacyRow`, docs/architecture/rendering-keys.md).
+     */
+    row: Doc<'translations'>;
+    /** The wording the learner saw, for the prompt's reconsider block. */
+    previousTranslation: string;
     /** The prebuilt audit bundle (retranslationAuditFields) for this
      * (gesture, language). The child row is written HERE because this is
      * the only place that can tell an enqueue from a lost claim. */
@@ -1480,10 +1558,13 @@ async function enqueueFlagRetranslation(
   const RULE = 'retranslation_high';
   const auditFields = { ...opts.audit, rule: RULE };
 
+  const renderingKey = opts.row.variantKey;
   const claimId = await claimLlmTranslationIfAvailable(
     ctx,
     text._id,
     targetLanguage,
+    undefined,
+    renderingKey,
   );
   if (!claimId) {
     // Something else owns this (text, language). This request — and any
@@ -1511,7 +1592,14 @@ async function enqueueFlagRetranslation(
         sourceLanguage: text.language,
         targetLanguage,
         text: text.text,
-        audioSpeakerGender: text.audioSpeakerGender,
+        // A legacy row is re-rendered for the text's primary key (its voice
+        // and primary form) and stored back into the legacy slot.
+        renderingKeys: [
+          renderingKey ??
+            primaryKeyForLanguage(text, targetLanguage, opts.row.regionVariant),
+        ],
+        ...(renderingKey === undefined ? { replacesLegacyRow: true } : {}),
+        previousTranslation: opts.previousTranslation,
         // The flagging/editing user deliberately asked for this retranslation.
         requestedByUserId: opts.audit.userId,
         ruleOverride: RULE,
@@ -1551,6 +1639,8 @@ async function retranslateOrRecordCapSkip(
     beforeTranslationSource?: string;
     userSuggestion?: string;
     flagCountAfter: number;
+    /** See `enqueueFlagRetranslation`. */
+    row: Doc<'translations'>;
     onClaimed?: () => Promise<void>;
   },
 ): Promise<boolean> {
@@ -1574,6 +1664,8 @@ async function retranslateOrRecordCapSkip(
   }
   return enqueueFlagRetranslation(ctx, text, language, {
     reason: opts.reason,
+    row: opts.row,
+    previousTranslation: opts.beforeText,
     audit,
     userSuggestedTranslation: opts.userSuggestion,
     onClaimed: opts.onClaimed,
@@ -1662,6 +1754,7 @@ async function suggestCurriculumFixesForEdit(
       beforeTranslationSource: existing.translationSource,
       userSuggestion: submittedMap.get(lang),
       flagCountAfter: nextCount,
+      row: existing,
     });
   }
 
@@ -1702,23 +1795,124 @@ async function suggestCurriculumFixesForEdit(
  * carries `updatedToLatest` so the client can say so instead of showing the
  * "Flagged" pill.
  */
+/** Longest "other" note stored on the audit row. */
+const FLAG_NOTE_MAX_LENGTH = 500;
+
+/**
+ * Has this learner flagged this card before? The reward is paid once per
+ * card; the counter, the audit row and the work still run every time. Read
+ * BEFORE this gesture's own audit row is written.
+ */
+async function hasFlaggedCardBefore(
+  ctx: QueryCtx,
+  userId: string,
+  cardId: Id<'cards'>,
+): Promise<boolean> {
+  const prior = await ctx.db
+    .query('cardEdits')
+    .withIndex('by_userId_and_cardIdBefore', (q) =>
+      q.eq('userId', userId).eq('cardIdBefore', cardId),
+    )
+    .filter((q) => q.eq(q.field('kind'), 'flag'))
+    .first();
+  return prior !== null;
+}
+
+/**
+ * Pay the flag reward: `FLAG_REWARD_CREDITS`, at most
+ * `FLAG_REWARDS_PER_MONTH` times per calendar month (UTC). The per-card
+ * rule is the caller's (`hasFlaggedCardBefore`); the custom-sentence rule
+ * too. Returns the credits granted: 0 when the month is capped or the plan
+ * has no `credits` balance (`grantCredits`).
+ */
+async function payFlagReward(
+  ctx: MutationCtx,
+  userId: string,
+  now: number,
+): Promise<number> {
+  const period = new Date(now).toISOString().slice(0, 7);
+  const row = await ctx.db
+    .query('flagRewards')
+    .withIndex('by_user_and_period', (q) =>
+      q.eq('userId', userId).eq('period', period),
+    )
+    .first();
+  const count = row?.count ?? 0;
+  if (count >= FLAG_REWARDS_PER_MONTH) return 0;
+  const granted = await grantCredits(ctx, userId, FLAG_REWARD_CREDITS);
+  if (granted === 0) return 0;
+  if (row) {
+    await ctx.db.patch(row._id, { count: count + 1 });
+  } else {
+    await ctx.db.insert('flagRewards', { userId, period, count: 1 });
+  }
+  return granted;
+}
+
+/**
+ * Flag a card's translations as wrong. The learner ticks one or more
+ * reasons (`flagReasonValidator`); every reason bumps the rows' `flagCount`,
+ * writes the audit row and pays the reward, and each decides its own work:
+ *
+ *  - wrong_translation, other: the retranslation this mutation always did
+ *    (`retranslation_high`, under the per-row cap, one quota unit).
+ *  - wrong_gender: the per-card override when a gender was picked, and a
+ *    sentence-metadata classification of the shared text when the current
+ *    classifier has not judged it yet. NO immediate retranslation: it would
+ *    run under the coin flip the flag is complaining about, and the sweep
+ *    regenerates the rows the verdict proves wrong once it lands
+ *    (`sweepStaleTranslations`). With wrong_translation ticked as well the
+ *    retranslation happens anyway.
+ *  - wrong_politeness: the per-card override when a level was picked (the
+ *    variant path renders it); otherwise a retranslation, which on ja, ko,
+ *    th and fil requests the language's default level.
+ *
+ * The view is the card's own, settings included, so the pinned check and
+ * the audit's `before` describe the wording the learner saw, and the
+ * retranslation targets exactly the row the card reads: its keyed row, or
+ * its legacy row (docs/architecture/rendering-keys.md). Rows versioned
+ * from a replaced primary are re-derived by the next sweep.
+ */
 export const flagTranslation = mutation({
   args: {
     cardId: v.id('cards'),
+    reasons: v.array(flagReasonValidator),
+    // Only read with the 'other' reason; trimmed and capped.
+    note: v.optional(v.string()),
+    // The learner's pick under wrong_gender / wrong_politeness.
+    requestedGender: v.optional(voiceGenderValidator),
+    requestedPolitenessLevel: v.optional(politenessLevelValidator),
   },
   returns: v.object({
     retranslated: v.boolean(),
     updatedToLatest: v.optional(v.boolean()),
+    creditsAwarded: v.number(),
   }),
   handler: async (ctx, args) => {
     const { userId, card, course } = await authorizeCardAccess(
       ctx,
       args.cardId,
     );
+    const reasons: FlagReason[] = [...new Set(args.reasons)];
+    if (reasons.length === 0) {
+      throw new ConvexError({
+        code: 'INVALID_ARGUMENT',
+        message: 'A flag needs at least one reason',
+      });
+    }
+    const note = reasons.includes('other')
+      ? args.note?.trim().slice(0, FLAG_NOTE_MAX_LENGTH) || undefined
+      : undefined;
 
     const text = await ctx.db.get(card.textId);
     if (!text)
       throw new ConvexError({ code: 'NOT_FOUND', message: 'Text not found' });
+
+    const renderingSettings = renderingSettingsOf(
+      await getCourseSettings(ctx, course._id),
+    );
+    const view = viewOfCard(card, renderingSettings);
+    const renderingText = renderingTextOf(text);
 
     // Languages we need translations for. Every row the card shows
     // (`cardRowLanguages`, the course languages with the source slot's
@@ -1728,7 +1922,6 @@ export const flagTranslation = mutation({
     // course. We shouldn't bump flagCount on those. Accent-only variants
     // that show the source text verbatim, such as `en_us` on an `en`
     // sentence, have nothing to dispute and nothing to retranslate.
-    const view = viewOfCard(card);
     const source = await servedSourceText(ctx, text, view);
     const cardLanguages = cardRowLanguages(text, view, [
       ...course.baseLanguages,
@@ -1739,33 +1932,37 @@ export const flagTranslation = mutation({
     );
 
     if (cardLanguages.length === 0) {
-      return { retranslated: false };
+      return { retranslated: false, creditsAwarded: 0 };
     }
 
-    // Parallel indexed reads. One per language, each O(1) via the
-    // composite index. Faster than a single `by_textId` collect + JS
-    // filter when only a subset of the text's translations matter.
-    const fetched = await Promise.all(
-      cardLanguages.map((lang) => liveTranslation(ctx, card.textId, lang)),
+    // The row the card reads per language (its keyed row, or its legacy
+    // row), pin-resolved. Languages with no row at all are dropped (the
+    // card simply doesn't have a translation there yet, nothing to flag).
+    const renderings = await Promise.all(
+      cardLanguages.map((lang) =>
+        resolveServedRendering(ctx, {
+          textId: card.textId,
+          targetLanguage: lang,
+          text: renderingText,
+          view,
+        }),
+      ),
+    );
+    // A placeholder (the legacy wording shown while the card's keyed row
+    // is being written) is not the card's wording: nothing to dispute
+    // there, the keyed row is on its way.
+    const served = renderings.flatMap((r) =>
+      r.served && !r.textPending ? [r.served] : [],
     );
 
-    // Drop languages with no translation row (the card simply doesn't
-    // have a translation in that language yet, nothing to flag).
-    const liveRows = fetched.filter(
-      (tr): tr is NonNullable<typeof tr> => tr !== null,
-    );
-
-    if (liveRows.length === 0) {
-      return { retranslated: false };
+    if (served.length === 0) {
+      return { retranslated: false, creditsAwarded: 0 };
     }
 
     // What the learner's card actually shows per language. A served row that
     // is archived means the curriculum already revised this wording after
     // the card was pinned: the fix for that learner is the latest wording,
     // not another retranslation.
-    const served = await Promise.all(
-      liveRows.map((tr) => resolveServedFromLive(ctx, tr, view.pinAt)),
-    );
     const moved = served.filter((s) => s.archived);
     const updatedToLatest = moved.length > 0;
     if (updatedToLatest) {
@@ -1778,7 +1975,19 @@ export const flagTranslation = mutation({
         ctx,
         card.textId,
         courseLanguages,
-        { text, view: { pinAt: now, accentLanguage: card.accentLanguage } },
+        {
+          text,
+          // The card's view as of the new pin: the live rows, and the
+          // rendering it shows (its variant may already exist for the live
+          // wording, generated for other learners), so the index holds the
+          // words the card now displays.
+          view: {
+            pinAt: now,
+            accentLanguage: card.accentLanguage,
+            settings: view.settings,
+            card: view.card,
+          },
+        },
       );
       // Raw patch: no card aggregate keys on the pin or the search fields.
       await ctx.db.patch(card._id, {
@@ -1820,9 +2029,24 @@ export const flagTranslation = mutation({
         retranslated: false,
         updated_to_latest: true,
         target_languages: course.targetLanguages,
+        reasons,
       });
-      return { retranslated: false, updatedToLatest };
+      return { retranslated: false, updatedToLatest, creditsAwarded: 0 };
     }
+
+    // The wording the learner saw per language, for the audit and the
+    // prompt's reconsider block.
+    const shownByLanguage = new Map<string, string>();
+    for (const s of served) {
+      shownByLanguage.set(s.live.targetLanguage, s.row.translatedText);
+    }
+
+    // Read before this gesture's own audit row lands below.
+    const firstFlagOfCard = !(await hasFlaggedCardBefore(
+      ctx,
+      userId,
+      card._id,
+    ));
 
     // 1) Compute the post-patch count once per row and persist it. Doing the
     // increment up front means a quota failure later in this mutation
@@ -1836,7 +2060,7 @@ export const flagTranslation = mutation({
     }
 
     // Audit row for the gesture itself, written now that we know which
-    // languages it actually touched. Deliberately before the two policy
+    // languages it actually touched. Deliberately before the policy
     // short-circuits below: a flag that deliberately produces no retranslation
     // is exactly the case QC needs to see, and `textWasUserCreated` on this row
     // is what explains the user-created one.
@@ -1859,20 +2083,86 @@ export const flagTranslation = mutation({
         language: tr.targetLanguage,
         role: languageRole(course, tr.targetLanguage),
         isSourceLanguage: false,
-        before: tr.translatedText,
+        before: shownByLanguage.get(tr.targetLanguage) ?? tr.translatedText,
         beforeTranslationSource: tr.translationSource,
         beforeFlagCount: nextCount - 1,
       })),
+      flagReasons: reasons,
+      flagNote: note,
     });
 
     // Custom-text flag policy: increment counters but never auto-retranslate.
     // Custom texts have no curated source of truth. The LLM would only be
     // second-guessing the user's own content. Flagging surfaces them in the
     // "Flagged" UI pill for the user and admin triage; that's the full
-    // workflow. No quota charge, no audio invalidation, no enqueue.
+    // workflow. No quota charge, no audio invalidation, no enqueue, and no
+    // reward: nothing here improves anyone else's sentence.
     if (isUserCreatedText(text)) {
-      return { retranslated: false, updatedToLatest };
+      return { retranslated: false, updatedToLatest, creditsAwarded: 0 };
     }
+
+    const creditsAwarded = firstFlagOfCard
+      ? await payFlagReward(ctx, userId, Date.now())
+      : 0;
+
+    // The learner's correction, kept on the card. Written whatever the
+    // classifier will say: a definitive verdict outranks it in the resolver
+    // (lib/preferenceResolution.ts), so an override on a sentence that fixes
+    // its own gender is inert rather than wrong. The card's variant is card
+    // demand from now on, so the ensure pass runs for it right away.
+    const overridePatch: {
+      renderingGenderOverride?: 'male' | 'female';
+      renderingPolitenessOverride?: NonNullable<
+        Doc<'cards'>['renderingPolitenessOverride']
+      >;
+    } = {};
+    if (reasons.includes('wrong_gender') && args.requestedGender) {
+      overridePatch.renderingGenderOverride = args.requestedGender;
+    }
+    if (reasons.includes('wrong_politeness') && args.requestedPolitenessLevel) {
+      overridePatch.renderingPolitenessOverride = args.requestedPolitenessLevel;
+    }
+    if (Object.keys(overridePatch).length > 0) {
+      // Raw patch: no card aggregate keys involved.
+      await ctx.db.patch(card._id, overridePatch);
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.decks.prepareCardContent,
+        {
+          textId: card.textId,
+          baseLanguages: course.baseLanguages,
+          targetLanguages: course.targetLanguages,
+          requestedByUserId: userId,
+          renderingSettings,
+          renderingCard: { ...renderingCardOf(card), ...overridePatch },
+        },
+      );
+    }
+
+    // A gender complaint on a text the current classifier has not judged:
+    // ask it now, from the source sentence alone. A text already at the
+    // current source is not re-asked (same prompt, same answer); the
+    // override above is the learner's lever there.
+    if (reasons.includes('wrong_gender')) {
+      await requestSentenceMetadataIfNeeded(
+        ctx,
+        text,
+        course.baseLanguages,
+        course.targetLanguages,
+        { requestedByUserId: userId },
+      );
+    }
+
+    // Every flag under the cap attempts a fix (Paul, 2026-09-09): a reason
+    // with a pick is answered by the override above; one without a pick
+    // falls back to a retranslation of the shared row, gender and
+    // politeness alike.
+    const wantsRetranslation =
+      reasons.includes('wrong_translation') ||
+      reasons.includes('other') ||
+      (reasons.includes('wrong_politeness') &&
+        args.requestedPolitenessLevel === undefined) ||
+      (reasons.includes('wrong_gender') && args.requestedGender === undefined);
 
     // 2) Per-language: over-cap rows record their skip (counter already rose
     // above); under-cap rows claim a slot and enqueue, charging quota on the
@@ -1883,42 +2173,46 @@ export const flagTranslation = mutation({
     let anyEnqueued = false;
     let quotaCharged = false;
 
-    for (const { tr, nextCount } of withCounts) {
-      const enqueued = await retranslateOrRecordCapSkip(
-        ctx,
-        text,
-        tr.targetLanguage,
-        {
-          reason: 'flag',
-          cardEditId,
-          userId,
-          role: languageRole(course, tr.targetLanguage),
-          beforeText: tr.translatedText,
-          beforeTranslationSource: tr.translationSource,
-          flagCountAfter: nextCount,
-          // Charge once total, on the first successful claim. If the user is
-          // depleted this throws USAGE_LIMIT from inside the helper, before
-          // that language's job is enqueued, and the whole mutation rolls
-          // back (counters, claim rows, any earlier enqueue).
-          onClaimed: async () => {
-            if (quotaCharged) return;
-            await consumeQuota(ctx, userId, FEATURE_IDS.TRANSLATION_FLAGS);
-            quotaCharged = true;
+    if (wantsRetranslation) {
+      for (const { tr, nextCount } of withCounts) {
+        const enqueued = await retranslateOrRecordCapSkip(
+          ctx,
+          text,
+          tr.targetLanguage,
+          {
+            reason: 'flag',
+            cardEditId,
+            userId,
+            role: languageRole(course, tr.targetLanguage),
+            beforeText:
+              shownByLanguage.get(tr.targetLanguage) ?? tr.translatedText,
+            beforeTranslationSource: tr.translationSource,
+            flagCountAfter: nextCount,
+            row: tr,
+            // Charge once total, on the first successful claim. If the user is
+            // depleted this throws USAGE_LIMIT from inside the helper, before
+            // that language's job is enqueued, and the whole mutation rolls
+            // back (counters, claim rows, any earlier enqueue).
+            onClaimed: async () => {
+              if (quotaCharged) return;
+              await consumeQuota(ctx, userId, FEATURE_IDS.TRANSLATION_FLAGS);
+              quotaCharged = true;
+            },
           },
-        },
-      );
-      if (enqueued) anyEnqueued = true;
-    }
+        );
+        if (enqueued) anyEnqueued = true;
+      }
 
-    if (
-      withCounts.every(
-        ({ nextCount }) => nextCount > FLAG_AUTO_RETRANSLATION_MAX,
-      )
-    ) {
-      // Everything was over-cap. Counters incremented and skips recorded,
-      // no quota charge, no retranslations, no analytics event (unchanged
-      // from before the loop merge).
-      return { retranslated: false, updatedToLatest };
+      if (
+        withCounts.every(
+          ({ nextCount }) => nextCount > FLAG_AUTO_RETRANSLATION_MAX,
+        )
+      ) {
+        // Everything was over-cap. Counters incremented and skips recorded,
+        // no quota charge, no retranslations, no analytics event (unchanged
+        // from before the loop merge).
+        return { retranslated: false, updatedToLatest, creditsAwarded };
+      }
     }
 
     // Flag volume per language is the clearest quality signal the app has for
@@ -1927,9 +2221,11 @@ export const flagTranslation = mutation({
       retranslated: anyEnqueued,
       updated_to_latest: updatedToLatest,
       target_languages: course.targetLanguages,
+      reasons,
+      credits_awarded: creditsAwarded,
     });
 
-    return { retranslated: anyEnqueued, updatedToLatest };
+    return { retranslated: anyEnqueued, updatedToLatest, creditsAwarded };
   },
 });
 
@@ -1937,7 +2233,7 @@ export const flagTranslation = mutation({
  * Regenerate audio for every language on the card. Consumes one
  * `audio_regenerations` quota unit per call regardless of language count.
  * Deletes all `audioRecordings` rows for the card's text and re-invokes
- * `scheduleMissingContent`, which only schedules audio jobs for languages
+ * `ensureTextContent`, which only schedules audio jobs for languages
  * that already have translations (no re-translation here).
  */
 export const regenerateCardAudio = mutation({
@@ -1972,48 +2268,80 @@ export const regenerateCardAudio = mutation({
     // live audio would spend the quota unit on a clip this card never plays,
     // so those languages re-synthesize their archived asset in place instead
     // and keep the live pointer as it is.
-    const view = viewOfCard(card);
+    const renderingSettings = renderingSettingsOf(
+      await getCourseSettings(ctx, course._id),
+    );
+    const view = viewOfCard(card, renderingSettings);
     // The rows this card plays. A Mixed English card plays its accent row's
     // clip for the source slot (`cardRowLanguages`), so that row is the one
     // regenerated, not the source clip the card never plays.
     const audioLanguages = cardRowLanguages(text, view, allLanguages);
+    // The clip the card plays per language: its keyed row's pointer when
+    // it reads a keyed row, else the legacy pointer; the source slot's clip
+    // under the card's voice (docs/architecture/rendering-keys.md). A
+    // language served an archived revision re-synthesizes that revision's
+    // asset in place instead and keeps its live pointer.
+    const renderingText = renderingTextOf(text);
     const supersededLanguages = new Set<string>();
     for (const lang of audioLanguages) {
-      if (lang === text.language) continue;
-      const served = await resolveServedTranslation(ctx, {
+      if (lang === text.language) {
+        // A legacy view plays the legacy source clip; every other view the
+        // clip under its voice key (`loadContentState`).
+        const pointer = await audioPointer(
+          ctx,
+          card.textId,
+          lang,
+          viewAcceptsLegacyRow(view, renderingText)
+            ? undefined
+            : sourceRenderingForView(view, renderingText, card.textId).key,
+        );
+        if (pointer) await deleteAudioRow(ctx, pointer);
+        continue;
+      }
+      const served = await resolveServedRendering(ctx, {
         textId: card.textId,
         targetLanguage: lang,
-        pinAt: view.pinAt,
+        text: renderingText,
+        view,
       });
-      if (served?.archived) {
+      // A placeholder's clip is not this card's to regenerate.
+      if (served.textPending) continue;
+      if (served.served?.archived) {
         supersededLanguages.add(lang);
-        await regenerateSupersededRevisionAudio(ctx, text, served.row, {
+        await regenerateSupersededRevisionAudio(ctx, text, served.served.row, {
           audioSpeakerGender: text.audioSpeakerGender,
           // The button means "synthesize anew": bypass the asset cache (a
           // hit would hand back the very asset being replaced).
           forceRegen: true,
           requestedByUserId: userId,
         });
+        continue;
       }
-    }
-    // The live pointers of the superseded languages stay, so the sweep
-    // below sees their audio as present and regenerates nothing for them.
-    for (const lang of audioLanguages) {
-      if (supersededLanguages.has(lang)) continue;
-      await deleteAudioRowsForTextLanguage(ctx, card.textId, lang);
+      const pointer = await audioPointer(
+        ctx,
+        card.textId,
+        lang,
+        served.servedKeyed ? served.rendering.key : undefined,
+      );
+      if (pointer) await deleteAudioRow(ctx, pointer);
     }
 
     // forceAudioRegen: bypass the audioAssets cache (a hit would hand back
     // exactly the audio the user just asked to replace) and synthesize anew.
     // The completed job patches the shared asset in place, so every other
     // text with the same sentence also gets the new audio on next load.
-    await scheduleMissingContent(
+    await ensureTextContent(
       ctx,
       card.textId,
       text,
       course.baseLanguages,
       course.targetLanguages,
-      { forceAudioRegen: true, requestedByUserId: userId },
+      {
+        forceAudioRegen: true,
+        requestedByUserId: userId,
+        card: renderingCardOf(card),
+        settings: renderingSettings,
+      },
     );
 
     await trackCardAction(ctx, userId, 'regenerate_audio', card);
@@ -2054,7 +2382,7 @@ export async function applyCardEdit(
     skipQuota?: boolean;
     /** Definitive speaker gender proposed alongside the edit (the chat
      * "also correct" replace). Applied to the text row BEFORE this edit's
-     * `scheduleMissingContent` pass: the TTS enqueue resolves its voice from
+     * `ensureTextContent` pass: the TTS enqueue resolves its voice from
      * the row and takes a per-(text, language) claim, so a gender patched
      * only afterwards (applyTextMetadata) would come too late. The claim
      * blocks the follow-up pass and the wrong-gender synthesis wins. */
@@ -2181,7 +2509,7 @@ export async function applyCardEdit(
   }
 
   // Metadata-before-scheduling: land the proposed gender on the resolved
-  // text row now, so `scheduleMissingContent` below (which resolves the
+  // text row now, so `ensureTextContent` below (which resolves the
   // voice from this row and claims the synthesis) already speaks with the
   // right voice. See the arg's doc comment for why afterwards is too late.
   // Both fields: `resolveCardSpeakerGenders` gives the definitive

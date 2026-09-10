@@ -31,13 +31,6 @@ export const AI_COST_RATES = {
     sourceUrl: 'https://cloud.google.com/text-to-speech/pricing',
     lastVerified: '2026-07-28',
   },
-  /** Cloud Translation v2, billed per character of source text. */
-  googleTranslate: {
-    usdPerUnit: 20,
-    unit: 'million_characters',
-    sourceUrl: 'https://cloud.google.com/translate/pricing',
-    lastVerified: '2026-07-28',
-  },
   /**
    * MAI-Transcribe-2 via OpenRouter, billed per hour of audio (rounded up to
    * whole seconds). Fallback only: the transcription response carries the
@@ -54,9 +47,9 @@ export const AI_COST_RATES = {
 
 export type AiCostProvider = keyof typeof AI_COST_RATES;
 
-/** Cost of synthesizing / translating `characterCount` characters. */
+/** Cost of synthesizing `characterCount` characters. */
 export function costForCharacters(
-  provider: 'googleTts' | 'googleTranslate',
+  provider: 'googleTts',
   characterCount: number,
 ): number {
   if (!Number.isFinite(characterCount) || characterCount <= 0) return 0;

@@ -25,11 +25,20 @@ export const OPENROUTER_MODELS = {
   translationAutoFill: LUNA_BO3.model,
   /** Linguistic metadata inference (register, gender, addresseeNumber) for
    *  newly-created cards. Runs once per row, including during bulk import,
-   *  so we stay on the lite tier. 3.5 Flash Lite is a tier up from 3.1
-   *  ($0.30/$2.50 per M vs $0.25/$1.50), ~33% more per call at identical
-   *  token counts, taken for the newer model's accuracy on cross-lingual
-   *  gender/register inference. */
-  sentenceMetadata: 'google/gemini-3.5-flash-lite',
+   *  so we stay on the lite tier. Back on 3.1 Flash Lite since 2026-09-06:
+   *  with the per-language prompt (lib/sentenceMetadataPrompt.ts) the
+   *  `pnpm eval:metadata` gold run scored 3.1 at register 141/143 and
+   *  speakerGender 501/508 against 133/143 and 500/508 for 3.5, at a lower
+   *  price ($0.25/$1.50 vs $0.30/$2.50 per M). Re-run it before switching. */
+  sentenceMetadata: 'google/gemini-3.1-flash-lite',
+  /** Rendering classifier (convex/lib/renderingClassifier.ts): what a stored
+   *  translation's wording actually is on the first-person-gender and
+   *  politeness axes. Batched over the rows a sweep meets
+   *  (MAX_ROWS_PER_CALL) and once per generated variant, so the lite tier.
+   *  Starting point; `pnpm eval:rendering` compares 3.1 / 3.5 Flash Lite,
+   *  3.7 Flash and Luna against the gold corpora and a judged wild sample.
+   *  Re-run it before switching. */
+  renderingClassifier: 'google/gemini-3.1-flash-lite',
   /** Short thread title from first user message. Left on 3.1 Flash Lite.
    *  A 4-word title in the user's own language is the one job here where
    *  the newer model buys nothing. */
@@ -55,6 +64,33 @@ export const OPENROUTER_MODELS = {
    *  auto language detection with code switching, $0.10 per audio hour.
    *  Replaced Azure Fast Transcription in Sep 2026. */
   stt: 'microsoft/mai-transcribe-2',
+  /** Romanization for the two languages with no library and no Google
+   *  support: Thai (which had none at all) and Hebrew (whose
+   *  `hebrew-transliteration` gave the consonants of unpointed text and
+   *  dropped the vowels — "šlwm lkwlm" for שלום לכולם).
+   *
+   *  Chosen on the Sep 2026 `pnpm eval:rom` run over 2,555 human-curated
+   *  rows (data_preparation/romanization_eval): Thai 98%, Hebrew 96%, against 38% for
+   *  the library Hebrew was on. 3.1 Flash Lite scored 86%/93% and was not
+   *  good enough for a line the learner reads as fact; 3.7 Flash matched 3.8
+   *  but costs more. Re-run the eval before switching.
+   *
+   *  Reasoning is `minimal`, not off: Gemini 3.x rejects a disabled-reasoning
+   *  request outright ("Reasoning is mandatory for this endpoint").
+   *
+   *  Routing: `:floor` sorts endpoints by price and opts into the flex
+   *  service tier, which a base slug never matches, so the cheapest is
+   *  tried first and a busy flex falls through to standard rather than
+   *  failing the row. Same idiom as `SOL_MINIMAL` in lib/languages.ts. The
+   *  three tiers are $0.375/$1.875, $0.75/$3.75 and $1.35/$6.75 per M
+   *  tokens; no ceiling is set (Paul, 2026-09-09), because the job is a
+   *  hundred tokens a sentence and the spread is worth less than a learner
+   *  seeing the transliteration line arrive at all. Note `:floor` sorts
+   *  across PROVIDERS too, so google-vertex is eligible alongside
+   *  google-ai-studio; the Sep 2026 eval measured the two google-ai-studio
+   *  tiers as indistinguishable (91% IPA, 98% romanization), not Vertex. */
+  romanization: 'google/gemini-3.8-flash:floor',
+
   /** Speech-to-text for languages MAI-Transcribe-2 does not cover
    *  (convex/lib/stt/gemini.ts): the clip goes in as `input_audio` on a
    *  chat completion. No word timestamps, so no karaoke; text only. Routed
@@ -115,6 +151,14 @@ export const OPENROUTER_CHAT_EXTRA_BODY = {
 export const OPENROUTER_USAGE_ACCOUNTING = {
   usage: { include: true },
 } as const;
+
+/**
+ * Reasoning effort for the romanization call. Gemini 3.x cannot run
+ * thinking-free — OpenRouter answers "Reasoning is mandatory for this
+ * endpoint and cannot be disabled" — so this is its floor, and the same
+ * constraint already recorded on `translationAutoFill` above.
+ */
+export const ROMANIZATION_REASONING = 'minimal' as const;
 
 /** Default OpenRouter provider options for the chat agent.
  *  Reasoning is streamed (exclude: false) so Gemini thought signatures

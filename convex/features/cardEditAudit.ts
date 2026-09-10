@@ -3,6 +3,7 @@ import type { MutationCtx } from '../_generated/server';
 import type {
   CardEditKind,
   CardEditLanguageRole,
+  FlagReason,
   RetranslationStatus,
 } from '../types';
 
@@ -76,6 +77,9 @@ export async function recordCardEdit(
     sourceLanguage: string;
     sourceText: string;
     changes: CardEditChange[];
+    /** `kind: 'flag'` only: what the learner ticked, and the "other" note. */
+    flagReasons?: FlagReason[];
+    flagNote?: string;
   },
 ): Promise<Id<'cardEdits'>> {
   return ctx.db.insert('cardEdits', {
@@ -96,6 +100,8 @@ export async function recordCardEdit(
     baseLanguages: args.course.baseLanguages,
     targetLanguages: args.course.targetLanguages,
     changes: args.changes,
+    ...(args.flagReasons ? { flagReasons: args.flagReasons } : {}),
+    ...(args.flagNote ? { flagNote: args.flagNote } : {}),
   });
 }
 

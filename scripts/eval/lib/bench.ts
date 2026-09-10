@@ -34,6 +34,10 @@ import type { ModelStage } from '../../../lib/languages';
 export const JUDGE_MODEL = 'google/gemini-3.1-pro-preview';
 export const JUDGE_REASONING: ReasoningEffort = 'low';
 export const JUDGE_MAX_OUTPUT_TOKENS = 4_000;
+/** Gemini 3.8 Flash: the judge for the sentence-form benches (Paul,
+ *  2026-09-06), a third of 3.1 Pro's price and still a different family
+ *  than the GPT candidates. */
+export const FLASH_JUDGE_MODEL = 'google/gemini-3.8-flash';
 
 // ------------------------------------------------------------------- types
 
@@ -214,8 +218,12 @@ export function contextLines(args: TranslationPromptArgs): string[] {
   if (args.addressesSomeone) {
     ctx.push(
       `  <addressee_gender>${args.addresseeGender ?? 'unspecified'}</addressee_gender>`,
-      `  <register>${args.formality ?? 'neutral'}</register>`,
     );
+  }
+  // The rendering key's form, as the production prompt states it since
+  // the rendering keys (2026-09-10); no register line otherwise.
+  if (args.requestedForm) {
+    ctx.push(`  <politeness_form>${args.requestedForm.id}</politeness_form>`);
   }
   return ctx;
 }
@@ -231,13 +239,17 @@ export async function judgeCandidates(
   prompt: string,
   candidates: string[],
   label?: string,
+  // The Sep 2026 sentence-form benches judge with Gemini 3.8 Flash
+  // (`FLASH_JUDGE_MODEL`); the older benches keep 3.1 Pro so their reports
+  // stay comparable.
+  judgeModel: string = JUDGE_MODEL,
 ): Promise<JudgeOutcome | null> {
   const providerOptions = openrouterCallOptions(JUDGE_REASONING);
   for (let attempt = 1; attempt <= 3; attempt++) {
     const startedAt = Date.now();
     try {
       const res = await generateText({
-        model: openrouter(JUDGE_MODEL),
+        model: openrouter(judgeModel),
         prompt,
         temperature: 0,
         maxOutputTokens: JUDGE_MAX_OUTPUT_TOKENS,
@@ -245,7 +257,7 @@ export async function judgeCandidates(
       });
       const telemetry: CallTelemetry[] = [
         {
-          model: JUDGE_MODEL,
+          model: judgeModel,
           inputTokens: res.usage.inputTokens ?? 0,
           outputTokens: res.usage.outputTokens ?? 0,
           costUsd: openrouterCostUsd(res.providerMetadata),

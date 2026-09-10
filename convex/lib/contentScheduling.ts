@@ -7,7 +7,6 @@ import {
   getVoiceGenderByApiCode,
   resolveCardSpeakerGenders,
   getTtsProviderForLanguage,
-  getTranslationConfigForLanguage,
   isMixedLanguage,
   isTtsVersionStale,
   isTranslationVersionStale,
@@ -16,9 +15,19 @@ import {
   pickAccentForText,
   usesSourceTextVerbatim,
 } from '../../lib/languages';
-import { mayRegenerateTranslation } from '../../lib/translationProvenance';
+import {
+  GOOGLE_TRANSLATE_SOURCE,
+  mayRegenerateTranslation,
+  SOURCE_VERBATIM_TRANSLATION_SOURCE,
+} from '../../lib/translationProvenance';
+import {
+  definitiveSpeakerGender,
+  hasCurrentSentenceMetadata,
+} from '../../lib/sentenceMetadataSource';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
+  annotationRequestInFlight,
+  annotationsDue,
   missingAnnotationKinds,
   scheduleTranslationAnnotations,
   TEXT_ANNOTATIONS,
@@ -34,7 +43,6 @@ import {
   storeTranslationAndScheduleTTSHandler,
   verbatimTranslationArgs,
 } from '../features/translationPipeline';
-import { llmPool, llmWarmPool } from './workpools';
 import {
   type TtsPriority,
   type LlmPriority,
@@ -51,18 +59,47 @@ import {
   hasBlockingLlmClaim,
   isClaimFresh,
 } from '../features/llmTranslationQueue';
-import { splitRevisions, translationRevisions } from '../db/translationReads';
+import {
+  splitRevisions,
+  translationRevisions,
+  audioPointer,
+  liveTranslation,
+  previewView,
+  renderingForView,
+  renderingTextOf,
+  servedAccentRow,
+  sourceRenderingForView,
+  viewAcceptsLegacyRow,
+  dialectForRendering,
+  type SourceView,
+  type SweepCard,
+  primaryKeyForLanguage,
+} from '../db/translationReads';
+import {
+  NO_FORM,
+  parseRenderingKey,
+  type LanguageRendering,
+  type RenderingSettings,
+} from '../../lib/preferenceResolution';
+import { classificationLanguageForRow } from './renderingClassifier';
+import { languageMarksFirstPerson } from '../../lib/languageForms';
 
 /**
- * Content-scheduling helpers: the shared "fill whatever this text is missing"
- * slice of the pipeline — claim + enqueue translations (LLM queue or legacy
- * Google path), claim + enqueue TTS (with audioAssets cache reuse), and the
- * authoritative per-text sweep (`scheduleMissingContent`) that validates
- * stored content and schedules everything absent or stale. Lifted out of
- * features/decks.ts so features/collections.ts can share it without importing
- * decks (which formed the backend's only import cycle). The registered
- * functions that expose these helpers (prepareCardContent, ensureCardContent,
- * …) stay in features/decks.ts.
+ * Content-scheduling helpers: the "make this text's content complete" sweep
+ * (`ensureTextContent`), which every card surface, warm loop and browse
+ * surface runs, plus the claim + enqueue slices it is built from (rendering
+ * jobs on the LLM queue, TTS with `audioAssets` cache reuse). Lifted out of
+ * features/decks.ts so features/collections.ts can share it without
+ * importing decks. The registered functions that expose these helpers
+ * (prepareCardContent, ensureCardContent, …) stay in features/decks.ts.
+ *
+ * The model (docs/architecture/rendering-keys.md): a card resolves to one
+ * RENDERING KEY per language (lib/preferenceResolution.ts), every row
+ * written since the cutover carries its key, and the sweep's job per
+ * language is "does the row at this key exist, and is it complete". A row
+ * with no key is a legacy row from before; a view that accepts legacy rows
+ * (a user-written text, an uncorrected card from before the feature) is
+ * maintained on those and never asks for a keyed row where it has one.
  */
 
 /**
@@ -82,169 +119,157 @@ export class ProbeNeedsWork extends Error {
   }
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Rendering jobs
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Options a rendering job is enqueued with. */
+export type RenderingJobOpts = {
+  preferredRegionVariant?: string;
+  /** Translation-only mode. The landing translation won't enqueue TTS. */
+  skipTts?: boolean;
+  /**
+   * Priority the downstream TTS enqueue (in
+   * `storeTranslationAndScheduleTTS`) runs at once the translation lands.
+   * Distinct from `llmPriority` below: this is about the audio, that is
+   * about the translation. A collection preview wants an interactive
+   * translation whose audio, if any, rides the warm pool.
+   */
+  priority?: TtsPriority;
+  /**
+   * Tier the translation itself runs at: 'background' routes it to
+   * `llmWarmPool` so a warm sweep can't queue ahead of user-facing work.
+   * Absent means interactive.
+   */
+  llmPriority?: LlmPriority;
+  /** Read-only probe: throw ProbeNeedsWork instead of writing. */
+  probe?: boolean;
+  /**
+   * User whose deliberate action caused this request; the job's cost
+   * events bill to them (see the llm queue validator). Absent for
+   * background/self-heal sweeps.
+   */
+  requestedByUserId?: string;
+  /**
+   * Overwrite semantics for the landing write (see the `replaceExisting`
+   * arg of `storeTranslationAndScheduleTTS`). Set together with
+   * `translationReason: 'version_bump'` by `enqueueVersionBumpRegen`;
+   * absent on every ordinary fill of a missing key.
+   */
+  replaceExisting?: boolean;
+  /** Why the translation is requested; see translationReasonValidator. */
+  translationReason?: TranslationReason;
+  /**
+   * Adoption: verify the legacy row's wording against the key and store a
+   * copy of it when it passes, generating afresh only when it does not.
+   */
+  adoptLegacy?: boolean;
+};
+
 /**
- * Claim + enqueue a translation job for (text, targetLanguage), the routing
- * slice shared by `scheduleMissingContent` and the collection-preview
- * generation path (`requestPreviewTranslations`). OpenRouter languages go
- * through the LLM queue under a claim; the rest take the legacy Google path
- * (still pool-bounded, claimless). Returns true iff a job was enqueued.
+ * Claim + enqueue ONE rendering job for (text, language) producing the given
+ * keys: the primary key first when it is in the list (a fresh translation),
+ * then every other key as a versioning of the primary wording. Every key is
+ * claimed here, in the mutation, so nothing inside the job ever waits for
+ * another job; keys already held by a fresh claim are dropped from the list.
+ * An accent-only sibling of the text's own language with no rewrite of its
+ * own (an `en` sentence on an `en_us` course) is stored verbatim under each
+ * key without any LLM. Returns true iff a job was enqueued (or a verbatim
+ * row written); in probe mode throws ProbeNeedsWork iff it would.
  */
-export async function scheduleTranslationForLanguage(
+export async function enqueueRenderingJob(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   targetLanguage: string,
-  opts: {
-    audioSpeakerGender?: string;
-    preferredRegionVariant?: string;
-    /** Translation-only mode. The landing translation won't enqueue TTS. */
-    skipTts?: boolean;
-    /**
-     * Priority the downstream TTS enqueue (in
-     * `storeTranslationAndScheduleTTS`) runs at once the translation lands.
-     * Distinct from `llmPriority` below: this is about the audio, that is
-     * about the translation. A collection preview wants an interactive
-     * translation whose audio, if any, rides the warm pool.
-     */
-    priority?: TtsPriority;
-    /**
-     * Tier the translation itself runs at: 'background' routes it to
-     * `llmWarmPool` so a warm sweep can't queue ahead of user-facing work.
-     * Absent means interactive.
-     */
-    llmPriority?: LlmPriority;
-    /** Read-only probe: throw ProbeNeedsWork instead of writing. */
-    probe?: boolean;
-    /**
-     * User whose deliberate action caused this request; the job's cost
-     * events bill to them (see the llm queue validator). Absent for
-     * background/self-heal sweeps.
-     */
-    requestedByUserId?: string;
-    /**
-     * Overwrite semantics for the landing write (see the `replaceExisting`
-     * arg of `storeTranslationAndScheduleTTS`). Set together with
-     * `translationReason: 'version_bump'` by `enqueueVersionBumpRegen`;
-     * absent on every ordinary fill of a missing language.
-     */
-    replaceExisting?: boolean;
-    /** Why the translation is requested; see translationReasonValidator. */
-    translationReason?: TranslationReason;
-  },
+  keys: string[],
+  opts: RenderingJobOpts,
 ): Promise<boolean> {
-  // Accent-only variant of the text's own language with no rewrite of its
-  // own (an `en` sentence on an `en_us` course, a British custom sentence
-  // on a Mixed English base): the wording is the source text itself, so
-  // store it verbatim. The write choke point does the rest (version stamp,
-  // archive-on-bump, annotations, TTS against the variant's own voice
-  // pool). No LLM claim is involved. Variants that declare an
-  // `accentRewrite` (`en_gb`, `en_au`) fall through to the OpenRouter path
-  // below like any translation; the worker swaps in the rewrite prompt.
+  if (keys.length === 0) return false;
   if (usesSourceTextVerbatim(targetLanguage, text.language)) {
     if (opts.probe) throw new ProbeNeedsWork();
-    await storeTranslationAndScheduleTTSHandler(
-      ctx,
-      verbatimTranslationArgs(text, targetLanguage, opts),
-    );
+    for (const key of keys) {
+      await storeTranslationAndScheduleTTSHandler(
+        ctx,
+        verbatimTranslationArgs(text, targetLanguage, key, opts),
+      );
+    }
     return true;
   }
-
-  const tCfg = getTranslationConfigForLanguage(targetLanguage);
   if (opts.probe) {
-    // A fresh LLM claim means a job already owns this translation: the real
-    // call would no-op, so it is not "work needed". Priority-aware on purpose:
+    // A fresh LLM claim means a job already owns this key: the real call
+    // would no-op, so it is not "work needed". Priority-aware on purpose:
     // a fresh 'background' claim probed at interactive priority IS needy,
-    // because the real run would take it over (cancel the warm job, re-enqueue
-    // on llmPool) — a write. Google-path languages are claimless and always
-    // enqueue, hence always needy here.
-    if (tCfg.provider === 'openrouter') {
+    // because the real run would take it over (cancel the warm job,
+    // re-enqueue on llmPool), which is a write.
+    for (const key of keys) {
       if (
-        await hasBlockingLlmClaim(
+        !(await hasBlockingLlmClaim(
           ctx,
           text._id,
           targetLanguage,
           opts.llmPriority,
-        )
+          key,
+        ))
       ) {
-        return false;
+        throw new ProbeNeedsWork();
       }
     }
-    throw new ProbeNeedsWork();
+    return false;
   }
-  if (tCfg.provider === 'openrouter') {
+  const claimed: string[] = [];
+  for (const key of keys) {
     const claimId = await claimLlmTranslationIfAvailable(
       ctx,
       text._id,
       targetLanguage,
       opts.llmPriority,
+      key,
     );
-    if (!claimId) return false;
-    await ctx.runMutation(
-      internal.features.llmTranslationQueue.enqueueLlmTranslation,
-      {
-        args: {
-          textId: text._id,
-          sourceLanguage: text.language,
-          targetLanguage,
-          text: text.text,
-          audioSpeakerGender: opts.audioSpeakerGender,
-          preferredRegionVariant: opts.preferredRegionVariant,
-          skipTts: opts.skipTts,
-          priority: opts.priority,
-          llmPriority: opts.llmPriority,
-          requestedByUserId: opts.requestedByUserId,
-          replaceExisting: opts.replaceExisting,
-          translationReason: opts.translationReason,
-        },
-      },
-    );
-    return true;
+    if (claimId) claimed.push(key);
   }
-  // Legacy Google Translate path. Runs through the LLM pools too (for
-  // retries + slot bounding); holds no LLM claim, so its onComplete's
-  // claim lookup no-ops.
-  const pool = opts.llmPriority === 'background' ? llmWarmPool : llmPool;
-  await pool.enqueueAction(
-    ctx,
-    internal.features.decks.processTranslationForCard,
+  if (claimed.length === 0) return false;
+  await ctx.runMutation(
+    internal.features.llmTranslationQueue.enqueueLlmTranslation,
     {
-      textId: text._id,
-      sourceLanguage: text.language,
-      targetLanguage,
-      text: text.text,
-      audioSpeakerGender: opts.audioSpeakerGender,
-      preferredRegionVariant: opts.preferredRegionVariant,
-      skipTts: opts.skipTts,
-      priority: opts.priority,
-      requestedByUserId: opts.requestedByUserId,
-      replaceExisting: opts.replaceExisting,
-      translationReason: opts.translationReason,
-    },
-    {
-      onComplete:
-        internal.features.llmTranslationQueue.onGoogleFallbackComplete,
-      context: { textId: text._id, targetLanguage },
+      args: {
+        textId: text._id,
+        sourceLanguage: text.language,
+        targetLanguage,
+        text: text.text,
+        renderingKeys: claimed,
+        preferredRegionVariant: opts.preferredRegionVariant,
+        skipTts: opts.skipTts,
+        priority: opts.priority,
+        llmPriority: opts.llmPriority,
+        requestedByUserId: opts.requestedByUserId,
+        replaceExisting: opts.replaceExisting,
+        translationReason: opts.translationReason,
+        adoptLegacy: opts.adoptLegacy,
+      },
     },
   );
   return true;
 }
 
 /**
- * Regenerate a version-stale translation IN PLACE. The row keeps serving its
- * current wording and audio until the new wording lands; the write choke
- * point (`storeTranslationAndScheduleTTS`, reason `'version_bump'`) then
+ * Regenerate a stale KEYED row IN PLACE. The row keeps serving its current
+ * wording and audio until the new wording lands; the write choke point
+ * (`storeTranslationAndScheduleTTS`, reason `'version_bump'`) then
  * restamps an identical result, or archives the old wording for the cards
  * that reference the text before replacing it (see `supersededAt` in
  * schema.ts). Nothing is deleted up front, so a learner never sees a gap and
- * never sees their card's wording change. Shared by the card sweep and the
- * collection preview / warmup path so the two cannot drift. Returns true iff
- * a job was enqueued; in probe mode throws ProbeNeedsWork iff it would.
+ * never sees their card's wording change. Two triggers share it: a language
+ * `translationVersion` bump, and derivation staleness (a versioned row
+ * whose primary wording moved on). Legacy rows are never regenerated: a
+ * card still on one keeps it, and a new card gets a keyed row instead.
+ * Returns true iff a job was enqueued; in probe mode throws ProbeNeedsWork
+ * iff it would.
  */
 export async function enqueueVersionBumpRegen(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   translation: Doc<'translations'>,
   opts: {
-    audioSpeakerGender?: string;
     skipTts?: boolean;
     priority?: TtsPriority;
     llmPriority?: LlmPriority;
@@ -252,16 +277,26 @@ export async function enqueueVersionBumpRegen(
     requestedByUserId?: string;
   },
 ): Promise<boolean> {
-  return scheduleTranslationForLanguage(ctx, text, translation.targetLanguage, {
-    ...opts,
-    // The row survives, so its dialect pin is still on it; forwarding it
-    // keeps the Google path and a swept-then-refilled race on the same
-    // variant either way.
-    preferredRegionVariant: translation.regionVariant,
-    replaceExisting: true,
-    translationReason: 'version_bump',
-  });
+  if (translation.variantKey === undefined) return false;
+  return enqueueRenderingJob(
+    ctx,
+    text,
+    translation.targetLanguage,
+    [translation.variantKey],
+    {
+      ...opts,
+      // The row survives, so its dialect pin is still on it; forwarding it
+      // keeps a swept-then-refilled race on the same variant either way.
+      preferredRegionVariant: translation.regionVariant,
+      replaceExisting: true,
+      translationReason: 'version_bump',
+    },
+  );
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Audio
+// ────────────────────────────────────────────────────────────────────────────
 
 /**
  * Resolve the curated gender for `voiceName` and enqueue the TTS job. The
@@ -281,6 +316,7 @@ export async function enqueueTtsForVoice(
     priority,
     requestedByUserId,
     supersededTranslationId,
+    variantKey,
   }: {
     textId: Id<'texts'>;
     text: string;
@@ -293,6 +329,8 @@ export async function enqueueTtsForVoice(
     requestedByUserId?: string;
     /** Audio for a superseded revision; see ttsJobArgsValidator. */
     supersededTranslationId?: Id<'translations'>;
+    /** The rendering key the clip belongs to; see ttsJobArgsValidator. */
+    variantKey?: string;
   },
 ): Promise<void> {
   const voiceGender = getVoiceGenderByApiCode(voiceName);
@@ -315,17 +353,18 @@ export async function enqueueTtsForVoice(
       priority,
       requestedByUserId,
       supersededTranslationId,
+      variantKey,
     },
   });
 }
 
 /**
- * Fill audio for (text, language), the slice shared by
- * `scheduleMissingContent`, `storeTranslationAndScheduleTTS`'s siblings,
- * and the preview audio-icon click (`requestPreviewAudio`). For the text's
- * own language the source text is synthesized; for any other language the
- * caller must pass the stored translation row (synthesis text + variant
- * pin).
+ * Fill audio for (text, language) under one pointer key, the slice shared
+ * by `ensureTextContent`, `storeTranslationAndScheduleTTS`'s siblings, and
+ * the preview audio-icon click (`requestPreviewAudio`). For the text's own
+ * language the source text is synthesized; for any other language the
+ * caller must pass the stored translation row (synthesis text + dialect
+ * pin). `variantKey` undefined is the legacy pointer.
  *
  * Checks the content-addressed `audioAssets` store first: when a fresh asset
  * already exists for this exact (language, gender, dialect, string), the
@@ -342,7 +381,7 @@ export async function scheduleAudioForLanguage(
   ctx: MutationCtx,
   text: Doc<'texts'>,
   language: string,
-  audioSpeakerGender: string | undefined,
+  voiceGender: string | undefined,
   translation: Doc<'translations'> | null,
   opts?: {
     forceRegen?: boolean;
@@ -351,10 +390,13 @@ export async function scheduleAudioForLanguage(
     probe?: boolean;
     /** Requester attribution for the synthesis cost event. */
     requestedByUserId?: string;
+    /** The pointer key; undefined = the legacy pointer. */
+    variantKey?: string;
   },
 ): Promise<boolean> {
   const isSource = language === text.language;
   if (!isSource && !translation) return false;
+  const variantKey = opts?.variantKey;
   if (opts?.probe) {
     // A fresh TTS claim the real run would respect means a job is already
     // filling this slot — not needy. Priority-aware on purpose: a fresh
@@ -362,7 +404,15 @@ export async function scheduleAudioForLanguage(
     // the real run would take it over (cancel the warm job, re-enqueue on
     // the interactive pool) — a write. Anything else (cache attach or
     // claim + enqueue) would write too.
-    if (await hasBlockingTtsClaim(ctx, text._id, language, opts?.priority)) {
+    if (
+      await hasBlockingTtsClaim(
+        ctx,
+        text._id,
+        language,
+        opts?.priority,
+        variantKey,
+      )
+    ) {
       return false;
     }
     throw new ProbeNeedsWork();
@@ -376,7 +426,7 @@ export async function scheduleAudioForLanguage(
     language,
     text._id,
     regionVariant,
-    audioSpeakerGender,
+    voiceGender,
   );
   const spokenText = isSource ? text.text : translation!.translatedText;
 
@@ -388,7 +438,7 @@ export async function scheduleAudioForLanguage(
       spokenText,
     });
     if (asset) {
-      await upsertAudioPointer(ctx, text._id, language, asset._id);
+      await upsertAudioPointer(ctx, text._id, language, asset._id, variantKey);
       return true;
     }
   }
@@ -398,6 +448,7 @@ export async function scheduleAudioForLanguage(
     text._id,
     language,
     opts?.priority,
+    variantKey,
   );
   if (!claimed) return false;
   await enqueueTtsForVoice(ctx, {
@@ -409,6 +460,7 @@ export async function scheduleAudioForLanguage(
     forceRegen: opts?.forceRegen,
     priority: opts?.priority,
     requestedByUserId: opts?.requestedByUserId,
+    variantKey,
   });
   return true;
 }
@@ -492,20 +544,29 @@ export async function regenerateSupersededRevisionAudio(
  * migrate the Arabic dialects); unlisted pairs keep the audio. Assets from
  * before the provider field are legacy Google. Version: the language's
  * `ttsVersion` was bumped above the asset's stamp (a new voice pool, Gemini
- * prompt or provider); `isTtsVersionStale` treats an unstamped asset as
- * current so un-backfilled rows never storm. Shared by the live pointer's
- * validity sweep and the superseded-revision repair.
+ * prompt or provider), on the cache language or on the accent variant whose
+ * locale the asset carries (`getCurrentTtsVersion`); `isTtsVersionStale`
+ * treats an unstamped asset as current so un-backfilled rows never storm.
+ * Shared by the live pointer's validity sweep and the superseded-revision
+ * repair.
  */
 function audioAssetMismatch(
   lang: string,
-  asset: Pick<Doc<'audioAssets'>, 'ttsProvider' | 'ttsVersion'>,
+  asset: Pick<
+    Doc<'audioAssets'>,
+    'ttsProvider' | 'ttsVersion' | 'regionVariant'
+  >,
 ): { providerMismatch: boolean; versionMismatch: boolean } {
   return {
     providerMismatch: shouldOverwriteProvider(
       getTtsProviderForLanguage(lang),
       asset.ttsProvider ?? 'google',
     ),
-    versionMismatch: isTtsVersionStale(lang, asset.ttsVersion),
+    versionMismatch: isTtsVersionStale(
+      lang,
+      asset.ttsVersion,
+      asset.regionVariant,
+    ),
   };
 }
 
@@ -535,8 +596,27 @@ function audioAccentDrifted(
   return target !== undefined && target !== asset.regionVariant;
 }
 
-/** Options threaded through the whole `scheduleMissingContent` sweep. */
-type ContentSweepOpts = {
+// ────────────────────────────────────────────────────────────────────────────
+// The sweep
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Options threaded through the whole `ensureTextContent` sweep. */
+export type ContentSweepOpts = {
+  /**
+   * Translation-only pass (collection previews, the library page): rows
+   * get their wording but no audio. See `skipTts` on the LLM job args.
+   */
+  skipTts?: boolean;
+  /**
+   * The card the sweep runs for, when the caller has one, so a per-card
+   * correction (`cards.renderingGenderOverride` /
+   * `renderingPolitenessOverride`) renders and the source clip voiced is
+   * the one the card plays (its accent row). Absent or null = the rendering
+   * a card created now would get.
+   */
+  card?: SweepCard | null;
+  /** The course's politeness setting; absent = each sentence's primary form. */
+  settings?: RenderingSettings;
   /**
    * Forced regeneration (regenerateCardAudio): audio enqueues bypass the
    * `audioAssets` cache (a hit would make the regenerate button a no-op)
@@ -579,122 +659,208 @@ type ResolvedAudioPayload = NonNullable<
 >;
 
 /**
- * The sweep's per-language view of what is stored for the text. The maps are
- * built once by `loadContentState` and mutated in place by the two
- * invalidation sweeps (a deleted row becomes `null` so the enqueue loop
- * refills the language).
+ * The sweep's view of one language of the text: the rendering the view
+ * resolves to, the rows that exist for it, and which of them the view is
+ * served. Built once by `loadContentState` and mutated in place by the
+ * invalidation sweeps (a detached pointer becomes `null` so the fill loop
+ * refills the slot).
  */
-type ContentSweepState = {
-  /** The LIVE translation row per language (null when none exists). */
-  translationMap: Map<string, Doc<'translations'> | null>;
+type LanguageSlot = {
+  lang: string;
+  /** The key, voice and form this view reads for `lang`. */
+  rendering: LanguageRendering;
+  /** The primary key of (text, lang) on the row's dialect. */
+  primaryKey: string;
+  /** The live LEGACY row (no key), when one exists. */
+  legacy: Doc<'translations'> | null;
+  /** The live row at `rendering.key`, when one exists. */
+  keyed: Doc<'translations'> | null;
   /**
-   * The superseded revisions per language (`supersededAt` set, see
-   * schema.ts), oldest first. Pinned cards are still served these, so the
-   * sweep fills their annotations and repairs their audio exactly like the
-   * live row's; it never regenerates their wording.
+   * The row this view is served and maintains: the keyed row, or the legacy
+   * row for a view that accepts legacy rows. Null when the view is waiting
+   * for its keyed row (a placeholder legacy row is not this view's to
+   * maintain).
    */
-  supersededMap: Map<string, Doc<'translations'>[]>;
-  audioMap: Map<string, Doc<'audioRecordings'> | null>;
-  llmClaimMap: Map<string, Doc<'llmTranslationClaims'> | null>;
-  /** Resolved payloads for the audio rows that SURVIVED the validity sweep. */
+  served: Doc<'translations'> | null;
+  servedKeyed: boolean;
+  /** The superseded revisions of the served row's key range, oldest first. */
+  superseded: Doc<'translations'>[];
+  /** The pointer key the served rendering plays under; undefined = legacy. */
+  audioKey: string | undefined;
+  audio: Doc<'audioRecordings'> | null;
+  /** The LLM claim at `rendering.key`. */
+  llmClaim: Doc<'llmTranslationClaims'> | null;
+};
+
+/** The key of the LLM claim that would replace the row a slot reads. */
+function slotClaimKey(slot: LanguageSlot): string | undefined {
+  return slot.served !== null && !slot.servedKeyed
+    ? undefined
+    : slot.rendering.key;
+}
+
+type ContentSweepState = {
+  slots: Map<string, LanguageSlot>;
+  /** Resolved payloads for the pointers that SURVIVED the validity sweep. */
   audioPayloadMap: Map<string, ResolvedAudioPayload>;
+  acceptsLegacy: boolean;
 };
 
 /**
- * Batch load existing translations, audio, AND LLM claims for the needed
- * languages. All three sets in one Promise.all so the read round-trips run
- * in parallel rather than serially inside the sweep loops. The claim lookup
- * gates whether `scheduleMissingContent` should defer a TTS enqueue while an
- * LLM retranslation is in flight; doing it per-language inline turned a fast
- * O(languages) read into a serial chain that pushed the mutation past
- * Convex's 1s budget when called from a batched caller like
- * `ensureContentForCollection`.
+ * Batch load the rows, pointers and claims of every required language: the
+ * legacy rows first (they carry the dialect pin the key depends on), then
+ * the keyed rows, the pointers and the claims in one parallel round each.
  */
 async function loadContentState(
   ctx: MutationCtx,
   textId: Id<'texts'>,
+  text: Doc<'texts'>,
+  view: SourceView,
   allRequiredLanguages: string[],
-  langsNeedingTranslation: string[],
 ): Promise<ContentSweepState> {
-  const [revisions, existingAudio, existingLlmClaims] = await Promise.all([
+  const acceptsLegacy = viewAcceptsLegacyRow(view, text);
+  const renderingText = renderingTextOf(text);
+  const targets = allRequiredLanguages.filter((l) => l !== text.language);
+  const legacyRevisions = await Promise.all(
+    targets.map((lang) => translationRevisions(ctx, textId, lang)),
+  );
+  const legacySplit = legacyRevisions.map(splitRevisions);
+  const renderings = targets.map((lang, i) =>
+    renderingForView(
+      view,
+      renderingText,
+      textId,
+      lang,
+      dialectForRendering(lang, textId, legacySplit[i].live),
+    ),
+  );
+  const primaryKeys = targets.map((lang, i) =>
+    primaryKeyForLanguage(
+      text,
+      lang,
+      dialectForRendering(lang, textId, legacySplit[i].live),
+    ),
+  );
+  // A view on its legacy row never reads the keyed range; every other view
+  // reads it, and the legacy row is only its placeholder.
+  const keyedRevisions = await Promise.all(
+    targets.map((lang, i) =>
+      acceptsLegacy && legacySplit[i].live
+        ? Promise.resolve([] as Doc<'translations'>[])
+        : translationRevisions(ctx, textId, lang, renderings[i].key),
+    ),
+  );
+  const keyedSplit = keyedRevisions.map(splitRevisions);
+
+  const slots = new Map<string, LanguageSlot>();
+  const sourceRendering = sourceRenderingForView(view, renderingText, textId);
+  slots.set(text.language, {
+    lang: text.language,
+    rendering: sourceRendering,
+    primaryKey: sourceRendering.key,
+    legacy: null,
+    keyed: null,
+    served: null,
+    servedKeyed: false,
+    superseded: [],
+    // A view on legacy rows plays the legacy source clip; every other view
+    // plays the clip keyed by its voice.
+    audioKey: acceptsLegacy ? undefined : sourceRendering.key,
+    audio: null,
+    llmClaim: null,
+  });
+  targets.forEach((lang, i) => {
+    const legacy = legacySplit[i].live;
+    const keyed = keyedSplit[i].live;
+    const served = acceptsLegacy ? (legacy ?? keyed) : keyed;
+    const servedKeyed = served !== null && served === keyed;
+    slots.set(lang, {
+      lang,
+      rendering: renderings[i],
+      primaryKey: primaryKeys[i],
+      legacy,
+      keyed,
+      served,
+      servedKeyed,
+      superseded: servedKeyed
+        ? keyedSplit[i].superseded
+        : served
+          ? legacySplit[i].superseded
+          : [],
+      // The pointer this view maintains: a legacy view's legacy pointer
+      // while it reads a legacy row, else the key's. A view waiting for
+      // its keyed row leaves the legacy clip to the legacy cards.
+      audioKey:
+        acceptsLegacy && !servedKeyed ? undefined : renderings[i].key,
+      audio: null,
+      llmClaim: null,
+    });
+  });
+
+  const slotList = [...slots.values()];
+  const [pointers, claims] = await Promise.all([
     Promise.all(
-      langsNeedingTranslation.map((lang) =>
-        translationRevisions(ctx, textId, lang),
+      slotList.map((slot) =>
+        audioPointer(ctx, textId, slot.lang, slot.audioKey),
       ),
     ),
     Promise.all(
-      allRequiredLanguages.map((lang) =>
-        ctx.db
-          .query('audioRecordings')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('language', lang),
-          )
-          .first(),
+      slotList.map((slot) =>
+        slot.lang === text.language
+          ? Promise.resolve(null)
+          : // The claim of the row this view reads: a flag on a legacy row
+            // claims the legacy slot (`replacesLegacyRow`), everything
+            // else the key.
+            getLlmClaim(ctx, textId, slot.lang, slotClaimKey(slot)),
       ),
-    ),
-    Promise.all(
-      langsNeedingTranslation.map((lang) => getLlmClaim(ctx, textId, lang)),
     ),
   ]);
-
-  // One index range per language returns the live row and its superseded
-  // revisions together; rows never bumped have no revisions, so this costs
-  // exactly what the live-row read used to.
-  const split = revisions.map(splitRevisions);
-  return {
-    translationMap: new Map(
-      langsNeedingTranslation.map((lang, i) => [lang, split[i].live]),
-    ),
-    supersededMap: new Map(
-      langsNeedingTranslation.map((lang, i) => [lang, split[i].superseded]),
-    ),
-    audioMap: new Map(
-      allRequiredLanguages.map((lang, i) => [lang, existingAudio[i]]),
-    ),
-    llmClaimMap: new Map(
-      langsNeedingTranslation.map((lang, i) => [lang, existingLlmClaims[i]]),
-    ),
-    audioPayloadMap: new Map(),
-  };
+  slotList.forEach((slot, i) => {
+    slot.audio = pointers[i];
+    slot.llmClaim = claims[i];
+  });
+  return { slots, audioPayloadMap: new Map(), acceptsLegacy };
 }
 
 /**
- * Validate audio rows. Delete stale ones (missing blob, gender drift,
- * superseded provider, bumped ttsVersion). All checks read the row's
- * RESOLVED payload (the shared `audioAssets` row). Deleting a pointer row
- * leaves a still-shared asset untouched; the re-synthesis a stale asset
- * triggers patches that asset in place, healing every other text sharing
- * the string at once.
+ * Validate audio pointers. Detach stale ones (missing blob, a voice the
+ * pointer's key does not name, superseded provider, bumped ttsVersion,
+ * accent drift). All checks read the row's RESOLVED payload (the shared
+ * `audioAssets` row). Detaching a pointer leaves a still-shared asset
+ * untouched; the re-synthesis a stale asset triggers patches that asset in
+ * place, healing every other text sharing the string at once.
  * Do not delete while TTS is in flight: `processTTSForCard` may have
  * attached a row whose URL is not yet resolvable, or concurrent cleanup
  * would remove the row while later validation updates expect it to exist
  * (silent no-op).
  *
- * Mutates `state.audioMap` (deleted rows become null) and fills
- * `state.audioPayloadMap` for the surviving rows. Returns the languages
- * whose audio was found to have drifted gender, so the translation sweep
- * can also invalidate the legacy translation row (the one without a stamped
- * `speakerGender`) that was generated alongside the now-stale audio.
+ * Mutates the slots (detached pointers become null) and fills
+ * `state.audioPayloadMap` for the surviving rows.
  */
 async function sweepInvalidAudio(
   ctx: MutationCtx,
   textId: Id<'texts'>,
-  text: Pick<Doc<'texts'>, 'userCreated'>,
-  audioSpeakerGender: string | undefined,
+  text: Doc<'texts'>,
+  textVoice: 'male' | 'female',
   state: ContentSweepState,
   opts: ContentSweepOpts | undefined,
-): Promise<Set<string>> {
-  const langsWithAudioGenderDrift = new Set<string>();
-  for (const [lang, audio] of state.audioMap) {
+  // Languages whose wording is being replaced in this same pass. Their clip
+  // is left exactly as it is, whatever mismatch it has: the incoming
+  // replace archives it against the LIVE pointer and then invalidates it
+  // itself. See the note where `correctedLanguages` is filled.
+  correctedLanguages: ReadonlySet<string>,
+): Promise<void> {
+  for (const slot of state.slots.values()) {
+    const { lang, audio } = slot;
     if (!audio) continue;
     const payload = await resolveAudioPayload(ctx, audio);
     if (!payload) {
       // Dangling pointer (asset gone), no usable audio behind this row.
       // Remove it so the enqueue loop below refills the language.
-      if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
+      if (await hasActiveTtsClaim(ctx, textId, lang, slot.audioKey)) continue;
       if (opts?.probe) throw new ProbeNeedsWork();
       await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
-      state.audioMap.set(lang, null);
+      slot.audio = null;
       continue;
     }
     // `db.system.get` (metadata point-read), not `storage.getUrl`: presence
@@ -702,228 +868,163 @@ async function sweepInvalidAudio(
     // signed URL — this loop runs per (card × language) on the ensure path.
     const blobExists = (await ctx.db.system.get(payload.storageId)) !== null;
     if (!blobExists) {
-      if (await hasActiveTtsClaim(ctx, textId, lang)) {
+      if (await hasActiveTtsClaim(ctx, textId, lang, slot.audioKey)) {
         continue;
       }
       if (opts?.probe) throw new ProbeNeedsWork();
       // The blob is gone, nothing left to reference-protect; row (and, for
       // a last-pointer row, its dead asset) bookkeeping still runs.
       await deleteAudioRow(ctx, audio, { blobAlreadyGone: true });
-      state.audioMap.set(lang, null);
+      slot.audio = null;
+      continue;
+    }
+    // A wording replacement is coming for this language. Detaching the
+    // clip for ANY reason here, voice, provider, version or accent, makes
+    // `replaceForVersionBump` find no live pointer when the new wording
+    // lands, skip the archive, and move every pinned card onto the new
+    // wording. The replace invalidates the clip itself once the archive has
+    // captured it; a byte-identical restamp leaves the mismatch to the next
+    // sweep, which no longer sees the language as corrected.
+    if (correctedLanguages.has(lang)) continue;
+    // A keyed pointer speaks the voice its key names, so any other voice is
+    // wrong for it. A legacy pointer speaks the text's own voice; it is
+    // re-voiced only when that voice is the sentence's own (a user-written
+    // text, or a verdict that fixes the speaker), never over a coin flip.
+    const wantedVoice =
+      slot.audioKey !== undefined
+        ? parseRenderingKey(slot.audioKey).voice
+        : text.userCreated || definitiveSpeakerGender(text) !== null
+          ? textVoice
+          : undefined;
+    const genderMismatch =
+      wantedVoice !== undefined && payload.voiceGender !== wantedVoice;
+    // A keyed pointer whose asset speaks another sentence is not this
+    // rendering's clip (a late synthesis after the wording moved on).
+    const wordingMismatch =
+      slot.audioKey !== undefined &&
+      slot.lang !== text.language &&
+      slot.served !== null &&
+      payload.asset.spokenText !== slot.served.translatedText;
+    const { providerMismatch, versionMismatch } = audioAssetMismatch(
+      lang,
+      payload,
+    );
+    // A user-created text keeps the accent it was voiced in. Its clip was
+    // made for its own hash, or carried over from the shared text the
+    // learner heard when it is a card-edit copy, so a drift here would
+    // only be the copy's new id re-rolling the accent the learner already
+    // knows.
+    const accentMismatch =
+      !text.userCreated && audioAccentDrifted(lang, textId, payload.asset);
+    if (
+      genderMismatch ||
+      wordingMismatch ||
+      providerMismatch ||
+      versionMismatch ||
+      accentMismatch
+    ) {
+      if (opts?.probe) throw new ProbeNeedsWork();
+      // Detach only: the asset and its blob stay even as the last pointer.
+      // That audio is still CORRECT for its string+voice+accent+setup and
+      // stays in the content-addressed cache: flipping the gender back, a
+      // pinned-accent course, or another text with the same sentence
+      // reuses it for free, and a provider or prompt-version change is a
+      // NEW setup, not obsolescence. The next synthesis creates a sibling
+      // asset under the new setup (`upsertAudioAsset`) and rolling the
+      // setup back finds this clip again. Full garbage collection is left
+      // to the manual regenerate button and the orphan cascades.
+      await deleteAudioRow(ctx, audio, { keepAsset: true });
+      slot.audio = null;
     } else {
-      const genderMismatch =
-        (audioSpeakerGender === 'male' || audioSpeakerGender === 'female') &&
-        payload.voiceGender !== audioSpeakerGender;
-      const { providerMismatch, versionMismatch } = audioAssetMismatch(
-        lang,
-        payload,
-      );
-      // A user-created text keeps the accent it was voiced in. Its clip was
-      // made for its own hash, or carried over from the shared text the
-      // learner heard when it is a card-edit copy, so a drift here would
-      // only be the copy's new id re-rolling the accent the learner already
-      // knows.
-      const accentMismatch =
-        !text.userCreated && audioAccentDrifted(lang, textId, payload.asset);
-      if (genderMismatch) {
-        langsWithAudioGenderDrift.add(lang);
-      }
-      if (
-        genderMismatch ||
-        providerMismatch ||
-        versionMismatch ||
-        accentMismatch
-      ) {
-        if (opts?.probe) throw new ProbeNeedsWork();
-        // Reference-aware delete: a shared asset (or an `editCard`-copied
-        // legacy blob) survives while anything else still points at it.
-        // Gender and accent drift additionally keep the asset+blob even as
-        // the last pointer: that audio is still CORRECT for this
-        // string+voice+accent. It stays in the content-addressed cache so
-        // flipping the gender back, a pinned-accent course, or any other
-        // text with the same sentence and accent reuses it for free.
-        // Provider/ttsVersion migrations are true obsolescence (a new TTS
-        // system) and keep the full garbage collection.
-        await deleteAudioRow(ctx, audio, {
-          keepAsset:
-            (genderMismatch || accentMismatch) &&
-            !providerMismatch &&
-            !versionMismatch,
-        });
-        state.audioMap.set(lang, null);
-      } else {
-        state.audioPayloadMap.set(lang, payload);
-      }
+      state.audioPayloadMap.set(lang, payload);
     }
   }
-  return langsWithAudioGenderDrift;
 }
 
 /**
- * Invalidate translations whose recorded gender no longer matches the card's
- * current `audioSpeakerGender`. Two cases trigger deletion:
+ * Regenerate served KEYED rows that are stale, in place, through the
+ * version-bump path. Two triggers:
  *
- *  1. Post-PR drift: `translation.speakerGender` is stamped and disagrees
- *     with `audioSpeakerGender`. The card flipped gender (custom-chat path
- *     when the metadata LLM lands a definitive gender that overrides the
- *     initial coin-flip; or any future code path that updates the field)
- *     after the translation was written.
+ *  1. Version-stale: the language's `translationVersion` config was bumped
+ *     above the row's stamp (a new model or prompt).
+ *  2. Derivation-stale: a row the versioning prompt produced whose
+ *     `versionedFromText` no longer equals the primary row's wording (a
+ *     flag, a curriculum fix or a bump moved the primary on).
  *
- *  2. Legacy drift: `translation.speakerGender` is undefined (row written
- *     before the field existed) AND the matching audio was just flagged as
- *     gender-drifted by the validity loop above. Audio drift is the
- *     retrospective signal that the translation alongside it was almost
- *     certainly generated under a gender that's now wrong. Without this,
- *     the audio loop heals the voice but the translation text: produced
- *     with the wrong grammar: survives and gets stamped as if correct by
- *     the "fill if missing" path, so the user ends up hearing the right
- *     voice reading wrong-grammar text.
- *
- * A third trigger is a version-stale row: the language's `translationVersion`
- * config was bumped above the row's stamp (a new model/prompt). That one is
- * NOT a delete: the wording is still correct, so it keeps serving while a
- * replacement is generated in place (`enqueueVersionBumpRegen`), and the
- * write choke point archives it for existing cards before overwriting.
- *
- * Legacy rows without an audio drift signal are left alone. We have no
- * evidence they're wrong, and a blanket invalidation would cause a regen
- * storm across the database.
- *
- * Content we may not touch is skipped unconditionally. See
- * `mayRegenerateTranslation` (lib/translationProvenance.ts) for the rule:
- * user-created cards in full, plus human-authored rows on premade texts.
- * Note this gates the TEXT only; the audio validity loop above still runs
- * for those cards, so a user-created card whose speaker gender changed gets
- * a matching voice while keeping the wording the user chose.
- *
- * Skip when TTS is in flight: deleting now would race the pending write
- * and leave an audio row pointing at no translation. Defer to the next
- * `scheduleMissingContent` pass.
- *
- * Mutates `state.translationMap` / `state.audioMap`. Returns the
- * regionVariant of each swept row, captured BEFORE the delete (the row is
- * gone by the time the regen enqueue below runs) so mixed-dialect cards
- * keep their dialect across regeneration instead of re-rolling it, plus the
- * number of in-place version-bump regenerations it enqueued (which the fill
- * loop never sees, the rows still exist).
+ * Legacy rows are never regenerated (a card still on one keeps it; a new
+ * card gets a keyed row). Content we may not touch is skipped
+ * (`mayRegenerateTranslation`). Skipped too while TTS is in flight or an
+ * LLM job already owns the key. Returns the languages whose replacement is
+ * now in flight, so the audio sweep leaves their clip for the archive.
  */
 async function sweepStaleTranslations(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   text: Doc<'texts'>,
-  audioSpeakerGender: string | undefined,
   state: ContentSweepState,
-  langsWithAudioGenderDrift: Set<string>,
   opts: ContentSweepOpts | undefined,
-): Promise<{
-  sweptRegionVariants: Map<string, string>;
-  regenScheduled: number;
-}> {
-  const sweptRegionVariants = new Map<string, string>();
+): Promise<{ regenScheduled: number; correctedLanguages: Set<string> }> {
+  const correctedLanguages = new Set<string>();
   let regenScheduled = 0;
-  for (const [lang, translation] of state.translationMap) {
-    if (!translation) continue;
-    // The one provenance gate for all three triggers below. Covers
-    // user-created (custom/chat) cards and human-authored rows alike. Every
-    // regeneration site shares this predicate so none of them can drift out of
-    // agreement with the others.
-    if (!mayRegenerateTranslation(text, translation)) continue;
-
-    const isLegacy = translation.speakerGender === undefined;
-    const isDrifted =
-      !isLegacy && translation.speakerGender !== audioSpeakerGender;
-    const isLegacyAlongsideDriftedAudio =
-      isLegacy && langsWithAudioGenderDrift.has(lang);
-    // Version-stale translation: the language's `translationVersion` config was
-    // bumped above this row's stamp (a new model/prompt). Regenerate.
-    // `isTranslationVersionStale` encodes the "undefined === current" rule.
+  for (const slot of state.slots.values()) {
+    const { lang, served } = slot;
+    if (!served || !slot.servedKeyed) continue;
+    if (!mayRegenerateTranslation(text, served)) continue;
     const isVersionStale = isTranslationVersionStale(
       lang,
-      translation.translationVersion,
+      served.translationVersion,
     );
-
-    if (!isDrifted && !isLegacyAlongsideDriftedAudio && !isVersionStale)
-      continue;
-    if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
-    // Defer while an LLM retranslation is in flight. It will overwrite the row
-    // anyway, so deleting now just races the pending write.
-    const llmClaim = state.llmClaimMap.get(lang) ?? null;
-    if (llmClaim && isClaimFresh(llmClaim)) continue;
-
-    if (!isDrifted && !isLegacyAlongsideDriftedAudio) {
-      // Pure version staleness: keep the row and its audio serving, and
-      // regenerate in place. The helper throws ProbeNeedsWork in probe mode
-      // iff it would enqueue, matching the fill path's probe semantics.
-      const enqueued = await enqueueVersionBumpRegen(ctx, text, translation, {
-        audioSpeakerGender,
-        priority: opts?.priority,
-        llmPriority: opts?.llmPriority,
-        probe: opts?.probe,
-        requestedByUserId: opts?.requestedByUserId,
-      });
-      if (enqueued) {
-        regenScheduled++;
-        // The fresh claim makes `scheduleLanguageContent` defer this pass's
-        // TTS for the language, so no audio is synthesized for the wording
-        // about to be replaced.
-        state.llmClaimMap.set(lang, await getLlmClaim(ctx, textId, lang));
-      }
-      continue;
+    let derivationStale = false;
+    if (served.versionedFromText !== undefined) {
+      const primary =
+        served.variantKey === slot.primaryKey
+          ? served
+          : await liveTranslation(ctx, textId, lang, slot.primaryKey);
+      derivationStale =
+        primary !== null && primary.translatedText !== served.versionedFromText;
     }
+    if (!isVersionStale && !derivationStale) continue;
+    if (await hasActiveTtsClaim(ctx, textId, lang, slot.audioKey)) continue;
+    // Defer while a job for this key is in flight. It will overwrite the
+    // row anyway, so a second one would race the pending write.
+    if (slot.llmClaim && isClaimFresh(slot.llmClaim)) continue;
 
-    if (opts?.probe) throw new ProbeNeedsWork();
-    if (translation.regionVariant) {
-      sweptRegionVariants.set(lang, translation.regionVariant);
-    }
-    await ctx.db.delete(translation._id);
-    // Drift is a correction for the card's gender, and gender is text-level:
-    // it must reach every card, pinned ones included. The pair's superseded
-    // revisions go with the live row, so the refilled row serves everyone.
-    // Their assets stay in the content-addressed cache, like the live audio
-    // below (keepAsset).
-    for (const revision of state.supersededMap.get(lang) ?? []) {
-      await ctx.db.delete(revision._id);
-    }
-    state.supersededMap.set(lang, []);
-    state.translationMap.set(lang, null);
-    // Audio for the legacy-alongside-drifted case was already deleted by the
-    // validity loop. The block below only fires when the sweep itself owns
-    // the delete, i.e. post-PR drift / version bump where the audio looked fine
-    // to the validity loop but the translation row is now stale. Reference-aware
-    // delete so a blob shared via an `editCard` copy isn't dropped.
-    const staleAudio = state.audioMap.get(lang);
-    if (staleAudio) {
-      // keepAsset: every trigger here is a CONTENT change (gender drift /
-      // translation-version bump regenerating the text), the recording
-      // itself is still valid audio of the old string, so it stays in the
-      // audioAssets cache instead of being garbage-collected.
-      await deleteAudioRow(ctx, staleAudio, { keepAsset: true });
-      state.audioMap.set(lang, null);
+    const enqueued = await enqueueVersionBumpRegen(ctx, text, served, {
+      skipTts: opts?.skipTts,
+      priority: opts?.priority,
+      llmPriority: opts?.llmPriority,
+      probe: opts?.probe,
+      requestedByUserId: opts?.requestedByUserId,
+    });
+    if (enqueued) {
+      regenScheduled++;
+      correctedLanguages.add(lang);
+      // The fresh claim makes `scheduleLanguageContent` defer this pass's
+      // TTS for the language, so no audio is synthesized for the wording
+      // about to be replaced.
+      slot.llmClaim = await getLlmClaim(ctx, textId, lang, served.variantKey);
     }
   }
-  return { sweptRegionVariants, regenScheduled };
+  return { regenScheduled, correctedLanguages };
 }
 
 /**
- * Schedule an STT backfill for an existing audio row that lacks timings, or
- * that was stored 'unchecked' because STT failed at synthesis time, in
- * which case the backfill delivers the verdict too. A no-op unless the row
- * survived the validity sweep, so its payload is in `state.audioPayloadMap`,
- * the language's STT can produce what is missing, and the asset has
- * backfill attempts left (`sttBackfillExhausted`). A clip STT keeps failing
- * on is left alone rather than retried on every view.
+ * Schedule an STT backfill for an existing audio pointer that lacks
+ * timings, or that was stored 'unchecked' because STT failed at synthesis
+ * time, in which case the backfill delivers the verdict too. A no-op unless
+ * the pointer survived the validity sweep, so its payload is in
+ * `state.audioPayloadMap`, the language's STT can produce what is missing,
+ * and the asset has backfill attempts left (`sttBackfillExhausted`). A clip
+ * STT keeps failing on is left alone rather than retried on every view.
  */
 async function scheduleTimingsBackfillIfNeeded(
   ctx: MutationCtx,
   textId: Id<'texts'>,
-  lang: string,
+  slot: LanguageSlot,
   state: ContentSweepState,
   opts: ContentSweepOpts | undefined,
 ): Promise<void> {
-  const audio = state.audioMap.get(lang);
-  // Payload was resolved (and the row survived) in the validity loop above;
-  // shared-asset timings serve every pointing text, so an asset that already
-  // has them needs no backfill.
+  const { lang, audio } = slot;
   const payload = state.audioPayloadMap.get(lang);
   if (!audio || !payload) return;
   if (sttBackfillExhausted(payload.asset)) return;
@@ -940,10 +1041,20 @@ async function scheduleTimingsBackfillIfNeeded(
     // Claim-held = a job (synthesis or backfill) already owns the slot —
     // unless it's a background claim the real (priority-less, hence
     // interactive) claim below would take over, which is a write.
-    if (await hasBlockingTtsClaim(ctx, textId, lang, undefined)) return;
+    if (
+      await hasBlockingTtsClaim(ctx, textId, lang, undefined, slot.audioKey)
+    ) {
+      return;
+    }
     throw new ProbeNeedsWork();
   }
-  const claimed = await claimTtsIfAvailable(ctx, textId, lang);
+  const claimed = await claimTtsIfAvailable(
+    ctx,
+    textId,
+    lang,
+    undefined,
+    slot.audioKey,
+  );
   if (!claimed) return;
   await ctx.scheduler.runAfter(
     0,
@@ -953,12 +1064,13 @@ async function scheduleTimingsBackfillIfNeeded(
       language: lang,
       storageId: payload.storageId,
       requestedByUserId: opts?.requestedByUserId,
+      variantKey: slot.audioKey,
     },
   );
 }
 
 /**
- * The superseded revisions of (text, language) are content in their own
+ * The superseded revisions of the served row are content in their own
  * right: a pinned card still shows their wording, so their annotations are
  * filled, their timings backfilled and their audio repaired exactly like the
  * live row's. Their WORDING is never regenerated. Runs after the live row's
@@ -970,13 +1082,13 @@ async function scheduleSupersededRevisionContent(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   text: Doc<'texts'>,
-  lang: string,
-  audioSpeakerGender: string | undefined,
-  state: ContentSweepState,
+  slot: LanguageSlot,
+  textVoice: string,
   opts: ContentSweepOpts | undefined,
 ): Promise<void> {
-  for (const revision of state.supersededMap.get(lang) ?? []) {
-    if (opts?.probe && missingAnnotationKinds(lang, revision).length > 0) {
+  const lang = slot.lang;
+  for (const revision of slot.superseded) {
+    if (opts?.probe && annotationsDue(lang, revision)) {
       throw new ProbeNeedsWork();
     }
     await scheduleTranslationAnnotations(ctx, revision, revision._id);
@@ -998,7 +1110,7 @@ async function scheduleSupersededRevisionContent(
         throw new ProbeNeedsWork();
       }
       await regenerateSupersededRevisionAudio(ctx, text, revision, {
-        audioSpeakerGender,
+        audioSpeakerGender: textVoice,
         // An existing asset (dead blob, stale version or provider) is
         // replaced in place; a lost one may be re-attached from the cache.
         forceRegen: asset !== null,
@@ -1040,8 +1152,13 @@ async function scheduleMissingSourceAnnotations(
   text: Doc<'texts'>,
   opts: ContentSweepOpts | undefined,
 ): Promise<void> {
-  for (const kind of missingAnnotationKinds(text.language, text)) {
-    if (opts?.probe) throw new ProbeNeedsWork();
+  const kinds = missingAnnotationKinds(text.language, text);
+  // A request inside the cooldown is still in flight; see
+  // `annotationRequestInFlight`.
+  if (kinds.length === 0 || annotationRequestInFlight(text)) return;
+  if (opts?.probe) throw new ProbeNeedsWork();
+  await ctx.db.patch(textId, { annotationRequestedAt: Date.now() });
+  for (const kind of kinds) {
     await ctx.scheduler.runAfter(0, TEXT_ANNOTATIONS[kind].sourceTextAction, {
       textId,
       text: text.text,
@@ -1050,133 +1167,311 @@ async function scheduleMissingSourceAnnotations(
   }
 }
 
+/** Copy of `value` with every `undefined` property dropped, for inserts. */
+function defined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, v]) => v !== undefined),
+  ) as T;
+}
+
 /**
- * Fill one language's remaining gaps after the sweeps: enqueue the missing
- * translation (non-source languages), backfill missing translation
- * annotations, enqueue missing audio (deferred while an LLM retranslation is
- * in flight), or the timings backfill for audio that already exists.
+ * Whether a legacy row may stand in for a key without a model call: the
+ * wording cannot carry either axis (an unmarked language, or a form-free
+ * key on a language that does not mark the first person), so there is
+ * nothing to verify.
+ */
+function legacyNeedsVerification(
+  legacy: Pick<Doc<'translations'>, 'targetLanguage' | 'regionVariant'>,
+  key: string,
+): boolean {
+  const concrete = classificationLanguageForRow(legacy);
+  return (
+    languageMarksFirstPerson(concrete) ||
+    parseRenderingKey(key).formId !== NO_FORM
+  );
+}
+
+/**
+ * Whether a legacy row may stand in for the PRIMARY key at all: not
+ * version-stale (a bump means the wording is to be redone, and a new card
+ * must not inherit it; a human wording the pipeline never regenerates,
+ * `mayRegenerateTranslation`, has no version to be stale against), and,
+ * when the wording could carry an axis, written by a model that was told
+ * the voice (never machine translation, never a verbatim copy).
+ */
+function legacyAdoptable(
+  text: Doc<'texts'>,
+  legacy: Doc<'translations'>,
+  key: string,
+): boolean {
+  if (
+    mayRegenerateTranslation(text, legacy) &&
+    isTranslationVersionStale(legacy.targetLanguage, legacy.translationVersion)
+  ) {
+    return false;
+  }
+  if (!legacyNeedsVerification(legacy, key)) return true;
+  return (
+    legacy.translationSource !== GOOGLE_TRANSLATE_SOURCE &&
+    legacy.translationSource !== SOURCE_VERBATIM_TRANSLATION_SOURCE
+  );
+}
+
+/**
+ * Copy a legacy row under a key: the same wording, annotations, provenance
+ * and version stamp, so a version-stale legacy wording is never frozen
+ * under a key and the copy's annotations need no regeneration. The audio
+ * ensure finds the same asset by string, voice and setup, so no clip is
+ * synthesized for it.
+ */
+async function copyLegacyRowUnderKey(
+  ctx: MutationCtx,
+  legacy: Doc<'translations'>,
+  key: string,
+  voice: 'male' | 'female',
+): Promise<Doc<'translations'>> {
+  const id = await ctx.db.insert(
+    'translations',
+    defined({
+      textId: legacy.textId,
+      targetLanguage: legacy.targetLanguage,
+      translatedText: legacy.translatedText,
+      romanizedText: legacy.romanizedText,
+      romanizationSource: legacy.romanizationSource,
+      ipaText: legacy.ipaText,
+      ipaSource: legacy.ipaSource,
+      furiganaText: legacy.furiganaText,
+      furiganaSource: legacy.furiganaSource,
+      translationSource: legacy.translationSource,
+      regionVariant: legacy.regionVariant,
+      translationVersion: legacy.translationVersion,
+      speakerGender: voice,
+      variantKey: key,
+    }),
+  );
+  return (await ctx.db.get(id))!;
+}
+
+/**
+ * Make the row at the slot's key exist: adopt the legacy row when it may
+ * stand in for the primary key (a copy with no call when the wording
+ * cannot carry an axis, a verifying job otherwise), else claim and enqueue
+ * one job for the key, together with the primary key when the primary row
+ * is missing (a versioned key is derived from it). Returns true iff a job
+ * was enqueued (a copy is complete on return); throws ProbeNeedsWork in
+ * probe mode where it would write.
+ */
+async function ensureRenderingRow(
+  ctx: MutationCtx,
+  text: Doc<'texts'>,
+  textId: Id<'texts'>,
+  slot: LanguageSlot,
+  gate: MetadataGate,
+  opts: ContentSweepOpts | undefined,
+): Promise<boolean> {
+  const { lang, legacy, primaryKey } = slot;
+  const key = slot.rendering.key;
+  // Every branch below writes a row or a claim under a key: none of it
+  // before the metadata the key is computed from is in.
+  if (!(await gate.ready())) return false;
+  const jobOpts: RenderingJobOpts = {
+    preferredRegionVariant: legacy?.regionVariant,
+    skipTts: opts?.skipTts,
+    priority: opts?.priority,
+    llmPriority: opts?.llmPriority,
+    probe: opts?.probe,
+    requestedByUserId: opts?.requestedByUserId,
+  };
+  if (legacy && key === primaryKey && legacyAdoptable(text, legacy, key)) {
+    if (!legacyNeedsVerification(legacy, key)) {
+      if (opts?.probe) throw new ProbeNeedsWork();
+      const copied = await copyLegacyRowUnderKey(
+        ctx,
+        legacy,
+        key,
+        slot.rendering.voiceGender,
+      );
+      // The copy is this view's row from now on: the caller goes on to
+      // its annotations and audio in this same pass. Nothing is in flight
+      // for it, so it is not counted as scheduled work.
+      slot.keyed = copied;
+      slot.served = copied;
+      slot.servedKeyed = true;
+      slot.superseded = [];
+      slot.audioKey = key;
+      slot.audio = null;
+      return false;
+    }
+    return enqueueRenderingJob(ctx, text, lang, [key], {
+      ...jobOpts,
+      adoptLegacy: true,
+    });
+  }
+  // A versioned key is derived from the primary row. When that row is
+  // missing and the legacy row can stand in for it with no call, copy it
+  // first, so the job versions from it instead of translating the primary
+  // afresh; otherwise the job renders both.
+  let primaryExists =
+    key === primaryKey ||
+    (await liveTranslation(ctx, textId, lang, primaryKey)) !== null;
+  if (
+    !primaryExists &&
+    legacy &&
+    legacyAdoptable(text, legacy, primaryKey) &&
+    !legacyNeedsVerification(legacy, primaryKey)
+  ) {
+    if (opts?.probe) throw new ProbeNeedsWork();
+    await copyLegacyRowUnderKey(
+      ctx,
+      legacy,
+      primaryKey,
+      parseRenderingKey(primaryKey).voice,
+    );
+    primaryExists = true;
+  }
+  // The primary rendered with the key is offered the legacy wording for
+  // adoption like a primary-only job would be.
+  return enqueueRenderingJob(
+    ctx,
+    text,
+    lang,
+    primaryExists ? [key] : [primaryKey, key],
+    {
+      ...jobOpts,
+      adoptLegacy:
+        !primaryExists &&
+        legacy !== null &&
+        legacyAdoptable(text, legacy, primaryKey),
+    },
+  );
+}
+
+function audioOptsOf(slot: LanguageSlot, opts: ContentSweepOpts | undefined) {
+  return {
+    forceRegen: opts?.forceAudioRegen,
+    priority: opts?.priority,
+    probe: opts?.probe,
+    requestedByUserId: opts?.requestedByUserId,
+    variantKey: slot.audioKey,
+  };
+}
+
+/**
+ * Fill one language's remaining gaps after the sweeps: the missing row at
+ * the key (non-source languages), missing annotations, missing audio
+ * (deferred while a job for the key is in flight), or the timings backfill
+ * for audio that already exists.
  */
 async function scheduleLanguageContent(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   text: Doc<'texts'>,
-  lang: string,
-  audioSpeakerGender: string | undefined,
+  slot: LanguageSlot,
+  textVoice: 'male' | 'female',
   state: ContentSweepState,
-  sweptRegionVariants: Map<string, string>,
+  gate: MetadataGate,
   opts: ContentSweepOpts | undefined,
 ): Promise<{ translationScheduled: boolean; audioScheduled: boolean }> {
   const scheduled = { translationScheduled: false, audioScheduled: false };
-  const hasAudio = state.audioMap.get(lang) != null;
+  const { lang } = slot;
 
   if (lang === text.language) {
-    // Source language, no translation needed, maybe TTS
-    if (!hasAudio) {
+    // Source language, no translation needed, maybe TTS in the view's voice.
+    if (opts?.skipTts) return scheduled;
+    if (slot.audio == null) {
+      // A keyed source clip is voiced by its key; not before the metadata
+      // that fixes the voice is in. The legacy clip speaks the text's
+      // voice as it stands.
+      if (slot.audioKey !== undefined && !(await gate.ready())) {
+        return scheduled;
+      }
       scheduled.audioScheduled = await scheduleAudioForLanguage(
         ctx,
         text,
         lang,
-        audioSpeakerGender,
+        slot.rendering.voiceGender,
         null,
-        {
-          forceRegen: opts?.forceAudioRegen,
-          priority: opts?.priority,
-          probe: opts?.probe,
-          requestedByUserId: opts?.requestedByUserId,
-        },
+        audioOptsOf(slot, opts),
       );
     } else {
-      await scheduleTimingsBackfillIfNeeded(ctx, textId, lang, state, opts);
+      await scheduleTimingsBackfillIfNeeded(ctx, textId, slot, state, opts);
     }
     return scheduled;
   }
 
-  // Different language. Need translation
-  const translation = state.translationMap.get(lang);
-  if (!translation) {
-    // Route to either the LLM queue or the legacy Google path based on
-    // the per-language config in lib/languages.ts. Both paths terminate
-    // by writing the `translations` row via storeTranslationAndScheduleTTS,
-    // so downstream (romanization, TTS) doesn't care which provider ran.
-    scheduled.translationScheduled = await scheduleTranslationForLanguage(
+  if (!slot.served) {
+    scheduled.translationScheduled = await ensureRenderingRow(
       ctx,
       text,
-      lang,
-      {
-        audioSpeakerGender,
-        preferredRegionVariant: sweptRegionVariants.get(lang),
-        priority: opts?.priority,
-        llmPriority: opts?.llmPriority,
-        probe: opts?.probe,
-        requestedByUserId: opts?.requestedByUserId,
-      },
+      textId,
+      slot,
+      gate,
+      opts,
     );
-    return scheduled;
+    // A legacy row copied under the key is served from here on; anything
+    // else (a job, a wait) leaves the language to a later pass.
+    if (!slot.served) return scheduled;
   }
+  const translation = slot.served;
+  const hasAudio = slot.audio != null;
 
-  // Translation exists. Backfill missing annotations (romanization,
-  // IPA). Same `=== undefined` sentinel semantics as the source-text
-  // loop above.
-  if (opts?.probe && missingAnnotationKinds(lang, translation).length > 0) {
+  // The row exists. Backfill missing annotations (romanization, IPA,
+  // furigana), by the row's own id so a keyed row's wording is the one
+  // annotated. Same `=== undefined` sentinel semantics as the source loop.
+  if (opts?.probe && annotationsDue(lang, translation)) {
     throw new ProbeNeedsWork();
   }
-  await scheduleTranslationAnnotations(ctx, translation, undefined);
+  await scheduleTranslationAnnotations(
+    ctx,
+    translation,
+    slot.servedKeyed ? translation._id : undefined,
+  );
+  if (opts?.skipTts) return scheduled;
   if (!hasAudio) {
-    // Defer TTS while an LLM retranslation is in flight for this
-    // (textId, lang). Without this guard, `flagTranslation` (which
-    // deletes audio + enqueues an LLM retranslation) races with a
-    // concurrent `scheduleMissingContent` that would otherwise see
-    // "translation exists, audio missing" and enqueue TTS against
-    // the OLD `translation.translatedText`, producing stale audio
-    // just before the new translation lands. The LLM worker's
-    // `storeTranslationAndScheduleTTS` will enqueue TTS for the new
-    // text once the LLM completes. The claim was pre-fetched in
-    // the batched load; no per-iteration DB read here.
-    const existingLlmClaim = state.llmClaimMap.get(lang) ?? null;
-    const llmRetranslationInFlight =
-      existingLlmClaim !== null && isClaimFresh(existingLlmClaim);
-    if (llmRetranslationInFlight) {
-      // Skip. The LLM worker owns the next TTS enqueue for this row.
-    } else {
+    // Defer TTS while a job for this key is in flight: it will overwrite
+    // the row anyway, and `storeTranslationAndScheduleTTS` enqueues the
+    // audio for the wording it lands. Without this guard a flag's
+    // retranslation raced a concurrent sweep into synthesizing the OLD
+    // wording just before the new one landed.
+    const jobInFlight =
+      slot.llmClaim !== null && isClaimFresh(slot.llmClaim);
+    if (!jobInFlight) {
       scheduled.audioScheduled = await scheduleAudioForLanguage(
         ctx,
         text,
         lang,
-        audioSpeakerGender,
+        slot.servedKeyed ? slot.rendering.voiceGender : textVoice,
         translation,
-        {
-          forceRegen: opts?.forceAudioRegen,
-          priority: opts?.priority,
-          probe: opts?.probe,
-          requestedByUserId: opts?.requestedByUserId,
-        },
+        audioOptsOf(slot, opts),
       );
     }
   } else {
-    await scheduleTimingsBackfillIfNeeded(ctx, textId, lang, state, opts);
+    await scheduleTimingsBackfillIfNeeded(ctx, textId, slot, state, opts);
   }
   await scheduleSupersededRevisionContent(
     ctx,
     textId,
     text,
-    lang,
-    audioSpeakerGender,
-    state,
+    slot,
+    textVoice,
     opts,
   );
   return scheduled;
 }
 
 /**
- * Schedule missing translations and audio for a text: resolve the speaker
- * gender, load the stored content state, sweep invalid audio and stale
- * translations, then fill each required language's gaps (translations,
- * annotations, audio, timings backfills) via the named steps above.
+ * Make a text's content complete for one view: decide the voice, make
+ * sure the source metadata is in (curriculum texts), resolve the rendering
+ * key per language, then fill each language's gaps (the row at the key,
+ * annotations, audio, timings) and repair what went stale. One entry point
+ * for every caller: the card surfaces pass their card and the course
+ * settings, the warm and browse surfaces pass the settings alone, and the
+ * guard "which rendering does this view read" is applied once, inside.
  *
- * Used by both `prepareCardContent` (for new cards) and
- * `ensureCardContent` (for on-demand regeneration).
+ * Returns how many translation and audio jobs were scheduled; a text whose
+ * metadata was just requested reports one translation and returns early.
  */
-export async function scheduleMissingContent(
+export async function ensureTextContent(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   text: Doc<'texts'>,
@@ -1186,102 +1481,306 @@ export async function scheduleMissingContent(
 ): Promise<{ translationsScheduled: number; audioScheduled: number }> {
   const sourceLanguage = text.language;
 
-  // Resolve gender for both the voice (audioSpeakerGender) and the translation
-  // prompt's <speaker_gender> tag so they agree (otherwise we hit the
-  // user-facing "voice is the opposite gender" bug). The full case logic
-  // (definitive vs custom-neutral vs premade-neutral) lives in
-  // `resolveCardSpeakerGenders` (lib/voices.ts), seeded by textId for a
-  // deterministic, retry-stable coin-flip.
-  const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
-    text,
-    textId,
-  );
-
+  // The voice, decided once and kept: the sentence's own when it fixes it,
+  // else one seeded flip written into `audioSpeakerGender` (lib/voices.ts).
+  const { audioSpeakerGender: textVoice, genderPatch } =
+    resolveCardSpeakerGenders(text, textId);
   if (Object.keys(genderPatch).length > 0) {
     if (opts?.probe) throw new ProbeNeedsWork();
     await ctx.db.patch(textId, genderPatch);
+    text = { ...text, ...genderPatch };
   }
+
+  // The metadata precondition: a curriculum text is classified from its
+  // source sentence BEFORE its first keyed row or clip, so no key is ever
+  // computed from a voice or a register a verdict can later overturn. The
+  // gate is asked only where a keyed write is due: legacy rows and clips
+  // are repaired without it. The verdict re-runs this sweep
+  // (`applyTextMetadata`). A text the classifier keeps failing on renders
+  // from defaults after `MAX_METADATA_ATTEMPTS`.
+  const gate = metadataGate(ctx, text, baseLanguages, targetLanguages, opts);
+
+  const view: SourceView = opts?.card
+    ? {
+        settings: opts.settings,
+        card: opts.card,
+        accentLanguage: opts.card.accentLanguage,
+      }
+    : previewView(opts?.settings);
 
   // Always include the text's own language (`sourceLanguage`) so the
   // source-language branch of `scheduleLanguageContent` queues audio for it
   // regardless of what the caller passed in `baseLanguages`. Without this, a
   // user whose course uses an English VARIANT (`en_gb` / `en_us` / `en_au`)
   // would never get audio for `en` curriculum + placement-test texts.
-  // `allRequiredLanguages` wouldn't contain `'en'`, so the
-  // `lang === sourceLanguage` branch never fires. Same shape applies to
-  // any other text where the user's variant differs from the text's
-  // actual language code (`es` vs `es_latam`, etc.). The Set dedupes
-  // when `baseLanguages`/`targetLanguages` already contain the source.
   //
   // A mixed-accent course (`en`) shows a British- or Australian-voiced
   // curriculum text the `en_gb` / `en_au` rewrite instead of the source
-  // wording (`getMixedAccentTextLanguage`, read by cardContent.ts), so that
-  // row is required content on such a course as well. Never for a
-  // user-created text: its wording is the user's.
+  // wording (`servedAccentRow`), so that row is required content on such a
+  // course as well. Never for a user-created text: its wording is the
+  // user's.
   const courseLanguages = [...baseLanguages, ...targetLanguages];
-  const mixedAccentLanguage =
+  const accent =
     !text.userCreated && courseLanguages.includes(sourceLanguage)
-      ? getMixedAccentTextLanguage(sourceLanguage, textId)
+      ? (servedAccentRow(text, view) ??
+        getMixedAccentTextLanguage(sourceLanguage, textId))
       : undefined;
   const allRequiredLanguages = [
     ...new Set([
       sourceLanguage,
       ...courseLanguages,
-      ...(mixedAccentLanguage ? [mixedAccentLanguage] : []),
+      ...(accent ? [accent] : []),
     ]),
   ];
-
-  // Languages that need translation (all except source). `sourceLanguage`
-  // is in `allRequiredLanguages` by construction above; filtering it out
-  // here ensures we don't enqueue a self-translation for it.
-  const langsNeedingTranslation = allRequiredLanguages.filter(
-    (l) => l !== sourceLanguage,
-  );
 
   const state = await loadContentState(
     ctx,
     textId,
+    text,
+    view,
     allRequiredLanguages,
-    langsNeedingTranslation,
   );
 
-  const langsWithAudioGenderDrift = await sweepInvalidAudio(
+  // Translations first, audio second. The wording sweep decides whether a
+  // replacement is coming, and the audio sweep needs that answer before it
+  // detaches a clip the incoming replace still has to archive.
+  const { regenScheduled, correctedLanguages } = await sweepStaleTranslations(
     ctx,
     textId,
     text,
-    audioSpeakerGender,
     state,
     opts,
   );
-
-  const { sweptRegionVariants, regenScheduled } = await sweepStaleTranslations(
+  await sweepInvalidAudio(
     ctx,
     textId,
     text,
-    audioSpeakerGender,
+    textVoice,
     state,
-    langsWithAudioGenderDrift,
     opts,
+    correctedLanguages,
   );
-
   await scheduleMissingSourceAnnotations(ctx, textId, text, opts);
 
   let translationsScheduled = regenScheduled;
   let audioScheduled = 0;
   for (const lang of allRequiredLanguages) {
+    const slot = state.slots.get(lang);
+    if (!slot) continue;
     const scheduled = await scheduleLanguageContent(
       ctx,
       textId,
       text,
-      lang,
-      audioSpeakerGender,
+      slot,
+      textVoice,
       state,
-      sweptRegionVariants,
+      gate,
       opts,
     );
     if (scheduled.translationScheduled) translationsScheduled++;
     if (scheduled.audioScheduled) audioScheduled++;
   }
-
+  // A classifier call scheduled by the gate is work on the way too.
+  if (gate.requested) translationsScheduled++;
   return { translationsScheduled, audioScheduled };
+}
+
+/**
+ * The audio half of one rendering outside the sweep: the clip of `spoken`
+ * under `key`, for the preview's audio-icon click. Attaches a cached asset
+ * or claims and enqueues the synthesis. Returns true iff a pointer was
+ * attached or a job enqueued.
+ */
+export async function ensureRenderingAudio(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  spoken: { language: string; text: string; regionVariant: string | undefined },
+  rendering: LanguageRendering,
+  opts: { priority?: TtsPriority; requestedByUserId?: string },
+): Promise<boolean> {
+  const lang = spoken.language;
+  const key = rendering.key;
+  const pointer = await audioPointer(ctx, textId, lang, key);
+  if (pointer) {
+    const payload = await resolveAudioPayload(ctx, pointer);
+    const blobGone =
+      payload === null || (await ctx.db.system.get(payload.storageId)) === null;
+    if (!blobGone && payload.asset.spokenText === spoken.text) return false;
+    if (await hasActiveTtsClaim(ctx, textId, lang, key)) return false;
+    await deleteAudioRow(
+      ctx,
+      pointer,
+      blobGone ? { blobAlreadyGone: true } : { keepAsset: true },
+    );
+  }
+  if (await hasBlockingTtsClaim(ctx, textId, lang, opts.priority, key)) {
+    return false;
+  }
+  const voiceName = getVoiceForText(
+    lang,
+    textId,
+    spoken.regionVariant,
+    rendering.voiceGender,
+  );
+  const asset = await findReusableAudioAssetForVoice(ctx, {
+    language: lang,
+    voiceName,
+    regionVariant: spoken.regionVariant,
+    spokenText: spoken.text,
+  });
+  if (asset) {
+    await upsertAudioPointer(ctx, textId, lang, asset._id, key);
+    return true;
+  }
+  const claimed = await claimTtsIfAvailable(
+    ctx,
+    textId,
+    lang,
+    opts.priority,
+    key,
+  );
+  if (!claimed) return false;
+  await enqueueTtsForVoice(ctx, {
+    textId,
+    text: spoken.text,
+    language: lang,
+    voiceName,
+    regionVariant: spoken.regionVariant,
+    priority: opts.priority,
+    requestedByUserId: opts.requestedByUserId,
+    variantKey: key,
+  });
+  return true;
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// Sentence metadata for curriculum texts (lib/sentenceMetadataSource.ts)
+// ────────────────────────────────────────────────────────────────────────────
+
+/**
+ * How many classifier calls one curriculum text may cost before the sweep
+ * stops waiting for a verdict and renders from defaults (neutral register,
+ * the seeded voice, the legacy addressee fallback).
+ */
+export const MAX_METADATA_ATTEMPTS = 3;
+
+/** How long a metadata request is honoured before a sweep asks again. */
+const METADATA_REQUEST_COOLDOWN_MS = 15 * 60 * 1000;
+
+export type MetadataState = 'current' | 'exhausted' | 'in_flight' | 'needed';
+
+/**
+ * Where a text stands with the sentence-metadata classifier. A user-written
+ * text is classified at creation and never again (`current`). A curriculum
+ * text is `current` at the current classifier source, `exhausted` after
+ * `MAX_METADATA_ATTEMPTS`, `in_flight` while a request is inside its
+ * cooldown, else `needed`.
+ */
+export function metadataState(
+  text: Pick<
+    Doc<'texts'>,
+    'userCreated' | 'metadataSource' | 'metadataRequestedAt' | 'metadataAttempts'
+  >,
+): MetadataState {
+  if (text.userCreated) return 'current';
+  if (hasCurrentSentenceMetadata(text)) return 'current';
+  // A request inside its cooldown is in flight whatever the count: the
+  // last permitted call may still land, and a keyed row written meanwhile
+  // would be stranded by its verdict.
+  if (
+    text.metadataRequestedAt !== undefined &&
+    Date.now() - text.metadataRequestedAt < METADATA_REQUEST_COOLDOWN_MS
+  ) {
+    return 'in_flight';
+  }
+  if ((text.metadataAttempts ?? 0) >= MAX_METADATA_ATTEMPTS) return 'exhausted';
+  return 'needed';
+}
+
+/**
+ * The metadata precondition as one sweep sees it: `ready()` is true when a
+ * keyed write may go ahead (the text is classified, or the classifier has
+ * given up on it), else false, after scheduling the classifier the first
+ * time it is asked. Asked lazily so a pass that writes nothing keyed never
+ * pays a call.
+ */
+export type MetadataGate = {
+  ready(): Promise<boolean>;
+  /** Whether this sweep scheduled the classifier. */
+  readonly requested: boolean;
+};
+
+export function metadataGate(
+  ctx: MutationCtx,
+  text: Doc<'texts'>,
+  baseLanguages: string[],
+  targetLanguages: string[],
+  opts: Parameters<typeof requestSentenceMetadataIfNeeded>[4],
+): MetadataGate {
+  let state = metadataState(text);
+  let requested = false;
+  return {
+    get requested() {
+      return requested;
+    },
+    async ready() {
+      if (state === 'current' || state === 'exhausted') return true;
+      if (state === 'needed') {
+        const result = await requestSentenceMetadataIfNeeded(
+          ctx,
+          text,
+          baseLanguages,
+          targetLanguages,
+          opts,
+        );
+        requested = result === 'requested';
+        state = 'in_flight';
+      }
+      return false;
+    },
+  };
+}
+
+/**
+ * Claim the text and schedule the classifier on its SOURCE sentence alone
+ * when it still needs one. The custom-card path sends every rendering,
+ * because a gendered form in any translation fixes the sentence's gender;
+ * on a curriculum text the translations were generated for whatever voice
+ * was known at the time, so they get no vote. The verdict lands through
+ * `applyTextMetadata`, which stamps `metadataSource` and re-runs the sweep.
+ * Returns the text's state after this call (`requested` when a call was
+ * scheduled); in probe mode throws ProbeNeedsWork iff it would schedule.
+ */
+export async function requestSentenceMetadataIfNeeded(
+  ctx: MutationCtx,
+  text: Doc<'texts'>,
+  baseLanguages: string[],
+  targetLanguages: string[],
+  opts: Pick<
+    ContentSweepOpts,
+    'probe' | 'requestedByUserId' | 'priority' | 'llmPriority'
+  > | undefined,
+): Promise<MetadataState | 'requested'> {
+  const state = metadataState(text);
+  if (state !== 'needed') return state;
+  if (opts?.probe) throw new ProbeNeedsWork();
+  await ctx.db.patch(text._id, {
+    metadataRequestedAt: Date.now(),
+    metadataAttempts: (text.metadataAttempts ?? 0) + 1,
+  });
+  await ctx.scheduler.runAfter(
+    0,
+    internal.features.sentenceMetadata.classifyCurriculumText,
+    {
+      textId: text._id,
+      translations: [{ language: text.language, text: text.text }],
+      schedulePrepareCard: true,
+      baseLanguages,
+      targetLanguages,
+      userId: opts?.requestedByUserId,
+      priority: opts?.priority,
+      llmPriority: opts?.llmPriority,
+    },
+  );
+  return 'requested';
 }

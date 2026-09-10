@@ -392,7 +392,7 @@ export function getProviderByApiCode(apiCode: string): TtsProvider | undefined {
  * the same gender. Without a seed the function falls back to `Math.random()`,
  * which is fine for one-shot creation paths (where the result is stored on
  * insert and never re-flipped) but causes a race for paths that may run
- * multiple times against an already-inserted text (e.g. `scheduleMissingContent`
+ * multiple times against an already-inserted text (e.g. `ensureTextContent`
  * for a text whose `audioSpeakerGender` field hasn't been written yet).
  * Two racing jobs would each flip independently and produce inconsistent
  * audio rows, triggering an audio-regeneration loop the next time the
@@ -425,20 +425,24 @@ export interface SpeakerGenderInput {
   audioSpeakerGender?: string;
   /** Whether the text is user-created (custom/chat) vs premade dataset. */
   userCreated: boolean;
+  /** See `texts.metadataSource`. Not read here; carried for the resolver. */
+  metadataSource?: string;
 }
 
 /**
- * Resolve the voice gender (`audioSpeakerGender`) a card's audio should use, and
- * the patch (if any) to write back to the text so the translation prompt's
- * `<speaker_gender>` tag and the audio voice agree.
+ * Resolve the voice gender (`audioSpeakerGender`) a card's audio should use,
+ * and the patch (if any) to write back to the text so the voice is decided
+ * once and kept.
  *
- * Three cases (`seed` is the text id, used for a deterministic coin-flip):
+ * Two cases (`seed` is the text id, used for a deterministic coin-flip):
  *   1. Definitive `speakerGender` ('male'/'female'): the source of truth; mirror
  *      it into `audioSpeakerGender`, never overwrite `speakerGender`.
- *   2. Custom + neutral/undefined: preserve the LLM's `speakerGender` verdict;
- *      only resolve `audioSpeakerGender` (preferring a prior resolution).
- *   3. Premade + neutral/undefined: coin-flip BOTH fields to the same value so
- *      the prompt and the voice agree.
+ *   2. Otherwise: keep a prior `audioSpeakerGender`, else flip once. The
+ *      flip is written into `audioSpeakerGender` ONLY. `speakerGender` is the
+ *      classifier's verdict (or empty) and is never written here, so a
+ *      reader can tell evidence from a flip without a third field. Rows from
+ *      before 2026-09-10 may still hold a flip in `speakerGender`; that is
+ *      what `metadataSource` (lib/sentenceMetadataSource.ts) guards.
  * Prior `audioSpeakerGender` is preserved when present so two runs don't re-roll.
  */
 export function resolveCardSpeakerGenders(
@@ -446,43 +450,19 @@ export function resolveCardSpeakerGenders(
   seed: string,
 ): {
   audioSpeakerGender: 'male' | 'female';
-  genderPatch: {
-    speakerGender?: 'male' | 'female';
-    audioSpeakerGender?: 'male' | 'female';
-  };
+  genderPatch: { audioSpeakerGender?: 'male' | 'female' };
 } {
-  let audioSpeakerGender: 'male' | 'female';
-  const genderPatch: {
-    speakerGender?: 'male' | 'female';
-    audioSpeakerGender?: 'male' | 'female';
-  } = {};
-
-  if (text.speakerGender === 'male' || text.speakerGender === 'female') {
-    audioSpeakerGender = text.speakerGender;
-    if (text.audioSpeakerGender !== audioSpeakerGender) {
-      genderPatch.audioSpeakerGender = audioSpeakerGender;
-    }
-  } else if (text.userCreated) {
-    audioSpeakerGender =
-      text.audioSpeakerGender === 'male' || text.audioSpeakerGender === 'female'
-        ? text.audioSpeakerGender
-        : resolveAudioSpeakerGender(text.speakerGender, seed);
-    if (text.audioSpeakerGender !== audioSpeakerGender) {
-      genderPatch.audioSpeakerGender = audioSpeakerGender;
-    }
-  } else {
-    audioSpeakerGender =
-      text.audioSpeakerGender === 'male' || text.audioSpeakerGender === 'female'
+  const audioSpeakerGender: 'male' | 'female' =
+    text.speakerGender === 'male' || text.speakerGender === 'female'
+      ? text.speakerGender
+      : text.audioSpeakerGender === 'male' ||
+          text.audioSpeakerGender === 'female'
         ? text.audioSpeakerGender
         : resolveAudioSpeakerGender(undefined, seed);
-    if (text.speakerGender !== audioSpeakerGender) {
-      genderPatch.speakerGender = audioSpeakerGender;
-    }
-    if (text.audioSpeakerGender !== audioSpeakerGender) {
-      genderPatch.audioSpeakerGender = audioSpeakerGender;
-    }
-  }
-
+  const genderPatch: { audioSpeakerGender?: 'male' | 'female' } =
+    text.audioSpeakerGender === audioSpeakerGender
+      ? {}
+      : { audioSpeakerGender };
   return { audioSpeakerGender, genderPatch };
 }
 

@@ -55,6 +55,15 @@ describe('extractJsonResult', () => {
     expect(extractJsonResult('nothing to see here\nstill nothing')).toBe(
       undefined,
     );
-    expect(extractJsonResult('')).toBe(undefined);
+  });
+
+  it('reads empty output as a null result', () => {
+    // `convex run` prints nothing when the function returned null, and
+    // `execFileSync` would have thrown on a non-zero exit, so silence is a
+    // result. Specs gate on `=== null` to skip; `undefined` slipped past
+    // that guard and crashed one line later.
+    expect(extractJsonResult('')).toBeNull();
+    expect(extractJsonResult('\n')).toBeNull();
+    expect(extractJsonResult('   ')).toBeNull();
   });
 });

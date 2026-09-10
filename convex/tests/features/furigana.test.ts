@@ -1,11 +1,14 @@
 /// <reference types="vite/client" />
 import { convexTest } from 'convex-test';
+import { ROMANIZATION_SOURCES } from '../../lib/localRomanization';
 import { describe, it, expect } from 'vitest';
 import schema from '../../schema';
 import { internal, api } from '../../_generated/api';
 import { FURIGANA_SOURCES } from '../../lib/textAnnotations';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
-import { liveTranslation } from '../../db/translationReads';
+import { liveTranslation, renderingTextOf } from '../../db/translationReads';
+import { primaryRenderingKey } from '../../../lib/preferenceResolution';
+import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -163,6 +166,14 @@ describe('preview-path scheduling gate', () => {
         userCreated: false,
         collectionId: collId,
         collectionRank: 1,
+        metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
+      });
+      // A keyed row, as the pipeline writes them: the preview reads the
+      // row at its key and annotates that one.
+      const key = primaryRenderingKey({
+        text: renderingTextOf((await ctx.db.get(textId))!),
+        textId,
+        code: 'ja',
       });
       // Japanese translation with romanization already present, furigana
       // missing: the gate must schedule ONLY the missing kind.
@@ -171,7 +182,11 @@ describe('preview-path scheduling gate', () => {
         targetLanguage: 'ja',
         translatedText: SENTENCE,
         romanizedText: 'maiasa shichiji ni okimasu.',
-        romanizationSource: 'google-v3',
+        // The REAL current tag, not a lookalike: missingAnnotationKinds now
+        // treats a tag that is not the current one as stale and re-schedules,
+        // so 'google-v3' (no -v1) would make this test schedule romanization.
+        romanizationSource: ROMANIZATION_SOURCES.googleV3,
+        variantKey: key,
       });
       return { collId, textId };
     });

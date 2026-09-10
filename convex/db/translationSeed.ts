@@ -4,7 +4,14 @@ import { internalMutation } from '../_generated/server';
 import { deleteAudioRow } from '../lib/audio';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { clearedAnnotationFields } from '../lib/textAnnotations';
-import { liveTranslation } from './translationReads';
+import {
+  liveTranslation,
+  audioPointer,
+  audioPointersForTextLanguage,
+  dialectForRendering,
+  primaryKeyForLanguage,
+} from './translationReads';
+import { resolveCardSpeakerGenders } from '../../lib/languages';
 
 const SPANISH_VOICE_PREFIXES: Record<string, string> = {
   es: 'es-ES',
@@ -25,6 +32,13 @@ function textEnPreview(text: string): string {
  * For each sentence: updates the texts row (normalized text + metadata),
  * upserts translations per language, and invalidates audio when translation
  * text changes or Spanish voices use the wrong regional prefix.
+ *
+ * A seeded wording is the sentence's PRIMARY rendering
+ * (docs/architecture/rendering-keys.md): the text's voice and primary form.
+ * It lands on the primary keyed row when one exists, else on the legacy
+ * row when one exists (a curriculum fix reaches the cards still on it),
+ * else as a new keyed primary row. Rows versioned from the primary become
+ * derivation-stale and are re-versioned by the next content sweep.
  */
 export const batchUpsertTranslations = internalMutation({
   args: {
@@ -105,6 +119,24 @@ export const batchUpsertTranslations = internalMutation({
 
       const textId = textDoc._id;
 
+      // The voice is decided once and kept (lib/voices.ts); the seed's
+      // speaker gender is a verdict when male/female.
+      const { audioSpeakerGender, genderPatch } = resolveCardSpeakerGenders(
+        { ...textDoc, speakerGender: item.speakerGender },
+        textId,
+      );
+      const patchedText = {
+        ...textDoc,
+        text: item.textEn,
+        register: item.register,
+        addresseeNumber: item.addresseeNumber,
+        speakerGender: item.speakerGender,
+        addresseeGender: item.addresseeGender,
+        tenseAspect: item.tenseAspect,
+        sentenceType: item.sentenceType,
+        literalFigurative: item.literalFigurative,
+        ...genderPatch,
+      };
       await ctx.db.patch(textId, {
         text: item.textEn,
         register: item.register,
@@ -114,31 +146,42 @@ export const batchUpsertTranslations = internalMutation({
         tenseAspect: item.tenseAspect,
         sentenceType: item.sentenceType,
         literalFigurative: item.literalFigurative,
+        ...genderPatch,
       });
       stats.textsUpdated++;
 
       // Check if source English text changed. Invalidate English audio too
       if (textDoc.text !== item.textEn) {
-        const enAudio = await ctx.db
-          .query('audioRecordings')
-          .withIndex('by_text_and_language', (q) =>
-            q.eq('textId', textId).eq('language', 'en'),
-          )
-          .first();
-        if (enAudio) {
+        // Every pointer of the slot: a wording change stales the canonical
+        // clip and every voice variant of it alike.
+        for (const enAudio of await audioPointersForTextLanguage(
+          ctx,
+          textId,
+          'en',
+        )) {
           await deleteAudioRow(ctx, enAudio);
           stats.audioInvalidated++;
         }
       }
 
       for (const tr of item.translations) {
-        const existing = await liveTranslation(ctx, textId, tr.language);
+        const legacy = await liveTranslation(ctx, textId, tr.language);
+        const primaryKey = primaryKeyForLanguage(
+          patchedText,
+          tr.language,
+          dialectForRendering(tr.language, textId, legacy),
+        );
+        const existing =
+          (await liveTranslation(ctx, textId, tr.language, primaryKey)) ??
+          legacy;
 
         if (!existing) {
           await ctx.db.insert('translations', {
             textId,
             targetLanguage: tr.language,
             translatedText: canonicalizeApostrophes(tr.language, tr.text),
+            variantKey: primaryKey,
+            speakerGender: audioSpeakerGender,
             ...(tr.translationSource
               ? { translationSource: tr.translationSource }
               : {}),
@@ -160,13 +203,15 @@ export const batchUpsertTranslations = internalMutation({
           });
           stats.translationsUpdated++;
 
-          // Translation text changed. Delete audio so it regenerates on demand
-          const audio = await ctx.db
-            .query('audioRecordings')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('language', tr.language),
-            )
-            .first();
+          // Translation text changed. Delete the row's audio so it
+          // regenerates on demand; the rows versioned from this wording are
+          // derivation-stale now and the sweep re-versions them.
+          const audio = await audioPointer(
+            ctx,
+            textId,
+            tr.language,
+            existing.variantKey,
+          );
           if (audio) {
             await deleteAudioRow(ctx, audio);
             stats.audioInvalidated++;
@@ -178,22 +223,19 @@ export const batchUpsertTranslations = internalMutation({
         // Spanish voice audit: delete audio using wrong regional voice prefix
         const expectedPrefix = SPANISH_VOICE_PREFIXES[tr.language];
         if (expectedPrefix) {
-          const audioForLang = await ctx.db
-            .query('audioRecordings')
-            .withIndex('by_text_and_language', (q) =>
-              q.eq('textId', textId).eq('language', tr.language),
-            )
-            .first();
-          const payloadForLang = audioForLang
-            ? await resolveAudioPayload(ctx, audioForLang)
-            : null;
-          if (
-            audioForLang &&
-            payloadForLang &&
-            !payloadForLang.voiceName.startsWith(expectedPrefix)
-          ) {
-            await deleteAudioRow(ctx, audioForLang);
-            stats.audioInvalidated++;
+          for (const audioForLang of await audioPointersForTextLanguage(
+            ctx,
+            textId,
+            tr.language,
+          )) {
+            const payloadForLang = await resolveAudioPayload(ctx, audioForLang);
+            if (
+              payloadForLang &&
+              !payloadForLang.voiceName.startsWith(expectedPrefix)
+            ) {
+              await deleteAudioRow(ctx, audioForLang);
+              stats.audioInvalidated++;
+            }
           }
         }
       }

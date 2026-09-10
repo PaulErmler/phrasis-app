@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -27,6 +27,13 @@ import {
 } from '@/lib/constants/dailyGoal';
 
 import { reportError } from '@/lib/report-error';
+import {
+  courseAsksPoliteness,
+  coursePolitenessRows,
+  type PolitenessLevel,
+  recommendedPolitenessLevels,
+} from '@/lib/languageForms';
+import { PolitenessRows } from '@/components/course/PolitenessRows';
 
 interface CreateCourseDialogProps {
   open: boolean;
@@ -46,6 +53,15 @@ export function CreateCourseDialog({
   const [difficulty, setDifficulty] = useState<CurrentLevel | null>(null);
   const [dailyGoal, setDailyGoal] = useState<number | null>(null);
   const [customGoal, setCustomGoal] = useState('');
+  // Step 5: the politeness setting (lib/languageForms.ts), asked only when
+  // the target marks it (the dialog then has four steps). Its rows come
+  // from the picked languages, so the state is the stored global levels.
+  // The recommended set for those languages starts ticked (below, once the
+  // rows are known), so a learner who does not care can continue straight
+  // through.
+  const [politenessLevels, setPolitenessLevels] = useState<PolitenessLevel[]>(
+    [],
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Course created by a partially-failed submit, stamped with the answers it
   // was created FROM. A retry reuses it instead of creating a duplicate, but
@@ -64,7 +80,9 @@ export function CreateCourseDialog({
     api.features.courses.updateCourseSettings,
   );
 
-  const totalSteps = 4;
+  const asksPoliteness =
+    targetLanguage !== '' && courseAsksPoliteness([targetLanguage]);
+  const totalSteps = asksPoliteness ? 5 : 4;
   const progress = (step / totalSteps) * 100;
 
   const parsedCustomGoal = Number.parseInt(customGoal, 10);
@@ -78,6 +96,21 @@ export function CreateCourseDialog({
   const courseSignature = () =>
     JSON.stringify([targetLanguage, baseLanguage, difficulty]);
 
+  const politenessRows = useMemo(
+    () =>
+      targetLanguage
+        ? coursePolitenessRows([
+            targetLanguage,
+            ...(baseLanguage ? [baseLanguage] : []),
+          ])
+        : [],
+    [targetLanguage, baseLanguage],
+  );
+  // Picking a language (re)starts from its recommendation.
+  useEffect(() => {
+    setPolitenessLevels(recommendedPolitenessLevels(politenessRows));
+  }, [politenessRows]);
+
   const resetForm = () => {
     setStep(1);
     setTargetLanguage('');
@@ -85,6 +118,7 @@ export function CreateCourseDialog({
     setDifficulty(null);
     setDailyGoal(null);
     setCustomGoal('');
+    setPolitenessLevels([]);
     setIsSubmitting(false);
     createdCourseRef.current = null;
   };
@@ -106,6 +140,8 @@ export function CreateCourseDialog({
         return difficulty !== null;
       case 4:
         return effectiveGoal !== null;
+      case 5:
+        return politenessLevels.length > 0;
       default:
         return false;
     }
@@ -178,11 +214,15 @@ export function CreateCourseDialog({
       // ring). Idempotent, so re-running it on a retry is harmless.
       await setActiveCourse({ courseId });
 
-      // Persist the daily goal (createCourse doesn't take it, the goal is
-      // a courseSettings field, patchable via updateCourseSettings).
+      // Persist the daily goal and the politeness answer (createCourse
+      // doesn't take them; they are courseSettings fields, patchable via
+      // updateCourseSettings).
       await updateCourseSettings({
         courseId,
         dailyTimeGoalMinutes: effectiveGoal,
+        ...(asksPoliteness && politenessLevels.length > 0
+          ? { politenessLevels }
+          : {}),
       });
 
       createdCourseRef.current = null;
@@ -360,6 +400,24 @@ export function CreateCourseDialog({
                   </span>
                 </div>
               </div>
+            </div>
+          )}
+
+          {step === 5 && (
+            <div className="flex h-full flex-col gap-5 overflow-y-auto py-6">
+              <div>
+                <h3 className="text-lg font-semibold">{t('step5.title')}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t('step5.subtitle')}
+                </p>
+              </div>
+              <PolitenessRows
+                rows={politenessRows}
+                selected={politenessLevels}
+                onChange={setPolitenessLevels}
+                compact
+                recommendDefault
+              />
             </div>
           )}
         </div>

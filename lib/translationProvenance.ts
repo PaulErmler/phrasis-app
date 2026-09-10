@@ -6,7 +6,7 @@
  * migration, warmup and backfill that regenerates content must route its
  * decision through `mayRegenerateTranslation` rather than re-deriving the rule
  * from `text.userCreated` / `translationSource` inline. That duplication is
- * what let the gender-drift sweep in `scheduleMissingContent` delete
+ * what let the gender-drift sweep in `ensureTextContent` delete
  * chat-authored translations while the version sweep next to it correctly
  * exempted them.
  *
@@ -20,9 +20,11 @@
  */
 
 /**
- * Stable identifier for the legacy Google Translate v2 path. Used as the
- * `translationSource` on rows produced by `processTranslationForCard`.
- * The fallback path the LLM queue schedules when every model stage fails.
+ * Stable identifier of the retired Google Translate v2 path. Nothing writes
+ * it since 2026-09-10 (the LLM chain is the only producer); legacy rows in
+ * production still carry it, and a rendering key never adopts such a row
+ * for an axis the wording could carry, since machine translation took no
+ * gender or form (convex/lib/contentScheduling.ts).
  */
 export const GOOGLE_TRANSLATE_SOURCE = 'google-translate-v2';
 
@@ -116,7 +118,7 @@ export function isUserCreatedText(text: TextProvenance): boolean {
  *
  * Note this governs the TEXT only. Audio may still be regenerated for a
  * user-created card. See the voice-gender validity loop in
- * `scheduleMissingContent`, which is deliberately left ungated so a card whose
+ * `ensureTextContent`, which is deliberately left ungated so a card whose
  * resolved speaker gender changes still gets a matching voice.
  */
 export function mayRegenerateTranslation(

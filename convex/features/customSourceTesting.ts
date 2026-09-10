@@ -1,7 +1,10 @@
 import { v } from 'convex/values';
-import { internalMutation, type MutationCtx } from '../_generated/server';
-import type { Doc, Id } from '../_generated/dataModel';
-import { assertTestHooksEnabled, requireUserIdByEmail } from '../lib/testHooks';
+import { internalMutation } from '../_generated/server';
+import type { Id } from '../_generated/dataModel';
+import {
+  activeCourseForEmail,
+  assertTestHooksEnabled,
+} from '../lib/testHooks';
 import {
   getCollectionProgress,
   getOrCreateCustomCollection,
@@ -27,22 +30,6 @@ import {
 
 /** Cap on one seeding call. The specs ask for tens, not thousands. */
 const MAX_SEED_TEXTS = 200;
-
-async function activeCourseForEmail(
-  ctx: MutationCtx,
-  email: string,
-): Promise<{ userId: string; course: Doc<'courses'> }> {
-  const userId = await requireUserIdByEmail(ctx, email);
-  const settings = await ctx.db
-    .query('userSettings')
-    .withIndex('by_userId', (q) => q.eq('userId', userId))
-    .first();
-  const courseId = settings?.activeCourseId;
-  if (!courseId) throw new Error(`No active course for "${email}"`);
-  const course = await ctx.db.get(courseId);
-  if (!course) throw new Error(`Active course ${courseId} is missing`);
-  return { userId, course };
-}
 
 /**
  * Put `count` pending texts in the user's Custom collection, tagged with

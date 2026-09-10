@@ -6,6 +6,8 @@ import {
   internalQuery,
 } from '../_generated/server';
 import { internal } from '../_generated/api';
+import { renderingSettingsOf } from '../db/translationReads';
+import { getCourseSettings } from '../db/courseSettings';
 import type { Id } from '../_generated/dataModel';
 import { requireAuthUserId, getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -20,7 +22,7 @@ import {
   getTranslationSource,
   isMixedLanguage,
   postProcessTranslation,
-  resolveMixedVariant,
+  pickMixedVariantForNewRow,
 } from '../../lib/languages';
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../lib/translationProvenance';
 import { trackEvent } from '../db/stats/dailyStats';
@@ -37,7 +39,10 @@ import {
   parseAutofillResponse,
 } from '../lib/translationAutofillPrompt';
 import { EVENTS, track } from '../analytics';
-import { sourcedTranslationEntriesValidator } from '../types';
+import {
+  sourcedTranslationEntriesValidator,
+  renderingSettingsValidator,
+} from '../types';
 import {
   captureGeneration,
   openrouterCostUsd,
@@ -47,6 +52,8 @@ import {
   canonicalizeApostrophes,
   resolveAudioSpeakerGender,
 } from '../../lib/languages';
+import { renderingKey } from '../../lib/preferenceResolution';
+import { NO_FORM } from '../../lib/languageForms';
 
 export const consumeAutoFillQuota = internalMutation({
   args: { userId: v.string() },
@@ -62,7 +69,13 @@ export const getAllowedLanguagesForAutoFill = internalQuery({
   args: { userId: v.string() },
   returns: v.union(
     v.null(),
-    v.object({ allowedLanguages: v.array(v.string()) }),
+    v.object({
+      allowedLanguages: v.array(v.string()),
+      // The course's sentence-form settings, for the prompt's settings
+      // block (lib/translationAutofillPrompt.ts); null when the course has
+      // none.
+      renderingSettings: v.union(renderingSettingsValidator, v.null()),
+    }),
   ),
   handler: async (ctx, { userId }) => {
     const active = await getActiveCourseForUser(ctx, userId);
@@ -71,7 +84,11 @@ export const getAllowedLanguagesForAutoFill = internalQuery({
     const allowedLanguages = [
       ...new Set([...course.baseLanguages, ...course.targetLanguages]),
     ];
-    return { allowedLanguages };
+    return {
+      allowedLanguages,
+      renderingSettings:
+        renderingSettingsOf(await getCourseSettings(ctx, course._id)) ?? null,
+    };
   },
 });
 
@@ -104,6 +121,13 @@ const sentenceMetadataValidator = v.object({
     v.literal('not_applicable'),
   ),
   addressesSomeone: v.boolean(),
+  // The third party's gender when the source fixes it; 'neutral' keeps the
+  // coin flip (convex/lib/sentenceMetadataShape.ts). Optional: the same
+  // shape travels back in as `createCustomText`'s metadata argument, and
+  // clients from before the field send five keys.
+  referentGender: v.optional(
+    v.union(v.literal('male'), v.literal('female'), v.literal('neutral')),
+  ),
 });
 
 export const autoFillTranslations = action({
@@ -200,7 +224,11 @@ export const autoFillTranslations = action({
     const resolutionByRequested = new Map<string, Resolved>();
     for (const code of targetLanguages) {
       if (isMixedLanguage(code)) {
-        const r = resolveMixedVariant(code, variantSeed);
+        // Always a new row, so the decorrelated pick. The legacy one made
+        // the dialect a copy of the speaker-gender draw below (both seeded
+        // on `variantSeed`), and worse: parity is permutation-invariant, so
+        // a seed whose varying part appears twice never moved it at all.
+        const r = pickMixedVariantForNewRow(code, variantSeed);
         if (r) {
           resolutionByRequested.set(code, {
             resolved: r.subCode,
@@ -212,11 +240,22 @@ export const autoFillTranslations = action({
       resolutionByRequested.set(code, { resolved: code });
     }
 
+    // The speaker the targets are written for when the source marks none:
+    // drawn here, before translation, so a language that must commit (Thai
+    // ครับ/ค่ะ, a Romance adjective) commits to the voice the text will be
+    // stored with. Seeded like the dialect pick, so a retry keeps it.
+    const speakerGender = resolveAudioSpeakerGender(
+      undefined,
+      `${variantSeed}|speaker`,
+    );
     const userPrompt = buildAutofillUserPrompt({
       texts: args.texts,
       resolvedTargets: targetLanguages.map(
         (code) => resolutionByRequested.get(code)!.resolved,
       ),
+      settings: courseCtx.renderingSettings ?? undefined,
+      politenessSeed: variantSeed,
+      speakerGender,
     });
 
     const openrouter = getOpenRouter();
@@ -299,8 +338,16 @@ export const autoFillTranslations = action({
       });
     }
 
-    // Metadata was validated inside parseAutofillResponse.
-    return { translations: results, metadata: parsed.metadata };
+    // Metadata was validated inside parseAutofillResponse. A model that
+    // reports the speaker as neutral despite the instruction still wrote
+    // the targets for the drawn speaker, so that is the voice the text
+    // gets (`createCustomText` reads `metadata.speakerGender`).
+    const metadata =
+      parsed.metadata.speakerGender === 'male' ||
+      parsed.metadata.speakerGender === 'female'
+        ? parsed.metadata
+        : { ...parsed.metadata, speakerGender };
+    return { translations: results, metadata };
   },
 });
 
@@ -413,6 +460,18 @@ export const createCustomText = mutation({
     const mainEntry = args.translations[0];
     const nextRank = collection.textCount + 1;
 
+    // The voice, decided at creation: the autofill's verdict when the
+    // wording marks a gender, else a flip. A user's own sentence has one
+    // rendering per language, keyed by this voice
+    // (docs/architecture/rendering-keys.md); `applyTextMetadata` re-keys
+    // the rows if the classifier later moves the voice.
+    const audioSpeakerGender = resolveAudioSpeakerGender(
+      args.metadata?.speakerGender === 'male' ||
+        args.metadata?.speakerGender === 'female'
+        ? args.metadata.speakerGender
+        : undefined,
+      `${mainEntry.text}|${userId}|${Date.now()}`,
+    );
     const textId = await ctx.db.insert('texts', {
       text: mainEntry.text,
       language: mainEntry.language,
@@ -420,6 +479,7 @@ export const createCustomText = mutation({
       userId,
       collectionId: collection._id,
       collectionRank: nextRank,
+      audioSpeakerGender,
       ...(args.metadata
         ? {
             register: args.metadata.register,
@@ -431,9 +491,6 @@ export const createCustomText = mutation({
             // across all target-language translations of this row. Mirrors the
             // logic in applyMetadataAndPrepareCard for the non-auto-fill path.
             referentGender: Math.random() < 0.5 ? 'male' : 'female',
-            audioSpeakerGender: resolveAudioSpeakerGender(
-              args.metadata.speakerGender,
-            ),
           }
         : {}),
     });
@@ -444,6 +501,8 @@ export const createCustomText = mutation({
         textId,
         targetLanguage: entry.language,
         translatedText: canonicalizeApostrophes(entry.language, entry.text),
+        variantKey: renderingKey(audioSpeakerGender, NO_FORM),
+        speakerGender: audioSpeakerGender,
         ...(entry.regionVariant ? { regionVariant: entry.regionVariant } : {}),
         // The client tags autofilled entries with the model slug and
         // everything else as user-provided (EnterTextsView). Default here
@@ -610,6 +669,11 @@ export const createCustomTextsBatch = mutation({
       const mainEntry = translations[0];
       const rank = baseRank + i + 1;
 
+      // The voice, decided at creation (see `createCustomText`).
+      const audioSpeakerGender = resolveAudioSpeakerGender(
+        undefined,
+        `${mainEntry.text}|${userId}|${rank}|${baseRank}`,
+      );
       const textId = await ctx.db.insert('texts', {
         text: mainEntry.text,
         language: mainEntry.language,
@@ -617,6 +681,7 @@ export const createCustomTextsBatch = mutation({
         userId,
         collectionId: collection._id,
         collectionRank: rank,
+        audioSpeakerGender,
       });
 
       for (let j = 1; j < translations.length; j++) {
@@ -625,6 +690,8 @@ export const createCustomTextsBatch = mutation({
           textId,
           targetLanguage: entry.language,
           translatedText: canonicalizeApostrophes(entry.language, entry.text),
+          variantKey: renderingKey(audioSpeakerGender, NO_FORM),
+          speakerGender: audioSpeakerGender,
           // Bulk-import is exclusively manual, no autofill path here, so
           // every inserted translation is user-typed. Tag it explicitly so
           // a future strategy swap doesn't regenerate text the user wrote.

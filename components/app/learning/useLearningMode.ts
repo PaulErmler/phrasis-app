@@ -1234,16 +1234,20 @@ export function useLearningMode(
     }
   }, [cardForReview, toggleFavoriteCardMutation]);
 
-  // Flag-only. Fires the retranslation mutation in the background (via the
-  // shared card-action surface) and otherwise leaves the card alone, no
-  // deletion, no exit animation, no automatic advance. The user stays on the
-  // card and can press next when they're ready; the new translation may
-  // arrive in-place as it lands.
-  const flagCard = cardActions.flagCard;
+  // Flag-only. Opens the flag dialog (via the shared card-action surface);
+  // the submitted flag runs in the background and otherwise leaves the card
+  // alone, no deletion, no exit animation, no automatic advance. The user
+  // stays on the card and can press next when they're ready; the new
+  // translation may arrive in-place as it lands.
+  const requestFlag = cardActions.requestFlag;
   const handleFlag = useCallback(async () => {
     if (!cardForReview || isReviewing) return;
-    flagCard(cardForReview._id);
-  }, [cardForReview, isReviewing, flagCard]);
+    requestFlag(cardForReview._id, {
+      userCreated:
+        cardForReview.collectionOrigin === 'custom' ||
+        cardForReview.collectionOrigin === 'chat',
+    });
+  }, [cardForReview, isReviewing, requestFlag]);
 
   const regenerateAudio = cardActions.regenerateAudio;
   const handleRegenerateAudio = useCallback(async () => {

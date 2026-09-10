@@ -50,7 +50,7 @@ export const PLACEMENT_SENTENCES_QUERY_CAP = 256;
 /**
  * Placement sentences processed per placement-content-sweep transaction
  * (`processPlacementSentences`). Sized well under Convex's per-mutation
- * system-op ceiling: each sentence runs the heavy `scheduleMissingContent`
+ * system-op ceiling: each sentence runs the heavy `ensureTextContent`
  * (~15–25 system ops), so the sweep entry point processes one batch inline
  * and fans the remaining batches out as independent scheduled workers instead
  * of sweeping the whole corpus in one transaction.

@@ -11,6 +11,7 @@ import {
   cardApprovalStatusValidator,
   proposedCardMetadataValidator,
   translationEntriesValidator,
+  voiceGenderValidator,
 } from '../../types';
 import type { Id, Doc } from '../../_generated/dataModel';
 import type { MutationCtx } from '../../_generated/server';
@@ -18,6 +19,8 @@ import { consumeQuota } from '../../usage/helpers';
 import { FEATURE_IDS } from '../featureIds';
 import { applyCardEdit } from '../scheduling';
 import { applyTextMetadata } from '../sentenceMetadata';
+import { renderingKey } from '../../../lib/preferenceResolution';
+import { NO_FORM } from '../../../lib/languageForms';
 import { storeWritingAlternative } from '../writingAlternatives';
 import { resolveCardContext } from './cardContext';
 import { MAX_CARD_TEXT_LENGTH } from '../../../lib/constants/learning';
@@ -26,10 +29,12 @@ import {
   getTranslationSource,
   postProcessTranslation,
   canonicalizeApostrophes,
+  resolveAudioSpeakerGender,
 } from '../../../lib/languages';
 import {
   ANNOTATION_KINDS,
   TEXT_ANNOTATIONS,
+  supportedAnnotationEntries,
   vAnnotationKind,
 } from '../../lib/textAnnotations';
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
@@ -96,6 +101,17 @@ async function processApproval(
 
   const nextRank = chatCollection.textCount + 1;
 
+  // The tutor decided who says the sentence and wrote every language for
+  // that speaker, so the card is voiced by it from the start. The
+  // classifier below only replaces it with a gender the wording proves
+  // (`applyTextMetadata` keeps a stored voice on a neutral verdict).
+  const tutorSpeaker = approval.proposedMetadata?.speakerGender;
+  const audioSpeakerGender = resolveAudioSpeakerGender(
+    tutorSpeaker === 'male' || tutorSpeaker === 'female'
+      ? tutorSpeaker
+      : undefined,
+    `${approval._id}|voice`,
+  );
   const textId: Id<'texts'> = await ctx.db.insert('texts', {
     text: mainText,
     language: mainEntry.language,
@@ -103,6 +119,7 @@ async function processApproval(
     userId,
     collectionId: chatCollection._id,
     collectionRank: nextRank,
+    audioSpeakerGender,
   });
 
   // The approval's translations were produced by the language-teacher chat
@@ -124,9 +141,13 @@ async function processApproval(
     // and get the language's post-processing step (default: strip
     // trailing '_' runs).
     const userEdited = userEditedLanguages.has(entry.language);
+    // One rendering per language, keyed by the text's voice
+    // (docs/architecture/rendering-keys.md).
     await ctx.db.insert('translations', {
       textId,
       targetLanguage: entry.language,
+      variantKey: renderingKey(audioSpeakerGender, NO_FORM),
+      speakerGender: audioSpeakerGender,
       translatedText: userEdited
         ? canonicalizeApostrophes(entry.language, entry.text)
         : postProcessTranslation(entry.language, entry.text),
@@ -257,6 +278,12 @@ export const createApprovalRequestInternal = internalMutation({
     messageId: v.string(),
     toolCallId: v.string(),
     translations: translationEntriesValidator,
+    /**
+     * The tutor's pick of who says the sentence (createCard requires it;
+     * older callers and approvals may lack it). Stored as the approval's
+     * proposed metadata and becomes the text's voice on approval.
+     */
+    speakerGender: v.optional(voiceGenderValidator),
     userId: v.string(),
   },
   returns: v.id('cardApprovals'),
@@ -302,6 +329,9 @@ export const createApprovalRequestInternal = internalMutation({
       translations: cappedTranslations,
       userId: args.userId,
       status: 'pending',
+      ...(args.speakerGender
+        ? { proposedMetadata: { speakerGender: args.speakerGender } }
+        : {}),
     });
     await scheduleApprovalAnnotations(ctx, approvalId, cappedTranslations);
 
@@ -934,8 +964,10 @@ export const getApprovalsByThread = query({
       _id: a._id,
       toolCallId: a.toolCallId,
       translations: a.translations,
-      entryIpa: a.entryIpa,
-      entryFurigana: a.entryFurigana,
+      // Gated on each kind's current language set; see
+      // supportedAnnotationEntries.
+      entryIpa: supportedAnnotationEntries('ipa', a.entryIpa),
+      entryFurigana: supportedAnnotationEntries('furigana', a.entryFurigana),
       status: a.status,
       kind: a.kind,
       cardId: a.cardId,

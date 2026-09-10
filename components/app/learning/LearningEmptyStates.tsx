@@ -1,10 +1,14 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useFormatter, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { Filter, Loader2, Lock, MessageSquare, PenLine } from 'lucide-react';
 import { FeatureBadge } from '@/components/feature_tracking/FeatureBadge';
 import { FEATURE_IDS } from '@/convex/features/featureIds';
+import { useCountdown } from '@/hooks/use-countdown';
+import { minuteBoundaryAtOrAfter } from '@/hooks/use-now-minute';
+import { nextReviewLine } from '@/lib/nextReview';
+import { getUserTimezone } from '@/lib/timezone';
 
 // ============================================================================
 // No collection selected
@@ -25,6 +29,92 @@ export function NoCollectionState({ onGoHome }: NoCollectionStateProps) {
       </div>
       <Button onClick={onGoHome}>{t('empty.goHome')}</Button>
     </main>
+  );
+}
+
+// ============================================================================
+// Next-review countdown
+// ============================================================================
+
+/**
+ * `Intl` options per `NextReviewLine.clock` discriminant.
+ *
+ * `hour: '2-digit'` rather than `'numeric'`: with `'numeric'`, German resolves a
+ * bare time to "4:01" but a weekday time to "04:01", so the same screen would
+ * show the hour two ways depending on how far off the review is. `'2-digit'` is
+ * stable across all three shapes in both locales.
+ */
+const CLOCK_FORMATS = {
+  time: { hour: '2-digit', minute: '2-digit' },
+  weekdayTime: { weekday: 'short', hour: '2-digit', minute: '2-digit' },
+  dateTime: {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  },
+} as const satisfies Record<string, Intl.DateTimeFormatOptions>;
+
+/**
+ * "Next review in 7h 48m · tomorrow at 04:01", ticking down live.
+ *
+ * Its own component so the per-second tick in the last minute re-renders this
+ * one paragraph instead of the whole empty state, whose Add button and
+ * `FeatureBadge` run their own queries.
+ *
+ * The countdown targets the minute boundary at or after `dueDate`, not the raw
+ * instant: the due queue is bounded by the minute-floored `useNowMinute`, so
+ * that boundary is when the card actually arrives. Zero therefore coincides with
+ * the tick that unmounts this screen, and no refresh button is needed.
+ */
+function NextReviewCountdown({ dueDate }: { dueDate: number }) {
+  const t = useTranslations('LearningMode');
+  const format = useFormatter();
+  const target = minuteBoundaryAtOrAfter(dueDate);
+  const line = useCountdown(target, (remaining) =>
+    nextReviewLine(target, remaining, getUserTimezone()),
+  );
+  if (!line) return null;
+
+  const time = line.time;
+  // The provider's timezone is UTC (i18n/request.tsx), which is right for
+  // the date-only formatting elsewhere but not for a wall-clock moment: the
+  // day word above is decided in the browser's timezone, so the clock has to
+  // be too, or a Berlin user reads "tomorrow at 02:01" for a 04:01 card.
+  const clock = line.clock
+    ? format.dateTime(new Date(target), {
+        ...CLOCK_FORMATS[line.clock],
+        timeZone: getUserTimezone(),
+      })
+    : '';
+
+  // One `t(...)` per variant rather than a computed key: next-intl types each
+  // message against its own values, so a union of keys in a single call is a
+  // fight with no upside. No `default` either, so adding a variant to
+  // `NextReviewLine` fails the build here instead of falling back silently.
+  let text: string;
+  switch (line.key) {
+    case 'nextReview':
+      text = t('nextReview', { time });
+      break;
+    case 'empty.nextReviewToday':
+      text = t('empty.nextReviewToday', { time, clock });
+      break;
+    case 'empty.nextReviewTomorrow':
+      text = t('empty.nextReviewTomorrow', { time, clock });
+      break;
+    case 'empty.nextReviewOn':
+      text = t('empty.nextReviewOn', { time, clock });
+      break;
+  }
+
+  return (
+    <p
+      className="text-muted-sm tabular-nums"
+      data-testid="next-review-countdown"
+    >
+      {text}
+    </p>
   );
 }
 
@@ -79,6 +169,14 @@ interface NoCardsDueStateProps {
    */
   customCardsPendingAdd?: boolean;
   /**
+   * When the earliest still-scheduled card comes due (`nextDueDate` from
+   * `getCardForReviewEmptyReason`), driving the live "next review in X"
+   * countdown. `null`/absent means there is nothing to count down to: free
+   * play, Learn-new mode with every card graduated, or a deck with no cards.
+   * The plain caught-up subtitle is the fallback.
+   */
+  nextDueDate?: number | null;
+  /**
    * True while the enable-time writing-track seed is still running (reason
    * 'preparing_writing'): the queue only looks empty because cards aren't
    * seeded yet, so render a transient preparing state instead of "all caught
@@ -109,6 +207,7 @@ export function NoCardsDueState({
   currentSourceHasAnyCards,
   filterUnblockAvailable,
   customCardsPendingAdd,
+  nextDueDate,
   isPreparingWriting,
   onIncludeOtherSource,
   onCreateChatCards,
@@ -195,6 +294,16 @@ export function NoCardsDueState({
       ? 'empty.deckEmptyTitle'
       : 'empty.noCardsDue';
 
+  // Where the countdown goes depends on what it would displace. The plain
+  // caught-up subtitle ("All caught up! Add more sentences…") says nothing the
+  // Add button below it doesn't, so the countdown takes its place and the screen
+  // stays two lines. The filter-blocked subtitles name which filter is hiding
+  // what and whether the other source has cards, which a wait time does not
+  // replace, so there the countdown is an extra line underneath.
+  const countdown =
+    nextDueDate != null ? <NextReviewCountdown dueDate={nextDueDate} /> : null;
+  const showSubtitle = isFilterBlocked || countdown === null;
+
   return (
     <main className="flex-1 flex flex-col items-center justify-center gap-6 px-4">
       <div className="text-center space-y-2">
@@ -202,7 +311,8 @@ export function NoCardsDueState({
           <Filter className="mx-auto h-8 w-8 text-muted-foreground" />
         )}
         <h2 className="body-large font-medium">{t(titleKey)}</h2>
-        <p className="text-muted-sm">{t(subtitleKey)}</p>
+        {showSubtitle && <p className="text-muted-sm">{t(subtitleKey)}</p>}
+        {countdown}
       </div>
       <div className="flex flex-col items-center gap-2">
         {isLimitReached ? (

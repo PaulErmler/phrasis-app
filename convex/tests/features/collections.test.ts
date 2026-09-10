@@ -2,6 +2,8 @@
 import { convexTest, type TestConvex } from 'convex-test';
 import { describe, it, expect, vi } from 'vitest';
 import schema from '../../schema';
+import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
+import { getCurrentTranslationVersion } from '../../../lib/languages';
 import { api } from '../../_generated/api';
 import { MARK_READ_LIMIT } from '../../db/collectionTextMarks';
 import type { Doc, Id } from '../../_generated/dataModel';
@@ -16,6 +18,8 @@ import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProven
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { MAX_PREVIEW_PAGE_SIZE } from '../../lib/collections';
 import { insertAudioFixture } from '../lib/audioFixtures';
+import { renderingTextOf } from '../../db/translationReads';
+import { primaryRenderingKey } from '../../../lib/preferenceResolution';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -30,7 +34,11 @@ async function insertUsVoicedText(
   fields: Omit<WithoutSystemFields<Doc<'texts'>>, 'language'>,
 ): Promise<Id<'texts'>> {
   for (let i = 0; i < 200; i++) {
-    const id = await ctx.db.insert('texts', { ...fields, language: 'en' });
+    const id = await ctx.db.insert('texts', {
+      metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
+      ...fields,
+      language: 'en',
+    });
     if (getMixedAccentTextLanguage('en', id) === undefined) return id;
     await ctx.db.delete(id);
   }
@@ -77,6 +85,7 @@ async function seedCourseWithTexts(
           userCreated: false,
           collectionId: collId,
           collectionRank: i,
+          metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
         }),
       );
     }
@@ -203,6 +212,80 @@ describe('features/collections', () => {
         },
       );
       expect(res.page).toEqual([]);
+    });
+
+    // 2026-09-09, the Thai pre-A1 rows sitting on "updating" for good. The
+    // client batches `requestPreviewTranslations` off
+    // `missingTranslationLanguages` (plus `needsAnnotationBackfill`), so a
+    // row whose canonical translations are all present was never sent and
+    // the rewrite the politeness setting wants was never asked for. The row
+    // has to say it needs one.
+    it('a fully translated row still reports a wanted rendering rewrite', async () => {
+      const t = convexTest(schema, modules);
+      const { collId } = await t.run(async (ctx) => {
+        const collId = await ctx.db.insert('collections', {
+          name: 'A1',
+          textCount: 1,
+        });
+        const courseId = await ctx.db.insert('courses', {
+          userId: 'user_A',
+          baseLanguages: ['en'],
+          targetLanguages: ['es'],
+        });
+        await ctx.db.insert('userSettings', {
+          userId: 'user_A',
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        await ctx.db.insert('decks', { courseId, name: 'd', cardCount: 0 });
+        await ctx.db.insert('courseSettings', {
+          courseId,
+          initialReviewCount: 5,
+          // "formal" is usted on Spain Spanish (form v) while the stored
+          // wording below is tú (form t).
+          politenessLevels: ['formal'],
+        });
+        const textId = await ctx.db.insert('texts', {
+          text: 'Are you coming?',
+          language: 'en',
+          userCreated: false,
+          collectionId: collId,
+          collectionRank: 1,
+          addressesSomeone: true,
+          audioSpeakerGender: 'male',
+          metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
+          ipaText: '',
+          romanizedText: '',
+        });
+        await ctx.db.insert('translations', {
+          textId,
+          targetLanguage: 'es',
+          translatedText: '¿Vienes?',
+          romanizedText: '',
+          ipaText: '',
+          translationSource: 'openai/gpt-5.6-sol:floor-minimal',
+          speakerGender: 'male',
+          translationVersion: getCurrentTranslationVersion('es'),
+        });
+        return { collId };
+      });
+
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      const res = await asUser.query(
+        api.features.collections.browseCollectionTexts,
+        {
+          collectionId: collId,
+          anchorRank: 0,
+          direction: 'after',
+          paginationOpts: firstPage,
+        },
+      );
+      const row = res.page[0];
+      // The Spanish row is complete, which is exactly the trap: the client
+      // batches off this list, so the row was never sent. ('en' can appear
+      // here for its own reason, the Mixed English accent row.)
+      expect(row.missingTranslationLanguages).not.toContain('es');
+      expect(row.needsRenderingRewrite).toBe(true);
     });
 
     it('lists texts in rank order with status + missingTranslationLanguages', async () => {
@@ -635,7 +718,7 @@ describe('features/collections', () => {
       expect(ttsClaims).toEqual([]);
     });
 
-    it('regenerates version-stale translations while browsing (marked missing, regenerated in place)', async () => {
+    it('renders a fresh keyed row for a version-stale legacy translation while browsing', async () => {
       const t = convexTest(schema, modules);
       const { collId } = await seedCourseWithTexts(t, 1);
       // An en curriculum text whose es translation is stamped below the
@@ -694,20 +777,25 @@ describe('features/collections', () => {
       expect(
         staleRow.translations.find((tr) => tr.language === 'es')?.text,
       ).toBe('Hola viejo');
-      // User-provided rows are exempt.
+      // The user-provided row is a legacy row too: never version-stale
+      // (user wording is not regenerated), but the browse reads the keyed
+      // row and shows the legacy wording as a placeholder until the sweep
+      // has adopted it under the key, which the rewrite flag requests.
       const userRow = browsed.page.find((r) => r._id === userTextId)!;
       expect(userRow.missingTranslationLanguages).not.toContain('es');
+      expect(userRow.needsRenderingRewrite).toBe(true);
 
-      // The preview mutation regenerates the stale row IN PLACE: the old
-      // wording and its paired audio keep serving until the version-bump
-      // replacement lands (and the write choke point archives them for any
-      // cards that show them, see translationArchive.test.ts).
+      // A legacy row is never regenerated (the cards on it keep it). The
+      // stale wording is not adopted under the key either, so the keyed
+      // row is rendered afresh; the user-provided wording is current and
+      // offered to a verifying adoption job. Both legacy rows and the
+      // paired audio stay exactly as they are.
       vi.mocked(llmPool.enqueueAction).mockClear();
       const res = await asUser.mutation(
         api.features.collections.requestPreviewTranslations,
         { collectionId: collId, textIds: [enTextId, userTextId] },
       );
-      expect(res.translationsScheduled).toBe(1);
+      expect(res.translationsScheduled).toBe(2);
       const { translations, audio } = await t.run(async (ctx) => ({
         translations: await ctx.db.query('translations').collect(),
         audio: await ctx.db.query('audioRecordings').collect(),
@@ -723,14 +811,19 @@ describe('features/collections', () => {
             replaceExisting?: boolean;
             translationReason?: string;
             skipTts?: boolean;
+            adoptLegacy?: boolean;
           },
       );
-      expect(regen.length).toBe(1);
-      expect(regen[0]).toMatchObject({
-        textId: enTextId,
-        replaceExisting: true,
-        translationReason: 'version_bump',
+      expect(regen.length).toBe(2);
+      expect(regen.find((job) => job.textId === enTextId)).toMatchObject({
         skipTts: true,
+      });
+      expect(
+        regen.find((job) => job.textId === enTextId)?.replaceExisting,
+      ).toBeUndefined();
+      expect(regen.find((job) => job.textId === userTextId)).toMatchObject({
+        skipTts: true,
+        adoptLegacy: true,
       });
       // The user-provided sibling survived untouched.
       expect(
@@ -773,11 +866,16 @@ describe('features/collections', () => {
           collectionId: collId,
           collectionRank: 1,
         });
-        // Current-version translation, but no romanization.
+        // Current-version keyed translation, but no romanization.
         await ctx.db.insert('translations', {
           textId,
           targetLanguage: 'el',
           translatedText: 'Καλημέρα',
+          variantKey: primaryRenderingKey({
+            text: renderingTextOf((await ctx.db.get(textId))!),
+            textId,
+            code: 'el',
+          }),
         });
         return { collId, textId };
       });

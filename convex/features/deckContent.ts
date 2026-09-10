@@ -16,10 +16,12 @@ import {
 import { ENSURE_CONTENT_LOOKAHEAD } from '../../lib/constants/learning';
 import { fetchFreePlayRotation } from '../lib/freePlay';
 import { fetchTrackDueCards } from '../lib/dueQueue';
-import {
-  ProbeNeedsWork,
-  scheduleMissingContent,
-} from '../lib/contentScheduling';
+import { ensureTextContent, ProbeNeedsWork } from '../lib/contentScheduling';
+import { renderingCardOf, renderingSettingsOf } from '../db/translationReads';
+import type {
+  RenderingCard,
+  RenderingSettings,
+} from '../../lib/preferenceResolution';
 import { getNextAddableTextsFromRank } from './collectionCardAdding';
 
 /**
@@ -51,12 +53,19 @@ export async function ensureCardContentHandler(
   const text = await ctx.db.get(args.textId);
   if (!text) return { translationsScheduled: 0, audioScheduled: 0 };
 
-  return scheduleMissingContent(
+  // The learner has this card, so its wording AND its voice are card
+  // demand; the sweep resolves the card's rendering key per language
+  // (docs/architecture/rendering-keys.md).
+  const settings = renderingSettingsOf(
+    await getCourseSettings(ctx, active.course._id),
+  );
+  return ensureTextContent(
     ctx,
     args.textId,
     text,
     active.course.baseLanguages,
     active.course.targetLanguages,
+    { card: renderingCardOf(card), settings },
   );
 }
 
@@ -143,6 +152,9 @@ async function scheduleContentForUpcomingCards(
   cards: Doc<'cards'>[],
 ): Promise<number> {
   let processed = 0;
+  const renderingSettings = renderingSettingsOf(
+    await getCourseSettings(ctx, active.course._id),
+  );
   // Batch-load the texts up front (one concurrent read round, not one
   // sequential get per card) before the sequential probe loop.
   const texts = await Promise.all(cards.map((card) => ctx.db.get(card.textId)));
@@ -150,15 +162,16 @@ async function scheduleContentForUpcomingCards(
     const card = cards[i];
     const text = texts[i];
     if (!text) continue;
+    const renderingCard = renderingCardOf(card);
     let needsWork = false;
     try {
-      await scheduleMissingContent(
+      await ensureTextContent(
         ctx,
         card.textId,
         text,
         active.course.baseLanguages,
         active.course.targetLanguages,
-        { probe: true },
+        { probe: true, card: renderingCard, settings: renderingSettings },
       );
     } catch (error) {
       if (error instanceof ProbeNeedsWork) {
@@ -183,6 +196,8 @@ async function scheduleContentForUpcomingCards(
           textId: card.textId,
           baseLanguages: active.course.baseLanguages,
           targetLanguages: active.course.targetLanguages,
+          renderingSettings,
+          renderingCard,
         },
       );
       processed++;
@@ -292,12 +307,20 @@ export async function prepareCardContentHandler(
     llmPriority?: LlmPriority;
     /** Requester attribution for the cost events (see ContentSweepOpts). */
     requestedByUserId?: string;
+    /** The course's politeness setting; absent = the primary form. */
+    renderingSettings?: RenderingSettings;
+    /**
+     * The caller's card, so a per-card correction renders. Absent for
+     * callers without a card, which get the rendering a new card would.
+     */
+    renderingCard?: NonNullable<RenderingCard>;
+    /** Translation-only pass; see ContentSweepOpts. */
+    skipTts?: boolean;
   },
 ): Promise<null> {
   const text = await ctx.db.get(args.textId);
   if (!text) return null;
-
-  await scheduleMissingContent(
+  await ensureTextContent(
     ctx,
     args.textId,
     text,
@@ -307,6 +330,9 @@ export async function prepareCardContentHandler(
       priority: args.priority,
       llmPriority: args.llmPriority,
       requestedByUserId: args.requestedByUserId,
+      card: args.renderingCard ?? null,
+      settings: args.renderingSettings,
+      skipTts: args.skipTts,
     },
   );
   return null;
@@ -326,6 +352,11 @@ export async function warmNextCollectionBatchHandler(
 ): Promise<null> {
   const course = await ctx.db.get(args.courseId);
   if (!course) return null;
+  // The next batch becomes curriculum cards that follow the course's
+  // settings, so their variants are warmed with the canonical content.
+  const renderingSettings = renderingSettingsOf(
+    await getCourseSettings(ctx, course._id),
+  );
   const scan = await getNextAddableTextsFromRank(ctx, {
     collectionId: args.collectionId,
     afterRank: args.afterRank,
@@ -341,16 +372,17 @@ export async function warmNextCollectionBatchHandler(
     // OCC contention the ensure sweep needed dispatch for doesn't apply.
     // One bad text must still not abort the rest of the warm.
     try {
-      await scheduleMissingContent(
+      await ensureTextContent(
         ctx,
         text._id,
         text,
         course.baseLanguages,
         course.targetLanguages,
+        { settings: renderingSettings },
       );
     } catch (error) {
       console.error(
-        '[warmNextCollectionBatch] scheduleMissingContent failed for one text — continuing',
+        '[warmNextCollectionBatch] ensureTextContent failed for one text — continuing',
         {
           textId: text._id,
           error,

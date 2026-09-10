@@ -2,7 +2,7 @@ import { v } from 'convex/values';
 import { internalMutation } from '../_generated/server';
 import { internal } from '../_generated/api';
 import type { Id } from '../_generated/dataModel';
-import { scheduleMissingContent } from '../features/decks';
+import { ensureTextContent } from '../lib/contentScheduling';
 import { isUserCreatedText } from '../../lib/translationProvenance';
 
 /**
@@ -10,18 +10,18 @@ import { isUserCreatedText } from '../../lib/translationProvenance';
  * chart: Arabic MSA, Chinese Simplified, Spanish Spain + LatAm, German,
  * French, Italian, Japanese, Russian, Korean, Greek, plus English for the
  * accent rows a Mixed English course shows; English audio itself is ensured
- * for every processed text, since `scheduleMissingContent` always includes
+ * for every processed text, since `ensureTextContent` always includes
  * the text's own language).
  *
  * Deliberately NOT a full-table sweep: it warms exactly the content a new
  * user hits first. The first {@link TEXTS_PER_COLLECTION} premade sentences
  * of every collection, plus all onboarding placement-test sentences. For each
- * of those texts it calls `scheduleMissingContent` with the warmup languages
+ * of those texts it calls `ensureTextContent` with the warmup languages
  * as targets, so translations/audio are CREATED where missing and REGENERATED
  * where a `translationVersion` / `ttsVersion` bump (or provider switch) made
  * them stale, and skipped entirely when current. Re-running after a
  * completed warmup is a cheap no-op pass. All the "only if necessary" logic
- * lives in `scheduleMissingContent`; this file only picks the text set.
+ * lives in `ensureTextContent`; this file only picks the text set.
  *
  * Run with:
  *   npx convex run admin/warmupLanguages:warmupChartLanguages '{}'
@@ -33,7 +33,7 @@ import { isUserCreatedText } from '../../lib/translationProvenance';
 
 /**
  * Chart languages as translation targets. `en` is in the list so
- * `scheduleMissingContent` sees a Mixed English course and derives the
+ * `ensureTextContent` sees a Mixed English course and derives the
  * en_gb / en_au accent row each text reads there
  * (`getMixedAccentTextLanguage`), not for a translation, since English is
  * source-only. Its source audio was always ensured.
@@ -57,7 +57,7 @@ const DEFAULT_WARMUP_LANGUAGES = [
 const TEXTS_PER_COLLECTION = 5;
 
 /** Collections handled per invocation. Each text fans out to ~12 languages
- * inside `scheduleMissingContent` (3 indexed reads + a storage-URL check per
+ * inside `ensureTextContent` (3 indexed reads + a storage-URL check per
  * language), so a small page keeps every invocation well inside mutation
  * limits even when everything is stale. */
 const COLLECTIONS_PER_PAGE = 3;
@@ -93,7 +93,7 @@ export const warmupChartLanguages = internalMutation({
       const text = await ctx.db.get(textId);
       // Premade content only. Custom/user texts stay on the lazy path.
       if (!text || isUserCreatedText(text)) return;
-      const scheduled = await scheduleMissingContent(
+      const scheduled = await ensureTextContent(
         ctx,
         textId,
         text,

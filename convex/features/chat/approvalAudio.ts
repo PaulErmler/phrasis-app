@@ -309,7 +309,14 @@ export const saveApprovalAudioAsset = internalMutation({
       regionVariant: undefined,
       spokenText: args.spokenText,
     });
-    const existing = await findAudioAssetByKey(ctx, key);
+    // The preview's own setup: the provider that made this clip at the
+    // language's current version. A clip from another setup is a sibling
+    // asset (retention rule in convex/lib/audioAssets.ts), not "existing".
+    const ttsVersion = getCurrentTtsVersion(key.language, key.regionVariant);
+    const existing = await findAudioAssetByKey(ctx, key, {
+      provider: args.provider,
+      version: ttsVersion,
+    });
     if (existing && existing.ttsQuality !== 'unknown') {
       // Completed audio (possibly validated) beat us to the key. Keep it.
       await deleteStorageBlobIfUnreferenced(ctx, args.storageId);
@@ -326,7 +333,7 @@ export const saveApprovalAudioAsset = internalMutation({
       ttsProvider: args.provider,
       ttsQuality: 'unvalidated',
       speed: 1,
-      ttsVersion: getCurrentTtsVersion(args.language),
+      ttsVersion,
     });
     if (result.outcome === 'kept') {
       await deleteStorageBlobIfUnreferenced(ctx, args.storageId);

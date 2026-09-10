@@ -7,15 +7,18 @@ import { api, internal } from '../../_generated/api';
 import type { Id } from '../../_generated/dataModel';
 import {
   scheduleAudioForLanguage,
-  scheduleMissingContent,
+  ensureTextContent,
 } from '../../features/decks';
 import { liveTranslation } from '../../db/translationReads';
 import { findAudioAssetInAnyAccent } from '../../lib/audioAssets';
 import { SOURCE_VERBATIM_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
 import { getVoiceLocale, pickAccentForText } from '../../../lib/voices';
+import { getCurrentTtsVersion } from '../../../lib/languages';
 import { llmPool, ttsPool } from '../../lib/workpools';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
+import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
+import type { ContentSweepOpts } from '../../lib/contentScheduling';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -50,24 +53,31 @@ async function seedEnglishText(t: TestConvex<typeof schema>, text: string) {
       collectionRank: 1,
       speakerGender: 'female',
       audioSpeakerGender: 'female',
+      addressesSomeone: false,
+      metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
     });
   });
 }
+
+/** The text's rendering key on every accent sibling (no form, its voice). */
+const KEY = 'female|none';
 
 async function sweep(
   t: TestConvex<typeof schema>,
   textId: Id<'texts'>,
   baseLanguages: string[],
   targetLanguages: string[],
+  opts?: ContentSweepOpts,
 ) {
   return t.run(async (ctx) => {
     const text = (await ctx.db.get(textId))!;
-    return scheduleMissingContent(
+    return ensureTextContent(
       ctx,
       textId,
       text,
       baseLanguages,
       targetLanguages,
+      opts,
     );
   });
 }
@@ -80,12 +90,15 @@ describe('English accent variants', () => {
 
       await sweep(t, textId, ['en_us'], ['es']);
 
-      const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_us'));
+      const row = await t.run((ctx) =>
+        liveTranslation(ctx, textId, 'en_us', KEY),
+      );
       expect(row).toMatchObject({
         translatedText: 'Hello world',
         translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
         translationVersion: 2,
         speakerGender: 'female',
+        variantKey: KEY,
       });
       // Only Spanish went to a model.
       expect(llmEnqueues().map((e) => e.targetLanguage)).toEqual(['es']);
@@ -137,7 +150,7 @@ describe('English accent variants', () => {
       expect(ttsEnqueues().map((e) => e.language)).toEqual(['en']);
     });
 
-    it('an old verbatim copy on a UK course is replaced in place by the accent rewrite on the version sweep', async () => {
+    it('an old verbatim copy on a UK course is left to its cards; the keyed row is a fresh rewrite', async () => {
       const t = convexTest(schema, modules);
       const textId = await seedEnglishText(t, 'The color of the elevator');
       const rowId = await t.run((ctx) =>
@@ -153,16 +166,17 @@ describe('English accent variants', () => {
 
       await sweep(t, textId, ['en_gb'], []);
 
-      // The row keeps serving until the new wording lands (silent bump).
+      // The legacy row is never regenerated (the cards on it keep it), and
+      // a version-stale wording is not adopted under the key either: the
+      // keyed row is rendered afresh.
       const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en_gb'));
       expect(row?._id).toBe(rowId);
       expect(llmEnqueues()).toMatchObject([
-        {
-          targetLanguage: 'en_gb',
-          replaceExisting: true,
-          translationReason: 'version_bump',
-        },
+        { targetLanguage: 'en_gb', renderingKeys: [KEY] },
       ]);
+      expect(
+        (llmEnqueues()[0] as { replaceExisting?: boolean }).replaceExisting,
+      ).toBeUndefined();
     });
 
     it('a custom German sentence with an en_gb target is still translated by a model', async () => {
@@ -214,7 +228,9 @@ describe('English accent variants', () => {
 
       await sweep(t, textId, ['en'], ['es']);
 
-      const row = await t.run((ctx) => liveTranslation(ctx, textId, 'en'));
+      const row = await t.run((ctx) =>
+        liveTranslation(ctx, textId, 'en', KEY),
+      );
       expect(row).toMatchObject({
         translatedText: 'Mind the gap',
         translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
@@ -246,6 +262,23 @@ describe('English accent variants', () => {
         spokenText,
       });
       return storageId;
+    }
+
+    function insertVerbatimRow(
+      t: TestConvex<typeof schema>,
+      textId: Id<'texts'>,
+      targetLanguage: string,
+      translatedText: string,
+    ) {
+      return t.run((ctx) =>
+        ctx.db.insert('translations', {
+          textId,
+          targetLanguage,
+          translatedText,
+          translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
+          speakerGender: 'female',
+        }),
+      );
     }
 
     it('a British clip made for mixed English is stored under en + en-GB and reused by a UK course', async () => {
@@ -294,6 +327,57 @@ describe('English accent variants', () => {
           .first(),
       );
       expect(pointer?.assetId).toBe(assets[0]._id);
+    });
+
+    it('an Australian clip from before the General-accent prompt is re-synthesized; a British one is kept', async () => {
+      const t = convexTest(schema, modules);
+      const textId = await seedEnglishText(t, 'Hello world');
+      await storeMixedEnglishClip(t, textId, 'Hello world', 'Leda@en-AU');
+      const textGb = await seedEnglishText(t, 'Hello there');
+      await storeMixedEnglishClip(t, textGb, 'Hello there', 'Leda@en-GB');
+
+      const assets = await t.run((ctx) =>
+        ctx.db.query('audioAssets').collect(),
+      );
+      expect(assets).toHaveLength(2);
+      const au = assets.find((a) => a.regionVariant === 'en-AU')!;
+      const gb = assets.find((a) => a.regionVariant === 'en-GB')!;
+      // A fresh clip is stamped with its own accent's version (en_au v2),
+      // the British one with en's.
+      expect(au.ttsVersion).toBe(getCurrentTtsVersion('en', 'en-AU'));
+      expect(gb.ttsVersion).toBe(getCurrentTtsVersion('en'));
+      expect(au.ttsVersion).toBeGreaterThan(gb.ttsVersion!);
+
+      // Age both to the stamp every clip carried before the bump.
+      await t.run(async (ctx) => {
+        await ctx.db.patch(au._id, { ttsVersion: 1 });
+        await ctx.db.patch(gb._id, { ttsVersion: 1 });
+      });
+
+      async function fill(
+        id: Id<'texts'>,
+        course: 'en_au' | 'en_gb',
+        spoken: string,
+      ) {
+        const translationId = await insertVerbatimRow(t, id, course, spoken);
+        return t.run(async (ctx) => {
+          const text = (await ctx.db.get(id))!;
+          const translation = (await ctx.db.get(translationId))!;
+          return scheduleAudioForLanguage(
+            ctx,
+            text,
+            course,
+            'female',
+            translation,
+          );
+        });
+      }
+      // The Australian clip is stale against en_au's version: a real job.
+      expect(await fill(textId, 'en_au', 'Hello world')).toBe(true);
+      expect(ttsEnqueues()).toMatchObject([{ language: 'en_au' }]);
+      // The British clip is still current: reused, nothing enqueued.
+      expect(await fill(textGb, 'en_gb', 'Hello there')).toBe(true);
+      expect(ttsEnqueues()).toHaveLength(1);
     });
 
     it('a UK-course clip is reused by mixed English only for texts whose accent is British', async () => {
@@ -394,10 +478,12 @@ describe('English accent variants', () => {
         return assetId;
       });
 
-      await sweep(t, us, ['en'], []);
+      // As the legacy cards that play these clips sweep them: a legacy
+      // pointer is maintained by the views that read it.
+      await sweep(t, us, ['en'], [], { card: {} });
       expect(ttsEnqueues()).toEqual([]);
 
-      await sweep(t, other, ['en'], []);
+      await sweep(t, other, ['en'], [], { card: {} });
       const jobs = ttsEnqueues();
       expect(jobs).toHaveLength(1);
       expect(jobs[0].language).toBe('en');
@@ -430,7 +516,7 @@ describe('English accent variants', () => {
           spokenText: 'Take care',
         });
       });
-      await sweep(t, other, ['en'], []);
+      await sweep(t, other, ['en'], [], { card: {} });
       expect(ttsEnqueues()).toEqual([]);
     });
   });
@@ -551,7 +637,10 @@ describe('English accent variants', () => {
 
       const res = await t
         .withIdentity({ subject: 'user_A' })
-        .mutation(api.features.scheduling.flagTranslation, { cardId });
+        .mutation(api.features.scheduling.flagTranslation, {
+          cardId,
+          reasons: ['wrong_translation'],
+        });
       expect(res.retranslated).toBe(true);
 
       expect(llmEnqueues().map((e) => e.targetLanguage)).toEqual(['es']);

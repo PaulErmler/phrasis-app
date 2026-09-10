@@ -1,16 +1,9 @@
 import { v, Infer } from 'convex/values';
-import { MutationCtx, ActionCtx, QueryCtx } from '../_generated/server';
+import { MutationCtx, QueryCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id, Doc } from '../_generated/dataModel';
-import { translateText, romanizeText } from './translation';
-import { captureGeneration } from '../lib/posthogAi';
-import { costForCharacters } from '../config/aiCosts';
-import { getRomanizationSource } from '../lib/localRomanization';
 import {
   getVoiceForText,
-  getMixedVariantByRegion,
-  resolveMixedVariant,
-  ROMANIZATION_LANGUAGES,
   IPA_LANGUAGES,
   FURIGANA_LANGUAGES,
   DEFAULT_CONTENT_VERSION,
@@ -18,7 +11,6 @@ import {
   postProcessTranslation,
 } from '../../lib/languages';
 import {
-  GOOGLE_TRANSLATE_SOURCE,
   isUserCreatedText,
   SOURCE_VERBATIM_TRANSLATION_SOURCE,
 } from '../../lib/translationProvenance';
@@ -27,7 +19,7 @@ import {
   resolveRetranslation,
   resolveRetranslationIfPending,
 } from './cardEditAudit';
-import { deleteAudioRowsForTextLanguage } from '../lib/audio';
+import { deleteAudioRow, deleteAudioRowsForTextLanguage } from '../lib/audio';
 import {
   findReusableAudioAssetForVoice,
   upsertAudioPointer,
@@ -40,95 +32,32 @@ import {
   ttsPriorityValidator,
   translationReasonValidator,
   voiceGenderValidator,
-  asVoiceGender,
 } from '../types';
-import { liveTranslation } from '../db/translationReads';
+import {
+  liveTranslation,
+  audioPointer,
+  primaryKeyForLanguage,
+} from '../db/translationReads';
+import {
+  parseRenderingKey,
+} from '../../lib/preferenceResolution';
 import { scheduleTranslationAnnotations } from '../lib/textAnnotations';
 
 /**
- * Translation write pipeline: the legacy Google Translate worker action and
- * `storeTranslationAndScheduleTTS`, the single write choke point every
- * translation producer (LLM queue, Google path, retranslations) lands
- * through. Owns the insert/replace/fill-metadata decision, the retranslation
- * audio decision (`soundsSame`), the audit-row resolution matrix, and the
- * follow-up scheduling (IPA/furigana regeneration, searchable-text rebuild,
- * TTS enqueue). The registered functions stay in features/decks.ts and
- * delegate here.
+ * Translation write pipeline: `storeTranslationAndScheduleTTS`, the single
+ * write choke point every translation producer (the LLM queue, the verbatim
+ * accent path, retranslations) lands through. Owns the
+ * insert/replace/fill-metadata decision, the retranslation audio decision
+ * (`soundsSame`), the audit-row resolution matrix, and the follow-up
+ * scheduling (IPA/furigana regeneration, searchable-text rebuild, TTS
+ * enqueue). The registered functions stay in features/decks.ts and delegate
+ * here. Every row written since the rendering keys carries `variantKey`
+ * (docs/architecture/rendering-keys.md).
  */
 
 // ────────────────────────────────────────────────────────────────────────────
 // Args validators (registered in features/decks.ts via `.fields`)
 // ────────────────────────────────────────────────────────────────────────────
-
-const vProcessTranslationForCardArgs = v.object({
-  textId: v.id('texts'),
-  sourceLanguage: v.string(),
-  targetLanguage: v.string(),
-  text: v.string(),
-  audioSpeakerGender: v.optional(v.string()),
-  /**
-   * User whose deliberate action caused this job; cost events bill to them
-   * (see the llm queue's validator for the full contract). Forwarded to
-   * `storeTranslationAndScheduleTTS` so the TTS leg inherits it.
-   */
-  requestedByUserId: v.optional(v.string()),
-  /**
-   * Retranslation flag. Set when this action is dispatched as the
-   * Google fallback for a deliberate LLM retranslation (flagTranslation
-   * or the model-swap migration). When true, the action skips the
-   * "reuse existing translatedText" shortcut and Google-translates fresh,
-   * then forwards the flag to `storeTranslationAndScheduleTTS` so the
-   * existing row is actually overwritten. False/absent → historical
-   * behavior (reuse existing translation if present).
-   *
-   * Failure contract: THROWS on translation/store errors. This action runs
-   * as an llmPool job (both the direct Google path and the LLM fallback),
-   * so the pool retries with backoff and terminal failures land in
-   * `onGoogleFallbackComplete`, which logs and leaves the claim to expire
-   * as a re-drive backoff.
-   */
-  replaceExisting: v.optional(v.boolean()),
-  /**
-   * Why the translation was requested (translationReasonValidator).
-   * Forwarded to `storeTranslationAndScheduleTTS`, whose `'version_bump'`
-   * branch archives the old wording for existing cards before replacing it.
-   * Absent = 'fill'.
-   */
-  translationReason: v.optional(translationReasonValidator),
-  /**
-   * Single-writer token, forwarded to `storeTranslationAndScheduleTTS` as
-   * `expectedClaimId`. Set by the LLM-fallback dispatch (the claim the
-   * failed LLM job owned, re-pointed at this job); absent on the direct
-   * Google path, which holds no claim.
-   */
-  claimId: v.optional(v.id('llmTranslationClaims')),
-  /**
-   * Mixed-dialect pin: the `regionVariant` of a translation row deleted
-   * before this regeneration was enqueued (captured pre-delete by the
-   * version-stale sweep, or forwarded through the LLM fallback). Preferred
-   * over a fresh `resolveMixedVariant` pick so the dialect never flips.
-   */
-  preferredRegionVariant: v.optional(v.string()),
-  /**
-   * Translation-only mode, forwarded to `storeTranslationAndScheduleTTS`
-   * so the landing translation does not auto-enqueue TTS. Set by the
-   * collection-preview generation path (directly or via the LLM fallback).
-   */
-  skipTts: v.optional(v.boolean()),
-  /** TTS priority, forwarded to `storeTranslationAndScheduleTTS`. */
-  priority: v.optional(ttsPriorityValidator),
-  /**
-   * Card-edit audit row this job resolves, forwarded from the LLM fallback
-   * dispatch. Absent on the direct Google path, which no user gesture
-   * triggers.
-   */
-  retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
-});
-export const processTranslationForCardArgs =
-  vProcessTranslationForCardArgs.fields;
-export type ProcessTranslationForCardArgs = Infer<
-  typeof vProcessTranslationForCardArgs
->;
 
 const vStoreTranslationAndScheduleTtsArgs = v.object({
   textId: v.id('texts'),
@@ -194,12 +123,8 @@ const vStoreTranslationAndScheduleTtsArgs = v.object({
    */
   translationReason: v.optional(translationReasonValidator),
   /**
-   * Speaker gender ('male' | 'female') the translation was produced under
-   * The card's resolved `audioSpeakerGender`. Persisted on the translation
-   * row so the gender-mismatch sweep in `scheduleMissingContent` can
-   * invalidate translations whose grammar no longer agrees with the card's
-   * current voice gender. Optional during rollout so old call sites that
-   * haven't been threaded yet still compile.
+   * Speaker gender ('male' | 'female') the translation was produced under:
+   * the key's voice. Persisted on the translation row.
    */
   speakerGender: v.optional(voiceGenderValidator),
   /**
@@ -207,22 +132,25 @@ const vStoreTranslationAndScheduleTtsArgs = v.object({
    * enqueued under. When supplied, the write only proceeds if that exact
    * claim doc still exists. A reclaim deletes + reinserts the claim under
    * a new `_id`, so a mismatch means another job now owns this
-   * (textId, targetLanguage) and this result is stale. Absent on the
-   * claimless direct-Google path (`scheduleMissingContent`'s non-openrouter
-   * branch), which then keeps its historical no-overwrite semantics only.
+   * (textId, targetLanguage, key) and this result is stale. Absent on the
+   * claimless verbatim path, which then keeps its historical no-overwrite
+   * semantics only.
    */
   expectedClaimId: v.optional(v.id('llmTranslationClaims')),
   /**
    * Translation-only mode: store the translation but do NOT auto-enqueue
-   * TTS, UNLESS a card references this text. Used by the collection-preview
-   * generation path, where audio for preview-only texts is deliberately
-   * deferred to an explicit audio-icon click. The card check closes a
-   * pipeline hole: a text can become a card while its skipTts warm job is
-   * in flight (onboarding seeds racing the collection warms), and the
-   * concurrent ensure sweep defers TTS to this very job via the fresh LLM
-   * claim, so honoring skipTts unconditionally left the card with a
-   * translation and no audio, forever. Absent/false → historical behavior
-   * (translation landing schedules its TTS).
+   * TTS, UNLESS the row is the text's PRIMARY rendering and a card
+   * references the text. Used by the browse surfaces, where audio for
+   * preview-only texts is deliberately deferred to an explicit audio-icon
+   * click. The card check closes a pipeline hole: a text can become a card
+   * while its skipTts warm job is in flight (onboarding seeds racing the
+   * collection warms), and the concurrent ensure sweep defers TTS to this
+   * very job via the fresh LLM claim, so honoring skipTts unconditionally
+   * left the card with a translation and no audio, forever. Only the
+   * primary: the card found may be another learner's, on other settings,
+   * and its presence says nothing about whether THIS key is ever played.
+   * Absent/false → historical behavior (translation landing schedules its
+   * TTS).
    */
   skipTts: v.optional(v.boolean()),
   /**
@@ -239,6 +167,20 @@ const vStoreTranslationAndScheduleTtsArgs = v.object({
    * ordinary fill, which is the overwhelming majority of calls.
    */
   retranslationAuditId: v.optional(v.id('cardEditRetranslations')),
+  /**
+   * The rendering key of the row (docs/architecture/rendering-keys.md).
+   * Every producer passes one; the row and its audio pointer share it.
+   */
+  variantKey: v.optional(v.string()),
+  /**
+   * The primary wording a versioned row was derived from. A versioning of
+   * a wording that is no longer the primary one (a flag or a bump landed
+   * while the job ran) is refused: the next ensure pass versions the new
+   * wording. Absent on a primary write.
+   */
+  versionedFromText: v.optional(v.string()),
+  /** The rendering classifier's verdict on the wording; see schema.ts. */
+  renderingVerified: v.optional(v.boolean()),
 });
 export const storeTranslationAndScheduleTtsArgs =
   vStoreTranslationAndScheduleTtsArgs.fields;
@@ -247,174 +189,39 @@ export type StoreTranslationAndScheduleTtsArgs = Infer<
 >;
 
 // ────────────────────────────────────────────────────────────────────────────
-// Legacy Google Translate worker
+// Row reads for the LLM worker
 // ────────────────────────────────────────────────────────────────────────────
 
-/** Handler body of the internal query `getTranslationForTextLanguage`. */
+/**
+ * Handler body of the internal query `getTranslationForTextLanguage`: the
+ * live row at one key (`variantKey` undefined = the legacy row), as the LLM
+ * worker reads it for the dialect pin, the primary wording a versioned key
+ * is derived from, and the legacy wording an adoption verifies.
+ */
 export async function getTranslationForTextLanguageHandler(
   ctx: QueryCtx,
-  args: { textId: Id<'texts'>; targetLanguage: string },
+  args: { textId: Id<'texts'>; targetLanguage: string; variantKey?: string },
 ): Promise<{
   translatedText: string;
   romanizedText?: string;
+  romanizationSource?: string;
   regionVariant?: string;
+  translationSource?: string;
 } | null> {
-  const row = await liveTranslation(ctx, args.textId, args.targetLanguage);
+  const row = await liveTranslation(
+    ctx,
+    args.textId,
+    args.targetLanguage,
+    args.variantKey,
+  );
   if (!row) return null;
   return {
     translatedText: row.translatedText,
     romanizedText: row.romanizedText,
+    romanizationSource: row.romanizationSource,
     regionVariant: row.regionVariant,
+    translationSource: row.translationSource,
   };
-}
-
-/** Handler body of the internal action `processTranslationForCard`. */
-export async function processTranslationForCardHandler(
-  ctx: ActionCtx,
-  args: ProcessTranslationForCardArgs,
-): Promise<null> {
-  const existingRow: {
-    translatedText: string;
-    romanizedText?: string;
-    regionVariant?: string;
-  } | null = await ctx.runQuery(
-    internal.features.decks.getTranslationForTextLanguage,
-    {
-      textId: args.textId,
-      targetLanguage: args.targetLanguage,
-    },
-  );
-
-  // Mixed-dialect targets (today: es_mixed) pick a deterministic
-  // sub-variant per text. The Google translate target is the sub-code so
-  // we get regional spelling/vocab; the persisted row keeps the mixed
-  // code as `targetLanguage` and records the chosen variant.
-  //
-  // Variant pin: prefer the existing row's persisted regionVariant, then
-  // the pre-delete capture (`preferredRegionVariant`), then a fresh
-  // deterministic pick. Regeneration must not flip the card's dialect.
-  // All three resolve to null for non-mixed targets.
-  const mixed =
-    (existingRow?.regionVariant
-      ? getMixedVariantByRegion(args.targetLanguage, existingRow.regionVariant)
-      : null) ??
-    (args.preferredRegionVariant
-      ? getMixedVariantByRegion(
-          args.targetLanguage,
-          args.preferredRegionVariant,
-        )
-      : null) ??
-    resolveMixedVariant(args.targetLanguage, args.textId as string);
-  const translateTarget = mixed ? mixed.subCode : args.targetLanguage;
-  const regionVariant = mixed?.regionVariant;
-
-  let translation: string;
-  let romanizedText: string | undefined;
-
-  // Honor `replaceExisting`: a retranslation that fell back to Google
-  // must Google-translate fresh rather than reuse the stale existing
-  // translatedText, otherwise the audio would be regenerated against
-  // an unchanged translation and we'd write the same row back.
-  const reuseExisting = !args.replaceExisting && existingRow !== null;
-  if (reuseExisting) {
-    translation = existingRow!.translatedText;
-    // `=== undefined`: respect the empty-string sentinel from a prior
-    // failed attempt so we don't keep re-running the 3-retry burst.
-    if (
-      ROMANIZATION_LANGUAGES.has(translateTarget) &&
-      existingRow!.romanizedText === undefined
-    ) {
-      try {
-        romanizedText = await romanizeText(translation, translateTarget);
-      } catch {
-        // 3 retries already exhausted. Persist sentinel so subsequent
-        // ensureContent runs see "tried" and skip rescheduling.
-        romanizedText = '';
-      }
-    } else {
-      romanizedText = existingRow!.romanizedText;
-    }
-  } else {
-    // Post-process before romanization so the derived romanizedText is
-    // computed from the cleaned text.
-    const translateStartedAt = Date.now();
-    translation = postProcessTranslation(
-      translateTarget,
-      await translateText(args.text, args.sourceLanguage, translateTarget),
-    );
-    // Google bills per character of source text. This is the final fallback
-    // after the LLM stage chain has given up, so its volume doubles as a
-    // health signal for the LLM translation pipeline.
-    await captureGeneration(ctx, {
-      distinctId: args.requestedByUserId,
-      feature: 'machine_translation',
-      model: 'google-translate-v2',
-      provider: 'google',
-      latencyMs: Date.now() - translateStartedAt,
-      costUsd: costForCharacters('googleTranslate', args.text.length),
-      sharedContent: true,
-      extra: {
-        text_id: args.textId,
-        target_language: translateTarget,
-        character_count: args.text.length,
-      },
-    });
-    if (ROMANIZATION_LANGUAGES.has(translateTarget)) {
-      try {
-        romanizedText = await romanizeText(translation, translateTarget);
-      } catch (err) {
-        // 3 retries already exhausted. Persist the empty-string
-        // sentinel so ensureContent doesn't reschedule another burst.
-        console.error(
-          `Romanization failed for ${args.targetLanguage} (persisting sentinel):`,
-          err instanceof Error ? err.message : err,
-        );
-        romanizedText = '';
-      }
-    }
-  }
-
-  const voiceName = getVoiceForText(
-    args.targetLanguage,
-    args.textId,
-    regionVariant,
-    args.audioSpeakerGender,
-  );
-
-  // Source travels with the romanization value (real or sentinel) so a
-  // future strategy swap can target rows produced by the old method.
-  // Resolved from `translateTarget` (the actual code romanizeText was
-  // given) so mixed dialects record the sub-code's source.
-  const romanizationSource =
-    romanizedText !== undefined
-      ? getRomanizationSource(translateTarget)
-      : undefined;
-
-  await ctx.runMutation(
-    internal.features.decks.storeTranslationAndScheduleTTS,
-    {
-      textId: args.textId,
-      targetLanguage: args.targetLanguage,
-      translatedText: translation,
-      voiceName,
-      romanizedText,
-      romanizationSource,
-      // Legacy Google Translate path (used as the fallback when the LLM
-      // queue's stage chain exhausts, or for languages explicitly pinned
-      // to `translationProvider: 'google'`).
-      translationSource: GOOGLE_TRANSLATE_SOURCE,
-      regionVariant,
-      replaceExisting: args.replaceExisting,
-      translationReason: args.translationReason,
-      speakerGender: asVoiceGender(args.audioSpeakerGender),
-      expectedClaimId: args.claimId,
-      skipTts: args.skipTts,
-      priority: args.priority,
-      retranslationAuditId: args.retranslationAuditId,
-    },
-  );
-
-  return null;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -427,6 +234,8 @@ export async function processTranslationForCardHandler(
  * audit-resolution tail.
  */
 type TranslationWriteResult = {
+  /** The row written, so the annotations are scheduled by its own id. */
+  rowId: Id<'translations'>;
   /**
    * Which write shape ran. `'restamped'`: a version-bump regeneration that
    * produced the identical wording, so only the version stamp (and source)
@@ -475,6 +284,10 @@ type TranslationWriteResult = {
  *    not write. The reclaiming job owns the row now, and a late stale result
  *    landing after the owner's would silently revert it (worst case: a
  *    flag-retranslation's text overwritten while its audio survives).
+ *  - stale versioning: a versioned row carries the primary wording it was
+ *    derived from (`versionedFromText`); when the primary row has moved on
+ *    since (a flag or a bump), the versioning describes a wording no card
+ *    shows and is dropped; the next ensure pass versions the new one.
  *  - backstop at the write choke point: no job may overwrite existing wording
  *    on a user-created card, whatever enqueued it. Callers already refuse to
  *    ask (`flagTranslation` short-circuits on user-created texts, and
@@ -483,11 +296,22 @@ type TranslationWriteResult = {
  *    Deliberately scoped to the OVERWRITE. The `existing &&` is load-bearing,
  *    and NOT for the fill-a-missing-language path: that one never sets
  *    `replaceExisting` (see `scheduleTranslationForLanguage`), so the guard is
- *    inert there either way. It matters for `onGoogleFallbackComplete`, which
- *    forwards the original job's `replaceExisting: true` into a re-enqueue,
- *    by the time that lands, the row it meant to replace may have been swept,
- *    and refusing then would leave the card with no translation at all.
+ *    inert there either way. It matters for a re-driven retranslation that
+ *    carries the original job's `replaceExisting: true`: by the time it
+ *    lands, the row it meant to replace may have been swept, and refusing
+ *    then would leave the card with no translation at all.
  */
+/** The primary key of (text, language) on the row's dialect. */
+function primaryKeyOf(
+  text: Doc<'texts'>,
+  args: Pick<
+    StoreTranslationAndScheduleTtsArgs,
+    'textId' | 'targetLanguage' | 'regionVariant'
+  >,
+): string {
+  return primaryKeyForLanguage(text, args.targetLanguage, args.regionVariant);
+}
+
 async function guardTranslationWrite(
   ctx: MutationCtx,
   args: StoreTranslationAndScheduleTtsArgs,
@@ -506,7 +330,12 @@ async function guardTranslationWrite(
   }
 
   if (args.expectedClaimId !== undefined) {
-    const llmClaim = await getLlmClaim(ctx, args.textId, args.targetLanguage);
+    const llmClaim = await getLlmClaim(
+      ctx,
+      args.textId,
+      args.targetLanguage,
+      args.variantKey,
+    );
     if (llmClaim?._id !== args.expectedClaimId) {
       await resolveRetranslation(
         ctx,
@@ -517,7 +346,37 @@ async function guardTranslationWrite(
     }
   }
 
-  const existing = await liveTranslation(ctx, args.textId, args.targetLanguage);
+  if (args.versionedFromText !== undefined) {
+    const primary = await liveTranslation(
+      ctx,
+      args.textId,
+      args.targetLanguage,
+      primaryKeyOf(text, args),
+    );
+    if (primary !== null && primary.translatedText !== args.versionedFromText) {
+      console.warn(
+        '[storeTranslationAndScheduleTTS] dropping a versioning of a superseded primary wording',
+        {
+          textId: args.textId,
+          targetLanguage: args.targetLanguage,
+          variantKey: args.variantKey,
+        },
+      );
+      await resolveRetranslation(
+        ctx,
+        args.retranslationAuditId,
+        'dropped_superseded',
+      );
+      return null;
+    }
+  }
+
+  const existing = await liveTranslation(
+    ctx,
+    args.textId,
+    args.targetLanguage,
+    args.variantKey,
+  );
 
   if (existing && args.replaceExisting && isUserCreatedText(text)) {
     await resolveRetranslation(
@@ -538,7 +397,7 @@ async function insertTranslationRow(
   translatedText: string,
   romanizedText: string | undefined,
 ): Promise<TranslationWriteResult> {
-  await ctx.db.insert('translations', {
+  const rowId = await ctx.db.insert('translations', {
     textId: args.textId,
     targetLanguage: args.targetLanguage,
     translatedText,
@@ -559,10 +418,18 @@ async function insertTranslationRow(
       : {}),
     ...(args.regionVariant ? { regionVariant: args.regionVariant } : {}),
     ...(args.speakerGender ? { speakerGender: args.speakerGender } : {}),
+    ...(args.variantKey ? { variantKey: args.variantKey } : {}),
+    ...(args.versionedFromText !== undefined
+      ? { versionedFromText: args.versionedFromText }
+      : {}),
+    ...(args.renderingVerified !== undefined
+      ? { renderingVerified: args.renderingVerified }
+      : {}),
     // Freshly produced row → stamp the language's current method version.
     translationVersion: getCurrentTranslationVersion(args.targetLanguage),
   });
   return {
+    rowId,
     outcome: 'inserted',
     audioUnchangedBySound: false,
     searchableContentChanged: true,
@@ -576,15 +443,16 @@ async function insertTranslationRow(
  * and new text are both in hand: a punctuation/'_'-only change sounds
  * identical, so the existing audio stays valid, deleting + regenerating
  * would spend real TTS cost on byte-identical speech. Only an audible change
- * drops the language's audio rows (all voices, reference-aware; keepAsset
- * because a retranslation is a content change — the old recording is still
- * correct audio of the old sentence and stays cached). Returns true when the
- * audio was kept (and TTS must not be enqueued).
+ * drops the row's own pointer (reference-aware; keepAsset because a
+ * retranslation is a content change — the old recording is still correct
+ * audio of the old sentence and stays cached). Returns true when the audio
+ * was kept (and TTS must not be enqueued).
  */
 async function invalidateAudioIfAudiblyChanged(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   targetLanguage: string,
+  variantKey: string | undefined,
   existingText: string,
   newText: string,
 ): Promise<boolean> {
@@ -592,6 +460,7 @@ async function invalidateAudioIfAudiblyChanged(
   if (!audioUnchangedBySound) {
     await deleteAudioRowsForTextLanguage(ctx, textId, targetLanguage, {
       keepAsset: true,
+      variantKey,
     });
   }
   return audioUnchangedBySound;
@@ -616,6 +485,7 @@ async function replaceTranslationRow(
     ctx,
     args.textId,
     args.targetLanguage,
+    args.variantKey,
     existing.translatedText,
     translatedText,
   );
@@ -632,10 +502,16 @@ async function replaceTranslationRow(
     regionVariant: string | undefined;
     speakerGender: 'male' | 'female';
     translationVersion: number;
+    versionedFromText: string | undefined;
+    renderingVerified: boolean | undefined;
   }> = {
     translatedText,
     // A retranslation is freshly produced → stamp the current method version.
     translationVersion: getCurrentTranslationVersion(args.targetLanguage),
+    // The derivation and the verdict describe the new wording (or nothing,
+    // for a primary write).
+    versionedFromText: args.versionedFromText,
+    renderingVerified: args.renderingVerified,
   };
   if (romanizedText !== undefined) {
     patch.romanizedText = romanizedText;
@@ -666,6 +542,7 @@ async function replaceTranslationRow(
   }
   await ctx.db.patch(existing._id, patch);
   return {
+    rowId: existing._id,
     outcome: 'replaced',
     audioUnchangedBySound,
     searchableContentChanged: true,
@@ -716,12 +593,21 @@ async function archiveTranslationRevision(
       regionVariant: existing.regionVariant,
       speakerGender: existing.speakerGender,
       translationVersion: existing.translationVersion,
+      variantKey: existing.variantKey,
+      versionedFromText: existing.versionedFromText,
+      renderingVerified: existing.renderingVerified,
       audioAssetId,
       supersededAt,
     }),
   );
   await ctx.db.patch(existing._id, { lastArchivedAt: supersededAt });
-  await scheduleTranslationAnnotations(ctx, existing, supersededId);
+  // The archive row is new: the live row's request claim does not carry
+  // over, or a copy made inside the cooldown would wait it out for nothing.
+  await scheduleTranslationAnnotations(
+    ctx,
+    { ...existing, annotationRequestedAt: undefined },
+    supersededId,
+  );
 }
 
 /**
@@ -742,7 +628,8 @@ async function archiveTranslationRevision(
  *
  * Flag and curriculum-fix retranslations never come here: they overwrite
  * for every learner, as the schema comment on `cardEditRetranslations`
- * documents.
+ * documents. The pointer looked up is the row's own key's, which is the
+ * one its clip lives under.
  */
 async function replaceForVersionBump(
   ctx: MutationCtx,
@@ -757,8 +644,18 @@ async function replaceForVersionBump(
       ...(args.translationSource
         ? { translationSource: args.translationSource }
         : {}),
+      // A derivation-stale row that came back byte-identical must still
+      // record the primary wording it now matches, or the sweep buys the
+      // same versioning on every pass. Same for the verdict.
+      ...(args.versionedFromText !== undefined
+        ? { versionedFromText: args.versionedFromText }
+        : {}),
+      ...(args.renderingVerified !== undefined
+        ? { renderingVerified: args.renderingVerified }
+        : {}),
     });
     return {
+      rowId: existing._id,
       outcome: 'restamped',
       audioUnchangedBySound: true,
       searchableContentChanged: false,
@@ -779,12 +676,12 @@ async function replaceForVersionBump(
           .withIndex('by_textId', (q) => q.eq('textId', args.textId))
           .first();
   if (referencingCard) {
-    const audio = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', args.textId).eq('language', args.targetLanguage),
-      )
-      .first();
+    const audio = await audioPointer(
+      ctx,
+      args.textId,
+      args.targetLanguage,
+      args.variantKey,
+    );
     if (audio) {
       await archiveTranslationRevision(ctx, existing, audio.assetId);
     }
@@ -867,6 +764,7 @@ async function fillTranslationMetadata(
     }
   }
   return {
+    rowId: existing._id,
     outcome: 'metadata_filled',
     audioUnchangedBySound: false,
     searchableContentChanged,
@@ -937,6 +835,10 @@ async function scheduleAnnotationRegeneration(
   args: StoreTranslationAndScheduleTtsArgs,
   write: TranslationWriteResult,
   translatedText: string,
+  // The row the annotations land on. A VARIANT write names its own row:
+  // the store resolves an unnamed row to the canonical one, whose wording
+  // guard would refuse the variant's text. Absent = the live canonical row.
+  translationId?: Id<'translations'>,
 ): Promise<void> {
   if (write.ipaMissingAfterWrite && IPA_LANGUAGES.has(args.targetLanguage)) {
     await ctx.scheduler.runAfter(
@@ -946,6 +848,7 @@ async function scheduleAnnotationRegeneration(
         textId: args.textId,
         text: translatedText,
         language: args.targetLanguage,
+        translationId,
       },
     );
   }
@@ -960,6 +863,7 @@ async function scheduleAnnotationRegeneration(
         textId: args.textId,
         text: translatedText,
         language: args.targetLanguage,
+        translationId,
       },
     );
   }
@@ -975,12 +879,16 @@ async function scheduleTtsForLandedTranslation(
   ctx: MutationCtx,
   args: StoreTranslationAndScheduleTtsArgs,
   translatedText: string,
+  isPrimaryRendering: boolean,
 ): Promise<void> {
   let ttsPriority = args.priority;
   if (args.skipTts) {
     // skipTts means "don't spend synthesis on texts nobody studies". A
-    // card referencing this text disproves that premise (see the arg's
-    // docstring for the race this closes), so only skip when none exists.
+    // card referencing this text disproves that premise for the PRIMARY
+    // rendering (see the arg's docstring for the race this closes), so only
+    // skip when none exists; any other key is voiced by the ensure pass of
+    // a card that actually reads it.
+    if (!isPrimaryRendering) return;
     const cardForText = await ctx.db
       .query('cards')
       .withIndex('by_textId', (q) => q.eq('textId', args.textId))
@@ -994,12 +902,27 @@ async function scheduleTtsForLandedTranslation(
     ttsPriority = undefined;
   }
 
-  const existingAudio = await ctx.db
-    .query('audioRecordings')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', args.textId).eq('language', args.targetLanguage),
-    )
-    .first();
+  let existingAudio = await audioPointer(
+    ctx,
+    args.textId,
+    args.targetLanguage,
+    args.variantKey,
+  );
+
+  // Keyed pointers only. A pointer speaking a different sentence is not
+  // "already voiced": a clip that outlived its wording (a TTS job still in
+  // flight when the wording moved on) would otherwise be treated as valid
+  // and the card would render one sentence while playing another. Legacy
+  // pointers are left alone here: `sweepInvalidAudio` owns that drift.
+  // Detach with the asset kept: it is still correct audio for its own
+  // string.
+  if (existingAudio && args.variantKey !== undefined) {
+    const asset = await ctx.db.get(existingAudio.assetId);
+    if (asset && asset.spokenText !== translatedText) {
+      await deleteAudioRow(ctx, existingAudio, { keepAsset: true });
+      existingAudio = null;
+    }
+  }
 
   if (!existingAudio) {
     // A translation just landed. Check the content-addressed store before
@@ -1020,6 +943,7 @@ async function scheduleTtsForLandedTranslation(
         args.textId,
         args.targetLanguage,
         asset._id,
+        args.variantKey,
       );
     } else {
       const claimed = await claimTtsIfAvailable(
@@ -1027,6 +951,7 @@ async function scheduleTtsForLandedTranslation(
         args.textId,
         args.targetLanguage,
         ttsPriority,
+        args.variantKey,
       );
       if (claimed) {
         await enqueueTtsForVoice(ctx, {
@@ -1037,6 +962,7 @@ async function scheduleTtsForLandedTranslation(
           regionVariant: args.regionVariant,
           priority: ttsPriority,
           requestedByUserId: args.requestedByUserId,
+          variantKey: args.variantKey,
         });
       }
     }
@@ -1045,13 +971,15 @@ async function scheduleTtsForLandedTranslation(
 
 /**
  * The write for a verbatim row, an accent-only variant's `source-verbatim`
- * copy of the text's own wording, voiced in the variant's accent. Built
- * here for the scheduler's verbatim branch and the LLM queue's
- * rewrite-exhausted fallback, so the two never drift.
+ * copy of the text's own wording, voiced in the variant's accent and in the
+ * key's voice. Built here for the scheduler's verbatim branch and the LLM
+ * queue's rewrite-exhausted fallback, so the two never drift.
  */
 export function verbatimTranslationArgs(
-  text: Pick<Doc<'texts'>, '_id' | 'text'>,
+  text: Pick<Doc<'texts'>, '_id' | 'text' | 'audioSpeakerGender'>,
   targetLanguage: string,
+  /** The row's key; undefined = the legacy row, voiced by the text's voice. */
+  variantKey: string | undefined,
   opts: Pick<
     StoreTranslationAndScheduleTtsArgs,
     | 'skipTts'
@@ -1059,20 +987,23 @@ export function verbatimTranslationArgs(
     | 'requestedByUserId'
     | 'replaceExisting'
     | 'translationReason'
-  > & { audioSpeakerGender?: string },
+  >,
 ): StoreTranslationAndScheduleTtsArgs {
+  const voice =
+    variantKey !== undefined
+      ? parseRenderingKey(variantKey).voice
+      : text.audioSpeakerGender === 'male' ||
+          text.audioSpeakerGender === 'female'
+        ? text.audioSpeakerGender
+        : undefined;
   return {
     textId: text._id,
     targetLanguage,
     translatedText: text.text,
-    voiceName: getVoiceForText(
-      targetLanguage,
-      text._id,
-      undefined,
-      opts.audioSpeakerGender,
-    ),
+    voiceName: getVoiceForText(targetLanguage, text._id, undefined, voice),
     translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
-    speakerGender: asVoiceGender(opts.audioSpeakerGender),
+    speakerGender: voice,
+    variantKey,
     skipTts: opts.skipTts,
     priority: opts.priority,
     requestedByUserId: opts.requestedByUserId,
@@ -1093,6 +1024,13 @@ export async function storeTranslationAndScheduleTTSHandler(
 ): Promise<null> {
   const gate = await guardTranslationWrite(ctx, args);
   if (gate === null) return null;
+  // This key's claim is done with: released here, in the same transaction
+  // as the row, so a later failure of the same job (another key's
+  // versioning) marks only the keys that really failed, and a retried
+  // action skips this key (`processLlmTranslationForCard`).
+  if (args.expectedClaimId !== undefined) {
+    await ctx.db.delete(args.expectedClaimId);
+  }
   const { existing } = gate;
 
   // Choke-point post-processing (idempotent, LLM/Google producers already
@@ -1129,17 +1067,33 @@ export async function storeTranslationAndScheduleTTSHandler(
 
   await resolveAuditForWriteOutcome(ctx, args, write, translatedText);
 
+  // The cards following this rendering now show different words, so their
+  // search string is stale: `searchableText` follows the served rendering
+  // (`buildSearchableTextPatchForCard`).
   if (write.searchableContentChanged) {
     await scheduleSearchableTextRebuild(ctx, args.textId);
   }
 
-  await scheduleAnnotationRegeneration(ctx, args, write, translatedText);
+  // Annotations by the row's own id: a keyed row's wording is the one
+  // annotated (an unnamed row resolves to the legacy row in the store).
+  await scheduleAnnotationRegeneration(
+    ctx,
+    args,
+    write,
+    translatedText,
+    args.variantKey !== undefined ? write.rowId : undefined,
+  );
 
   // `audioUnchangedBySound`: the retained audio row already serves this
-  // (text, language), skip outright.
+  // (text, language, key), skip outright.
   if (write.audioUnchangedBySound) {
     return null;
   }
-  await scheduleTtsForLandedTranslation(ctx, args, translatedText);
+  await scheduleTtsForLandedTranslation(
+    ctx,
+    args,
+    translatedText,
+    args.variantKey === undefined || args.variantKey === primaryKeyOf(gate.text, args),
+  );
   return null;
 }

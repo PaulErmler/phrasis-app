@@ -373,6 +373,62 @@ describe('features/chat/cardApprovals', () => {
       expect(approval?.translations[0].text.length).toBe(150);
     });
 
+    it("the tutor's speaker becomes the approval's proposed metadata and the text's voice", async () => {
+      const t = convexTest(schema, modules);
+      await t.run(async (ctx) => {
+        const courseId = await ctx.db.insert('courses', {
+          userId: 'user_A',
+          baseLanguages: ['en'],
+          targetLanguages: ['th'],
+        });
+        await ctx.db.insert('userSettings', {
+          userId: 'user_A',
+          hasCompletedOnboarding: true,
+          activeCourseId: courseId,
+        });
+        await ctx.db.insert('usageQuotas', {
+          userId: 'user_A',
+          features: {
+            custom_sentences: {
+              balance: 5,
+              included: 5,
+              used: 0,
+              unlimited: false,
+            },
+          },
+          lastSyncedAt: Date.now(),
+        });
+      });
+      const approvalId = await t.mutation(
+        internal.features.chat.cardApprovals.createApprovalRequestInternal,
+        {
+          threadId: 'thread_1',
+          messageId: 'm1',
+          toolCallId: 'tc1',
+          translations: [
+            { language: 'en', text: 'Thank you.' },
+            { language: 'th', text: 'ขอบคุณค่ะ' },
+          ],
+          speakerGender: 'female',
+          userId: 'user_A',
+        },
+      );
+      const pending = await t.run(async (ctx) => ctx.db.get(approvalId));
+      expect(pending?.proposedMetadata).toEqual({ speakerGender: 'female' });
+
+      vi.useFakeTimers();
+      const asUser = t.withIdentity({ subject: 'user_A' });
+      const res = await asUser.mutation(
+        api.features.chat.cardApprovals.approveCard,
+        { approvalId },
+      );
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      // The Thai particle was written for a woman, so the clip is too: the
+      // voice is fixed at insert, before the classifier or any coin flip.
+      const text = await t.run(async (ctx) => ctx.db.get(res.textId!));
+      expect(text?.audioSpeakerGender).toBe('female');
+    });
+
     it('user-edited languages are stored verbatim as user-provided; untouched ones stay machine post-processed', async () => {
       const t = convexTest(schema, modules);
       // Two target languages so one can be edited and one left untouched.

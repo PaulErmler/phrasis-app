@@ -131,16 +131,6 @@ describe('lib/languages: dominantTextDirection', () => {
 });
 
 describe('lib/languages: getTranslationConfigForLanguage', () => {
-  it("returns provider='google' for English (source-only, never translated)", () => {
-    const cfg = getTranslationConfigForLanguage('en');
-    expect(cfg.provider).toBe('google');
-  });
-
-  it("defaults non-English to provider='openrouter'", () => {
-    expect(getTranslationConfigForLanguage('de').provider).toBe('openrouter');
-    expect(getTranslationConfigForLanguage('fr').provider).toBe('openrouter');
-  });
-
   it('populates targetLangName + native name from the language record', () => {
     const de = getTranslationConfigForLanguage('de');
     expect(de.targetLangName).toBe('German');
@@ -205,38 +195,10 @@ describe('lib/languages: getTranslationConfigForLanguage', () => {
     );
   });
 
-  it("falls back to provider='google' for unknown language codes", () => {
-    expect(getTranslationConfigForLanguage('klingon-xyz').provider).toBe(
-      'google',
+  it('keeps the code as the name for an unknown language, so a prompt never lies', () => {
+    expect(getTranslationConfigForLanguage('klingon-xyz').targetLangName).toBe(
+      'klingon-xyz',
     );
-  });
-
-  it("returns provider='openrouter' for the production target languages", () => {
-    const targets = [
-      'es',
-      'es_latam',
-      'fr',
-      'de',
-      'it',
-      'pt',
-      'ru',
-      'hi',
-      'zh',
-      'ja',
-      'ko',
-      'vi',
-      'sv',
-      'fi',
-      'nl',
-      'el',
-      'ar',
-    ];
-    for (const code of targets) {
-      expect(
-        getTranslationConfigForLanguage(code).provider,
-        `code=${code}`,
-      ).toBe('openrouter');
-    }
   });
 });
 

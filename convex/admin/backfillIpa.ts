@@ -7,7 +7,7 @@ import { IPA_LANGUAGES } from '../../lib/languages';
 
 /**
  * One-off IPA backfill over existing rows. The lazy pipeline
- * (scheduleMissingContent + useEnsureContent) fills cards as they're viewed;
+ * (ensureTextContent + useEnsureContent) fills cards as they're viewed;
  * this walks the whole corpus so old content has IPA up front.
  *
  * Not part of migrations:runAll: `migrations.define` entries run as V8

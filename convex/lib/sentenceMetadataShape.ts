@@ -8,6 +8,16 @@
  * here, so its existing importers keep one import site.
  */
 
+// The source identifiers and the "is this a current verdict" helpers live in
+// lib/sentenceMetadataSource.ts (dependency-free, shared with the client
+// resolver); re-exported here so the Convex side keeps one import site.
+export {
+  SENTENCE_METADATA_SOURCES,
+  CURRENT_SENTENCE_METADATA_SOURCE,
+  hasCurrentSentenceMetadata,
+  definitiveSpeakerGender,
+} from '../../lib/sentenceMetadataSource';
+
 export const ALLOWED_REGISTER = ['formal', 'informal', 'neutral'] as const;
 export const ALLOWED_ADDRESSEE_NUMBER = [
   'singular',
@@ -21,6 +31,9 @@ export const ALLOWED_ADDRESSEE_GENDER = [
   'neutral',
   'not_applicable',
 ] as const;
+// 'neutral' = the sentence fixes no third party's gender; the coin flip in
+// `applyTextMetadata` then decides, as it always did.
+export const ALLOWED_REFERENT_GENDER = ['male', 'female', 'neutral'] as const;
 
 export type Metadata = {
   register: (typeof ALLOWED_REGISTER)[number];
@@ -28,6 +41,7 @@ export type Metadata = {
   speakerGender: (typeof ALLOWED_SPEAKER_GENDER)[number];
   addresseeGender: (typeof ALLOWED_ADDRESSEE_GENDER)[number];
   addressesSomeone: boolean;
+  referentGender: (typeof ALLOWED_REFERENT_GENDER)[number];
 };
 
 function validateField<T extends string>(
@@ -75,5 +89,11 @@ export function validateSentenceMetadata(input: unknown): Metadata {
       ALLOWED_ADDRESSEE_GENDER,
     ),
     addressesSomeone,
+    // Optional on the wire: the autofill prompt and older replies carry
+    // the five original keys; absence means "no evidence", the coin flip.
+    referentGender:
+      obj.referentGender === undefined
+        ? 'neutral'
+        : validateField(obj, 'referentGender', ALLOWED_REFERENT_GENDER),
   };
 }

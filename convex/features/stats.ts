@@ -1,4 +1,8 @@
-import { viewOfCard } from '../db/translationReads';
+import {
+  viewOfCard,
+  renderingSettingsOf,
+  renderingTextOf,
+} from '../db/translationReads';
 import { v } from 'convex/values';
 import {
   paginationOptsValidator,
@@ -44,6 +48,7 @@ import { getDailyStats } from '../db/stats/dailyStats';
 import { getCourseSettings } from '../db/courseSettings';
 import { type FsrsStateLabel } from '../lib/fsrsStates';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
+import { annotationFieldsOf } from '../lib/textAnnotations';
 import { normalizeLanguageCode } from '../../lib/languages';
 import { getTargetLanguageWordCounts } from '../db/stats/languageStats';
 
@@ -747,6 +752,9 @@ export const getSentencesForWord = query({
     ]);
 
     // Build inputs for the batch content loader (translations + audio for all course languages)
+    const renderingSettings = renderingSettingsOf(
+      await getCourseSettings(ctx, courseId),
+    );
     const inputs = result.page
       .map((link, i) => {
         const text = textDocs[i];
@@ -756,12 +764,15 @@ export const getSentencesForWord = query({
           textId: link.textId,
           sourceText: text.text,
           sourceLanguage: text.language,
-          sourceRomanization: text.romanizedText ?? undefined,
-          sourceIpa: text.ipaText ?? undefined,
-          sourceFurigana: text.furiganaText ?? undefined,
+          // Values and engine tags together: see sourceAnnotations in
+          // convex/lib/cardContent.ts.
+          sourceAnnotations: annotationFieldsOf(text),
           userCreated: text.userCreated,
+          renderingText: renderingTextOf(text),
           card: cardDocs[i] ?? null,
-          ...(cardDocs[i] ? { view: viewOfCard(cardDocs[i]) } : {}),
+          ...(cardDocs[i]
+            ? { view: viewOfCard(cardDocs[i], renderingSettings) }
+            : {}),
         };
       })
       .filter((input): input is NonNullable<typeof input> => input !== null);

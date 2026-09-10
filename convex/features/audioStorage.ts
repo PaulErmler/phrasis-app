@@ -54,6 +54,11 @@ const vStoreAudioRecordingArgs = v.object({
   // as usual, but the (text, language) pointer is left alone (it speaks the
   // live wording) and the revision's `audioAssetId` is re-pointed instead.
   supersededTranslationId: v.optional(v.id('translations')),
+  // The rendering key this clip belongs to (docs/architecture/
+  // rendering-keys.md). The pointer row written is keyed by it; absent = a
+  // legacy pointer. The asset key is unchanged: assets are shared by
+  // (language, voice, dialect, string) whatever key asked for them.
+  variantKey: v.optional(v.string()),
 });
 export const storeAudioRecordingArgs = vStoreAudioRecordingArgs.fields;
 export type StoreAudioRecordingArgs = Infer<typeof vStoreAudioRecordingArgs>;
@@ -98,29 +103,28 @@ export async function storeAudioRecordingHandler(
     return null;
   }
 
-  const result = await upsertAudioAsset(
-    ctx,
-    // Cache language + accent from the voice (see `buildAudioAssetKey`): an
-    // `en_gb` job's clip lands as an `en` asset pinned to `en-GB`.
-    buildAudioAssetKey({
-      language: args.language,
-      voiceGender: args.voiceGender,
-      voiceName: args.voiceName,
-      regionVariant: args.regionVariant,
-      spokenText: args.spokenText,
-    }),
-    {
-      storageId: args.storageId,
-      voiceName: args.voiceName,
-      ttsProvider: args.ttsProvider,
-      ttsQuality: args.ttsQuality,
-      speed: args.speed,
-      wordTimings: args.wordTimings,
-      // Freshly synthesized audio is always produced under the language's
-      // CURRENT TTS setup, so stamp the current ttsVersion unconditionally.
-      ttsVersion: getCurrentTtsVersion(args.language),
-    },
-  );
+  // Cache language + accent from the voice (see `buildAudioAssetKey`): an
+  // `en_gb` job's clip lands as an `en` asset pinned to `en-GB`.
+  const key = buildAudioAssetKey({
+    language: args.language,
+    voiceGender: args.voiceGender,
+    voiceName: args.voiceName,
+    regionVariant: args.regionVariant,
+    spokenText: args.spokenText,
+  });
+  const result = await upsertAudioAsset(ctx, key, {
+    storageId: args.storageId,
+    voiceName: args.voiceName,
+    ttsProvider: args.ttsProvider,
+    ttsQuality: args.ttsQuality,
+    speed: args.speed,
+    wordTimings: args.wordTimings,
+    // Freshly synthesized audio is always produced under the language's
+    // CURRENT TTS setup, so stamp the current ttsVersion unconditionally.
+    // Resolved on the key's accent, the same way the staleness check reads
+    // it back (`getCurrentTtsVersion`).
+    ttsVersion: getCurrentTtsVersion(key.language, key.regionVariant),
+  });
   if (args.supersededTranslationId !== undefined) {
     // Audio for a superseded revision: never touch the live pointer. The
     // asset was found or recreated by key; make sure the revision points at
@@ -136,7 +140,13 @@ export async function storeAudioRecordingHandler(
       }
     }
   } else {
-    await upsertAudioPointer(ctx, args.textId, args.language, result.assetId);
+    await upsertAudioPointer(
+      ctx,
+      args.textId,
+      args.language,
+      result.assetId,
+      args.variantKey,
+    );
   }
 
   if (result.outcome === 'kept') {

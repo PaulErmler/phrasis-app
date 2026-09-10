@@ -1,0 +1,5538 @@
+{
+  "gender:ar:أختي سعيدة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:ar:أدرس العربية.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar:أنا جائع.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar:أنا جائعة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar:أنا سعيد.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar:أنا سعيدة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar:أنا متأكد.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar:أنا متأكدة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar:أنا متعب.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar:أنا متعبة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar:أنا مشغول.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar:أنا مشغولة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar:الطقس جميل اليوم.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar:قالت: «أنا متعبة».": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:ar:هل أنتِ متعبة؟": {
+    "register": "neutral",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:ar:هو سعيد.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:ar:هي متعبة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:ar_eg:أنا تعبان.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_eg:أنا تعبانة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_eg:أنا عارف.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_eg:أنا عارفة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_eg:أنا مبسوط.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_eg:أنا مبسوطة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_eg:عاملة إيه؟": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:ar_eg:هو تعبان.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:ar_iq:أنا تعبان.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_iq:أنا تعبانة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_iq:أنا جوعان.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_iq:أنا جوعانة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_iq:ماكو مشكلة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_iq:هو تعبان.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:ar_lev:أنا تعبان.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_lev:أنا تعبانة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_lev:أنا جوعان.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_lev:أنا جوعانة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_lev:أنا مبسوط.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_lev:أنا مبسوطة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_lev:هي تعبانة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:ar_lev:وين رايحة؟": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:ar_sa:أنا تعبان.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_sa:أنا تعبانة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_sa:أنا فرحان.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_sa:أنا فرحانة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ar_sa:هو تعبان.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:ar_sa:هي فرحانة.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:bg:Бил съм в Париж.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Била съм в Париж.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Всяка сутрин пия кафе.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Готов съм.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Готова съм.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Живея в София.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Казах, че ще дойда.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Котката спи на дивана.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Роден съм в София.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Родена съм в София.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Сестра ми каза, че е уморена.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:bg:Сигурен съм.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Сигурна съм.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Ти си уморена.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Той попита: „Уморена ли си?“": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:bg:Уморен съм.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:bg:Уморена съм.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ca:Avui fa fred.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ca:El llibre és interessant.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ca:Ella va dir: «Estic cansada».": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:ca:Estic alegre.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ca:Estic cansada.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ca:Estic cansat.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ca:Estic content.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ca:Estic contenta.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ca:Estic feliç.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ca:Estic sol a casa.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ca:Estic sola a casa.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ca:Estic trist.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ca:Estic trista.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ca:Estàs cansada?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:ca:La meva germana està cansada.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:cs:Bydlím v Praze.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Byl jsem doma.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Byla jsem doma.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Jsem unavená.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Jsem unavený.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Každý den čtu noviny.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Koupil jsem chléb.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Koupila jsem chléb.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Kočka spí na gauči.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Moje sestra byla unavená.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:cs:Mám rád kávu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Mám ráda kávu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Pracuji doma.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Zeptal se: „Jsi unavená?“": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:cs:Řekl jsem, že přijdu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Řekla jsem, že přijdu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:cs:Řekla jsi, že přijdeš.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:de:Er ist Arzt.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:de:Heute ist das Wetter schön.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:de:Ich bin Lehrerin.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:de:Ich bin müde.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:de:Ich gehe morgen zur Arbeit.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:de:Ich wohne seit drei Jahren in München.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:de:Mein Bruder wohnt in Berlin.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:de:Meine Schwester ist müde.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:el:Είμαι έτοιμη.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:el:Είμαι έτοιμος.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:el:Είμαι καλά.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:el:Είμαι κουρασμένη.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:el:Είμαι κουρασμένος.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:el:Είμαι μόνη μου.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:el:Είμαι μόνος μου.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:el:Είμαι σίγουρη.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:el:Είμαι σίγουρος.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:el:Είμαι χαρούμενη.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:el:Είμαι χαρούμενος.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:el:Είσαι κουρασμένη;": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:el:Η Μαρία είπε: «Είμαι κουρασμένη».": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:el:Η αδερφή μου είναι κουρασμένη.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:el:Κάνει κρύο σήμερα.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:el:Το βιβλίο είναι ενδιαφέρον.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:Are you two sisters?": {
+    "register": "neutral",
+    "addresseeNumber": "plural",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "female"
+  },
+  "gender:en:As a man, I never had to think about it.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:As a woman, I see this differently.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:He asked: \"Are you her mother?\"": {
+    "register": "neutral",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:en:He told me he'd be late.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:en:He works in a hospital.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:en:Her mother lives in Rome.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:en:I am a single mother.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:I am a teacher.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:I am her husband.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:en:I am his wife.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:en:I am tired.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:I became a grandmother last year.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:I fixed the car myself.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:I love shopping for shoes.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:I was the bride at that wedding.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:I went to the store yesterday.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:I'm a firefighter.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:I'm a nurse at the children's hospital.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:I'm going to be a dad!": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:I'm her younger sister.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:en:I'm his older brother.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:en:I'm pregnant.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:I'm the father of two boys.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:I'm the groom's best man.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:en:I'm the queen of procrastination.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:My brother is a doctor.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:en:My friend is coming over tonight.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:My husband is a good cook.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:en:My sister and I are both nurses.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:en:My sister is tired.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:en:She said she was tired.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:en:She said: \"I'm his wife.\"": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:en:The actor forgot his lines.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:en:The doctor will see you now.": {
+    "register": "neutral",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:en:The nurse smiled at me.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:The waitress brought the bill.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:en:The weather is nice today.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:They call me the king of the kitchen.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:en:We are both mothers now.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:We are brothers.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:We are colleagues.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:We are friends.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:We are siblings.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:We are sisters.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:en:We're twin brothers.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:en:You'll make a great father.": {
+    "register": "neutral",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:en:You're a wonderful mother.": {
+    "register": "neutral",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:es:El libro es interesante.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:Ella dijo: «Estoy cansada».": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:es:Estoy cansada.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:Estoy cansado.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:Estoy feliz.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:Estoy lista.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:Estoy listo.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:Estoy segura.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:Estoy seguro.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:Estoy sola en casa.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:Estoy solo en casa.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:Estoy triste.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:Hace frío hoy.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:Mi hermana está cansada.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:es:Soy alta.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:Soy alto.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:es:¿Estás cansada?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:fi:Hän on lääkäri.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fi:Menen huomenna töihin.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fi:Minä olen opiskelija.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fi:Olen väsynyt.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fi:Siskoni on väsynyt.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:fi:Tänään on kaunis ilma.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fi:Veljeni asuu Helsingissä.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:fr:Elle a dit : « Je suis contente ».": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:fr:Il fait froid aujourd'hui.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fr:Je suis allé au cinéma.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fr:Je suis allée à Paris.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fr:Je suis content.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fr:Je suis contente.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fr:Je suis fatiguée.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fr:Je suis heureuse.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fr:Je suis heureux.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fr:Je suis malade.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fr:Je suis prêt.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fr:Je suis prête.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fr:Je suis triste.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fr:Le film est intéressant.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:fr:Ma sœur est fatiguée.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:fr:Tu es prête ?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:he:אחותי רופאה.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:he:אמרתי שאבוא.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:he:אני גר בתל אביב.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:he:אני גרה בתל אביב.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:he:אני כותב מכתב.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:he:אני כותבת מכתב.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:he:אני עובד כל יום.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:he:אני עובדת כל יום.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:he:אני עייף.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:he:אני עייפה.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:he:אני רעב.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:he:אני רעבה.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:he:את עייפה?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:he:הוא עובד כל יום.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:he:היא אמרה: \"אני עייפה.\"": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:he:היא עייפה מאוד.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:he:הילדים משחקים בחוץ.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:उसने कहा, \"मैं थक गई हूँ।\"": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:क्या तुम थकी हो?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:hi:मुझे भूख लगी है।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:मुझे यह किताब पसंद है।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:मेरी बहन डॉक्टर है।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:hi:मैं कल बाज़ार गई।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:मैं कल बाज़ार गया।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:मैं थका हुआ हूँ।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:मैं थकी हुई हूँ।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:मैं भारत में रहता हूँ।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:मैं भारत में रहती हूँ।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:मैं रोज़ काम करता हूँ।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:मैं रोज़ काम करती हूँ।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:मैं हिंदी सीख रहा हूँ।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:मैं हिंदी सीख रही हूँ।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hi:वह बहुत थकी हुई है।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:hi:वह रोज़ काम करता है।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:hr:Bila sam kod kuće.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Bio sam kod kuće.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Kupila sam kruh.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Kupio sam kruh.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Mačka spava na kauču.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Moja sestra je bila umorna.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:hr:Pitao je: „Jesi li umorna?“": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:hr:Radim kod kuće.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Rekao sam da ću doći.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Rekla sam da ću doći.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Rekla si da ćeš doći.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Svaki dan pijem kavu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Umoran sam.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Umorna sam.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Vidio sam taj film.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Vidjela sam taj film.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:hr:Živim u Zagrebu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:id:Besok saya pergi ke pasar.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:id:Cuaca hari ini cerah.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:id:Dia seorang dokter.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:id:Ibu saya suka memasak.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:id:Kakak perempuan saya lelah.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:id:Saya lelah.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:id:Saya seorang guru.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:id:Suami saya seorang guru.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:is:Bókin er skemmtileg.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:is:Ertu þreytt?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:is:Hún sagði: „Ég er þreytt“.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:is:Mér er kalt.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:is:Systir mín er þreytt.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:is:Ég er glaður.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:is:Ég er glöð.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:is:Ég er svangur.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:is:Ég er svöng.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:is:Ég er tilbúin.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:is:Ég er tilbúinn.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:is:Ég er veik.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:is:Ég er veikur.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:is:Ég er þreytt.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:is:Ég er þreyttur.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:is:Það er kalt í dag.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Ho mangiato la pasta.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Il libro è interessante.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Maria ha detto: «Sono stanca».": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:it:Mia sorella è stanca.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:it:Oggi fa freddo.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Sei stanca?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:it:Sono andata a casa.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Sono andato a casa.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Sono contenta.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Sono contento.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Sono italiana.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Sono italiano.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Sono pronta.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Sono pronto.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Sono stanca.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Sono stanco.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:it:Sono triste.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ja:あたしはコーヒーが好き。": {
+    "register": "informal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ja:あたしも行くわ。": {
+    "register": "informal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ja:今日は天気がいいですね。": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:ja:俺の名前は田中だ。": {
+    "register": "informal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ja:俺は行くぜ。": {
+    "register": "informal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ja:僕は学生です。": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ja:兄は背が高いです。": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:ja:弟は「俺は行くぜ」と言いました。": {
+    "register": "informal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:ja:早く行こうぜ。": {
+    "register": "informal",
+    "addresseeNumber": "plural",
+    "speakerGender": "male",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:ja:明日は早く起きます。": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ja:明日は雨かしら。": {
+    "register": "informal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ja:田中さんは毎朝コーヒーを飲みます。": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ja:私は学生です。": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ja:私も行くわよ。": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "female",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:ko:누나가 보고 싶어요.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:ko:동생이 밥을 먹어요.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ko:수미는 “오빠가 보고 싶어요”라고 말했어요.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:ko:수미의 오빠는 의사예요.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:ko:언니는 요리를 잘해요.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:ko:오늘은 날씨가 좋아요.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ko:오빠가 보고 싶어요.": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "female",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:ko:우리 오빠는 대학생이에요.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:ko:우리 형은 키가 커요.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:ko:저는 언니가 한 명 있어요.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:ko:저는 학생입니다.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ko:저는 형이 한 명 있어요.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:ko:친구가 서울에 살아요.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ko:형, 같이 가요.": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "male",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Aš esu alkana.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Aš esu alkanas.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Aš esu laiminga.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Aš esu laimingas.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Aš esu pasiruošusi.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Aš esu pasiruošęs.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Aš esu pavargusi.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Aš esu pavargęs.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Aš esu tikra.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Aš esu tikras.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Aš gyvenu Vilniuje.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Aš sakiau tiesą.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Jis paklausė: „Ar tu esi pavargusi?“": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:lt:Katė miega ant sofos.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Mano sesuo yra pavargusi.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:lt:Tu esi pavargusi.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:lt:Vakar aš dirbau namie.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Es dzīvoju Rīgā.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Es esmu gatava.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Es esmu gatavs.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Es esmu izsalcis.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Es esmu izsalkusi.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Es esmu laimīga.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Es esmu laimīgs.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Es esmu noguris.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Es esmu nogurusi.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Es esmu redzējis šo filmu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Es esmu redzējusi šo filmu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Katru rītu es dzeru kafiju.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Kaķis guļ uz dīvāna.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:lv:Mana māsa ir nogurusi.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:lv:Tu esi nogurusi.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Vakar es lasīju grāmatu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:lv:Viņš jautāja: „Vai tu esi nogurusi?”": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:pl:Byłam wczoraj w domu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Byłem wczoraj w domu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Codziennie piję kawę.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Jestem zmęczona.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Jestem zmęczony.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Kot śpi na kanapie.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Kupiłam chleb.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Kupiłem chleb.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Mieszkam w Warszawie.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Moja siostra była zmęczona.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:pl:On zapytał: „Jesteś zmęczona?”": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:pl:Powiedziałam, że przyjdę.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Powiedziałaś, że przyjdziesz.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Powiedziałem, że przyjdę.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Pracuję w domu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Widziałam ten film.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pl:Widziałem ten film.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Ela disse: “Estou cansada”.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:pt:Estou cansada.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Estou cansado.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Estou feliz.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Estou pronta.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Estou pronto.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Estou sozinha.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Estou sozinho.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Estou triste.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Hoje está muito quente.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Minha irmã está cansada.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:pt:O livro é interessante.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Obrigada!": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Obrigado!": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Sou brasileira.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Sou brasileiro.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt:Você está cansada?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:pt_pt:A minha irmã está cansada.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:pt_pt:Estou cansada.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt_pt:Estou cansado.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt_pt:Estou triste.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt_pt:Estás cansada?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:pt_pt:Obrigada!": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt_pt:Obrigado!": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt_pt:Sou portuguesa.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:pt_pt:Sou português.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ro:Afară este frig.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ro:Cartea este interesantă.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ro:Ea a spus: „Sunt obosită”.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:ro:Ești obosită?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:ro:Sora mea este obosită.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:ro:Sunt bine.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ro:Sunt bolnav.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ro:Sunt bolnavă.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ro:Sunt fericit.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ro:Sunt fericită.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ro:Sunt gata.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ro:Sunt obosit.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ro:Sunt obosită.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ro:Sunt singur acasă.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ro:Sunt singură acasă.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Вчера я купил хлеб.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Вчера я купила хлеб.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Каждое утро я пью кофе.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Кошка спит на диване.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:ru:Моя сестра сказала, что устала.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:ru:Он спросил: «Ты устала?»": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:ru:Ты сказала, что придёшь.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Я был дома.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Я была дома.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Я готов.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Я готова.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Я живу в Москве.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Я работаю дома.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Я сказал, что приду.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Я сказала, что приду.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Я устал.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:ru:Я устала.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Bol som doma.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Bola som doma.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Bývam v Bratislave.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Každý deň pijem kávu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Kúpil som chlieb.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Kúpila som chlieb.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Mačka spí na gauči.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Moja sestra bola unavená.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:sk:Opýtal sa: „Si unavená?“": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:sk:Povedal som, že prídem.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Povedala si, že prídeš.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Povedala som, že prídem.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Pracujem doma.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Som unavená.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Som unavený.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Videl som ten film.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sk:Videla som ten film.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Bil sem doma.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Bila sem doma.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Delam v pisarni.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Kupil sem kruh.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Kupila sem kruh.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Mačka spi na kavču.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:sl:Moja sestra je bila utrujena.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:sl:Povedal sem resnico.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Povedala sem resnico.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Povedala si resnico.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Utrujen sem.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Utrujena sem.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Videl sem ta film.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Videla sem ta film.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Vprašal je: »Ali si utrujena?«": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:sl:Vsak dan pijem kavo.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sl:Živim v Ljubljani.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Била сам код куће.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Био сам код куће.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Живим у Београду.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Купила сам хлеб.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Купио сам хлеб.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Мачка спава на каучу.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:sr:Моја сестра је била уморна.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:sr:Питао је: „Јеси ли уморна?“": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:sr:Радим код куће.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Рекао сам да ћу доћи.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Рекла сам да ћу доћи.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Рекла си да ћеш доћи.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Сваки дан пијем кафу.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Спавала сам цео дан.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Спавао сам цео дан.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Уморан сам.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:sr:Уморна сам.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:th:ขอบคุณครับ": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "male",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:th:ขอบคุณค่ะ": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:th:ครูใจดีมาก": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:th:ดิฉันหิวข้าวค่ะ": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:th:ดิฉันเป็นหมอ": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:th:ผมหิวข้าวครับ": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:th:ผมเป็นครู": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:th:พรุ่งนี้จะไปตลาด": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:th:พี่สาวทำงานที่โรงพยาบาล": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:th:วันนี้อากาศดี": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:th:สวัสดีครับ": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "male",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:th:สวัสดีค่ะ": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "female",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:th:หนังสือเล่มนี้แพงมาก": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:th:เขาบอกว่า “ผมหิวข้าวครับ”": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:th:ไปไหนคะ": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "female",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:tr:Ablam İstanbul'da yaşıyor.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:tr:Ben öğrenciyim.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:tr:Bugün hava çok güzel.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:tr:Kız kardeşim yorgun.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:tr:O bir doktor.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:tr:Yarın işe gideceğim.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:tr:Yorgunum.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Він запитав: «Ти втомилася?»": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:uk:Кіт спить на дивані.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:uk:Моя сестра сказала, що втомилася.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:uk:Ти сказала, що прийдеш.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Учора я купив хліб.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Учора я купила хліб.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Щодня я п'ю каву.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Я був удома.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Я була вдома.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Я втомився.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Я втомилася.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Я готова.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Я готовий.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Я живу в Києві.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Я працюю вдома.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Я сказав, що прийду.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:uk:Я сказала, що прийду.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:vi:Anh trai tôi rất cao.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:vi:Anh yêu em.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "male",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:vi:Anh ấy là bác sĩ.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:vi:Chào em, anh là Nam.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "male",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:vi:Chào em, chị là Lan.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "female",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:vi:Chị có khỏe không?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "gender:vi:Hôm nay trời đẹp.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:vi:Nam nói: “Anh yêu em.”": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "male",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "gender:vi:Tôi là anh trai của Lan.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:vi:Tôi là bố của cháu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:vi:Tôi là chị gái của Nam.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:vi:Tôi là chồng của cô ấy.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "male",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:vi:Tôi là mẹ của cháu.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:vi:Tôi là sinh viên.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:vi:Tôi là vợ của anh ấy.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:vi:Tôi thích cà phê.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:zh:今天天气很好。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:zh:他是医生。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:zh:我丈夫是老师。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "female",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:zh:我哥哥喜欢喝茶。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "gender:zh:我姐姐很累。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "female"
+  },
+  "gender:zh:我很累。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:zh:我明天去北京。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "gender:zh:我是学生。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:de:Danke schön! Ohne dich hätte ich das nie geschafft.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:de:Das Museum ist montags geschlossen.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:de:Der Zug nach Hamburg fährt um acht Uhr ab.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:de:Entschuldigen Sie, wissen Sie, wie spät es ist?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:de:Guten Tag, Frau Schmidt, wie geht es Ihnen?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:de:Haben Sie noch einen Tisch für zwei Personen frei?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:de:Im Winter schneit es in den Alpen oft.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:de:Kannst du mir kurz helfen?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:de:Kommst du morgen mit ins Kino?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:de:Kommt ihr heute Abend auch zur Party?": {
+    "register": "informal",
+    "addresseeNumber": "plural",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:de:Können Sie ihm bitte ausrichten: „Ruf mich morgen an“?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "politeness:de:Könnten Sie mir bitte helfen?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:de:Ruf mich später an, wenn du Zeit hast.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:de:Was machst du am Wochenende?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:es:Buenos días, señor García. ¿Cómo está usted?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:es:El tren a Sevilla sale a las ocho.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:es:En agosto hace mucho calor en Madrid.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:es:La biblioteca cierra los domingos.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:es:Llámame cuando llegues.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:es:Oye, ¿me prestas tu bici?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:es:Pase usted, por favor.": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:es:Por favor, pásame la sal.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:es:¡Muchas gracias! Eres un sol.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:es:¿Podría usted ayudarme, por favor?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:es:¿Puede decirle de mi parte: “llámame mañana”?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:es:¿Qué desea, señora?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:es:¿Qué haces este fin de semana?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:es:¿Vienes con nosotros esta noche?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:Appelle-moi quand tu arrives.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:Bonjour, monsieur, que puis-je faire pour vous ?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:Ce restaurant est fermé le lundi.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:Dites-lui simplement : “appelle-moi demain”.": {
+    "register": "formal",
+    "addresseeNumber": "plural",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:Est-ce que vous pourriez répéter, s'il vous plaît ?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:Il pleut souvent en Bretagne au printemps.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:Le train pour Lyon part à huit heures.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:Merci beaucoup ! T'es vraiment sympa.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:Passe-moi le sel, s'il te plaît.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:Pourriez-vous m'aider, s'il vous plaît ?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:Qu'est-ce que tu fais ce week-end ?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:T'as vu le match hier ?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:Tu viens avec nous ce soir ?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:fr:Vous avez choisi, madame ?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:आप कहाँ रहते हैं?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:आपका नाम क्या है?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:उनसे कहिए: “मुझे कल फ़ोन करो”।": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:कृपया बैठिए।": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:क्या आप मेरी मदद कर सकते हैं?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:खाना खा लो।": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:जुलाई में बहुत बारिश होती है।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:तुम कल आ रहे हो ना?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:तुम कहाँ रहते हो?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:तुम्हारा नाम क्या है?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:दिल्ली भारत की राजधानी है।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:नमस्ते, शर्मा जी! आप कैसे हैं?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:यह दुकान रविवार को बंद रहती है।": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:hi:शुक्रिया! तुमने मेरी बहुत मदद की।": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:いただきます!このカレー、うまそう!": {
+    "register": "informal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:おばあちゃんはもう晩ご飯を召し上がった?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "female"
+  },
+  "politeness:ja:この本はとても面白いですよ。": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:この電車は各駅に止まる。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:そんなの知らないよ。": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:どうぞこちらでお待ちください。": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:もうご飯食べた?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:京都には寺が多い。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:今日は寒いね。早く帰ろうよ。": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:先生は何時にいらっしゃいますか。": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:地球は太陽の周りを回っている。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:彼は「もう帰るぞ」と言っていました。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "male"
+  },
+  "politeness:ja:明日の会議は十時に始まります。": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:社長はもう昼食を召し上がりました。": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:資料は明日拝見いたします。": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ja:週末は何をしますか。": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:내일 같이 영화 보자.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:내일 다시 전화할게요.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:너 지금 어디야?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:동생이 “빨리 와!”라고 했어요.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:밥 먹었어?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:사장님께서 지금 회의실에 계십니다.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:서울은 한국의 수도이다.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:선생님, 어디 가세요?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:안녕하십니까? 만나서 반갑습니다.": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:주말에 뭐 해요?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:지구는 태양 주위를 돈다.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:지금 가요.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:지금 갑니다.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:한국의 겨울은 몹시 춥다.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ko:할머니는 벌써 진지 드셨어?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "female"
+  },
+  "politeness:ko:회의는 열 시에 시작합니다.": {
+    "register": "formal",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:pt:A senhora deseja mais alguma coisa?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:pt:Bom dia, doutor Silva. Como o senhor está?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:pt:Cadê você? Já cheguei no bar.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:pt:Chove muito em Manaus em janeiro.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:pt:Me liga quando você chegar.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:pt:Muito obrigado! Você me salvou hoje.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "male",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:pt:O museu fecha às segundas-feiras.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:pt:O que você vai fazer no fim de semana?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:pt:O senhor já almoçou?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:pt:O senhor pode avisar o João: “me liga amanhã”?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "politeness:pt:O senhor pode me ajudar, por favor?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:pt:O trem para São Paulo sai às oito horas.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:pt:Você já almoçou?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:pt:Você vem com a gente hoje à noite?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ru:Вы выходите на следующей остановке?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ru:Вы не могли бы мне помочь?": {
+    "register": "formal",
+    "addresseeNumber": "plural",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ru:Здравствуйте, Анна Петровна! Как вы себя чувствуете?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "female",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ru:Зимой в Сибири очень холодно.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ru:Музей закрыт по понедельникам.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ru:Передайте ему, пожалуйста: „позвони мне завтра“.": {
+    "register": "formal",
+    "addresseeNumber": "plural",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  },
+  "politeness:ru:Поезд в Москву отправляется в восемь часов.": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:ru:Позвони мне, когда освободишься.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ru:Привет! Ты уже дома?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ru:Садитесь, пожалуйста, доктор вас сейчас примет.": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ru:Скажите, пожалуйста, который час?": {
+    "register": "formal",
+    "addresseeNumber": "plural",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ru:Спасибо большое! Ты меня очень выручил.": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "male",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ru:Ты придёшь завтра на тренировку?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:ru:Что ты делаешь в выходные?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:th:กรุงเทพฯ เป็นเมืองหลวงของประเทศไทย": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:th:ขอบคุณมากครับ": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "male",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:th:ขอบคุณมากค่ะ": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "female",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:th:คุณหมอจะมาถึงกี่โมงคะ": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "female",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:th:ท่านประธานกำลังรับประทานอาหารกลางวันอยู่ครับ": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "male",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:th:ร้านนี้เปิดทุกวันตั้งแต่เก้าโมงเช้า": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:th:ฤดูฝนเริ่มในเดือนพฤษภาคม": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:th:สวัสดี กินข้าวหรือยัง": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:th:เชิญนั่งก่อนนะคะ": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "female",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:th:เธอจะไปกับฉันไหม": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:th:ไปกันเถอะ เดี๋ยวสายนะ": {
+    "register": "informal",
+    "addresseeNumber": "plural",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:th:ไปไหนมา": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:th:ไม่ทราบว่าห้องน้ำอยู่ทางไหนครับ": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "male",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:上海的夏天很热。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:你今天忙不忙?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:你叫什么名字?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:你吃饭了吗?": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:北京是中国的首都。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:咱们一起去看电影吧!": {
+    "register": "informal",
+    "addresseeNumber": "plural",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:您今天忙不忙?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:您慢走。": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:欢迎光临,您这边请。": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:王老师,您早!": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:请问,您贵姓?": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:谢谢啊!你可帮了我大忙了。": {
+    "register": "informal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:这家店周一不营业。": {
+    "register": "neutral",
+    "addresseeNumber": "not_applicable",
+    "speakerGender": "neutral",
+    "addresseeGender": "not_applicable",
+    "addressesSomeone": "false",
+    "referentGender": "neutral"
+  },
+  "politeness:zh:麻烦您转告他:“明天给我打电话。”": {
+    "register": "formal",
+    "addresseeNumber": "singular",
+    "speakerGender": "neutral",
+    "addresseeGender": "neutral",
+    "addressesSomeone": "true",
+    "referentGender": "male"
+  }
+}

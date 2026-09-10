@@ -937,6 +937,41 @@ describe('finalizeOnboarding', () => {
     expect(courseSettings?.reviewMode).toBe('full');
     expect(courseSettings?.writingInputMode).toBe('transcribe');
   });
+  it('treats the politeness levels as a set: a reordered pick is not re-synced', async () => {
+    const t = convexTest(schema, modules);
+    await seedEssentialCollection(t);
+    await seedQuota(t, 'user_A');
+    const asUser = t.withIdentity({ subject: 'user_A' });
+
+    await asUser.mutation(api.features.courses.saveOnboardingProgress, {
+      step: 6,
+      targetLanguages: ['ja'],
+      baseLanguages: ['en'],
+      currentLevel: 'beginner',
+      politenessLevels: ['polite', 'casual'],
+    });
+    const { courseId } = await asUser.mutation(
+      api.features.courses.completeOnboarding,
+      {},
+    );
+    await drainScheduled(t);
+    // The course carries the same set in another order (the settings page
+    // stores levels in canonical order).
+    const settingsId = await t.run(async (ctx) => {
+      const row = (await ctx.db
+        .query('courseSettings')
+        .withIndex('by_courseId', (q) => q.eq('courseId', courseId))
+        .first())!;
+      await ctx.db.patch(row._id, { politenessLevels: ['casual', 'polite'] });
+      return row._id;
+    });
+
+    await asUser.mutation(api.features.onboarding.finalizeOnboarding, {});
+
+    const courseSettings = await t.run((ctx) => ctx.db.get(settingsId));
+    expect(courseSettings?.politenessLevels).toEqual(['casual', 'polite']);
+  });
+
   it('clears a previously saved writing style when the user switches to Shadowing', async () => {
     // Regression: the wizard sends `writingInputMode: null` for Shadowing,
     // but null used to collapse to `undefined` on the way out, and the

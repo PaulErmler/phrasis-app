@@ -3,7 +3,11 @@ import { query } from '../_generated/server';
 import type { Doc } from '../_generated/dataModel';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { PLACEMENT_SENTENCES_QUERY_CAP } from '../../lib/constants/onboarding';
-import { liveTranslation, servedSourceText } from '../db/translationReads';
+import {
+  primaryOrLegacyAudio,
+  primaryOrLegacyTranslation,
+  servedSourceText,
+} from '../db/translationReads';
 
 /**
  * Placement-test backend.
@@ -75,13 +79,13 @@ export const getPlacementSentence = query({
     // code when a Mixed English course serves an accent row.
     let sourceAudioLanguage = text.language;
     if (sourceLanguage && sourceLanguage !== text.language) {
-      const sourceTranslation = await liveTranslation(
+      const sourceTranslation = await primaryOrLegacyTranslation(
         ctx,
-        text._id,
+        text,
         sourceLanguage,
       );
       if (sourceTranslation) {
-        resolvedSourceText = sourceTranslation.translatedText;
+        resolvedSourceText = sourceTranslation.row.translatedText;
         resolvedSourceLanguage = sourceLanguage;
         sourceAudioLanguage = sourceLanguage;
       }
@@ -93,12 +97,11 @@ export const getPlacementSentence = query({
       sourceAudioLanguage = source.language;
     }
 
-    const sourceAudio = await ctx.db
-      .query('audioRecordings')
-      .withIndex('by_text_and_language', (q) =>
-        q.eq('textId', text._id).eq('language', sourceAudioLanguage),
-      )
-      .first();
+    const sourceAudio = await primaryOrLegacyAudio(
+      ctx,
+      text,
+      sourceAudioLanguage,
+    );
     const sourcePayload = sourceAudio
       ? await resolveAudioPayload(ctx, sourceAudio)
       : null;
@@ -110,15 +113,14 @@ export const getPlacementSentence = query({
     let targetRomanization: string | undefined;
     let targetAudio: Doc<'audioRecordings'> | null = null;
     if (targetLanguage && targetLanguage !== text.language) {
-      const translation = await liveTranslation(ctx, text._id, targetLanguage);
-      targetText = translation?.translatedText;
-      targetRomanization = translation?.romanizedText;
-      targetAudio = await ctx.db
-        .query('audioRecordings')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', text._id).eq('language', targetLanguage),
-        )
-        .first();
+      const translation = await primaryOrLegacyTranslation(
+        ctx,
+        text,
+        targetLanguage,
+      );
+      targetText = translation?.row.translatedText;
+      targetRomanization = translation?.row.romanizedText;
+      targetAudio = await primaryOrLegacyAudio(ctx, text, targetLanguage);
     } else if (targetLanguage === text.language) {
       // Learning the text's own language (English on an English course):
       // the target side is the served source wording, accent row included,
@@ -126,12 +128,7 @@ export const getPlacementSentence = query({
       const source = await servedSourceText(ctx, text, null);
       targetText = source.text;
       targetRomanization = source.romanizedText;
-      targetAudio = await ctx.db
-        .query('audioRecordings')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', text._id).eq('language', source.language),
-        )
-        .first();
+      targetAudio = await primaryOrLegacyAudio(ctx, text, source.language);
     }
     const targetPayload = targetAudio
       ? await resolveAudioPayload(ctx, targetAudio)
@@ -198,13 +195,13 @@ export const getPlacementPreviewSentences = query({
         // the stored English text so a sentence always shows.
         let resolvedSourceText = text.text;
         if (sourceLanguage && sourceLanguage !== text.language) {
-          const sourceTranslation = await liveTranslation(
+          const sourceTranslation = await primaryOrLegacyTranslation(
             ctx,
-            text._id,
+            text,
             sourceLanguage,
           );
           if (sourceTranslation) {
-            resolvedSourceText = sourceTranslation.translatedText;
+            resolvedSourceText = sourceTranslation.row.translatedText;
           }
         } else {
           resolvedSourceText = (await servedSourceText(ctx, text, null)).text;
@@ -213,13 +210,13 @@ export const getPlacementPreviewSentences = query({
         let targetText: string | undefined;
         let targetRomanization: string | undefined;
         if (targetLanguage && targetLanguage !== text.language) {
-          const translation = await liveTranslation(
+          const translation = await primaryOrLegacyTranslation(
             ctx,
-            text._id,
+            text,
             targetLanguage,
           );
-          targetText = translation?.translatedText;
-          targetRomanization = translation?.romanizedText;
+          targetText = translation?.row.translatedText;
+          targetRomanization = translation?.row.romanizedText;
         } else if (targetLanguage === text.language) {
           const source = await servedSourceText(ctx, text, null);
           targetText = source.text;

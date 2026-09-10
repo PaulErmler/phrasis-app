@@ -259,6 +259,7 @@ describe('features/cardEditAudit', () => {
 
       await asUser.mutation(api.features.scheduling.flagTranslation, {
         cardId,
+        reasons: ['wrong_translation'],
       });
 
       const [edit] = await listEdits(t);
@@ -293,6 +294,7 @@ describe('features/cardEditAudit', () => {
 
       await asUser.mutation(api.features.scheduling.flagTranslation, {
         cardId,
+        reasons: ['wrong_translation'],
       });
 
       const rows = await listRetranslations(t);
@@ -310,6 +312,7 @@ describe('features/cardEditAudit', () => {
 
       await asUser.mutation(api.features.scheduling.flagTranslation, {
         cardId,
+        reasons: ['wrong_translation'],
       });
 
       // The gesture is recorded — `textWasUserCreated` is what explains why no
@@ -345,12 +348,19 @@ describe('features/cardEditAudit', () => {
           )
           .first(),
       );
-      return { textId, translationId, auditId: row._id, claimId: claim!._id };
+      return {
+        textId,
+        translationId,
+        auditId: row._id,
+        claimId: claim!._id,
+        variantKey: claim!.variantKey,
+      };
     }
 
     it('marks an applied retranslation with the wording the model produced', async () => {
       const t = convexTest(schema, modules);
-      const { textId, auditId, claimId } = await seedPendingRetranslation(t);
+      const { textId, auditId, claimId, variantKey } =
+        await seedPendingRetranslation(t);
 
       await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
         textId,
@@ -359,6 +369,7 @@ describe('features/cardEditAudit', () => {
         voiceName: TEST_VOICE,
         translationSource: 'openrouter/gemini-pro-medium',
         replaceExisting: true,
+        variantKey,
         expectedClaimId: claimId,
         retranslationAuditId: auditId,
       });
@@ -372,7 +383,8 @@ describe('features/cardEditAudit', () => {
 
     it('distinguishes a punctuation-only retranslation, which keeps its audio', async () => {
       const t = convexTest(schema, modules);
-      const { textId, auditId, claimId } = await seedPendingRetranslation(t);
+      const { textId, auditId, claimId, variantKey } =
+        await seedPendingRetranslation(t);
 
       await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
         textId,
@@ -381,6 +393,7 @@ describe('features/cardEditAudit', () => {
         translatedText: 'Hello!',
         voiceName: TEST_VOICE,
         replaceExisting: true,
+        variantKey,
         expectedClaimId: claimId,
         retranslationAuditId: auditId,
       });
@@ -392,7 +405,7 @@ describe('features/cardEditAudit', () => {
 
     it('marks a result whose claim was reclaimed mid-flight as superseded', async () => {
       const t = convexTest(schema, modules);
-      const { textId, translationId, auditId, claimId } =
+      const { textId, translationId, auditId, claimId, variantKey } =
         await seedPendingRetranslation(t);
 
       // A reclaim deletes + reinserts the claim under a new _id, which is what
@@ -402,6 +415,7 @@ describe('features/cardEditAudit', () => {
         await ctx.db.insert('llmTranslationClaims', {
           textId,
           targetLanguage: 'en',
+          variantKey,
           claimedAt: Date.now(),
         });
       });
@@ -412,6 +426,7 @@ describe('features/cardEditAudit', () => {
         translatedText: 'Stale result',
         voiceName: TEST_VOICE,
         replaceExisting: true,
+        variantKey,
         expectedClaimId: claimId,
         retranslationAuditId: auditId,
       });
@@ -426,7 +441,7 @@ describe('features/cardEditAudit', () => {
 
     it('marks a vanished text as dropped rather than leaving the row pending', async () => {
       const t = convexTest(schema, modules);
-      const { auditId, claimId } = await seedPendingRetranslation(t);
+      const { auditId, claimId, variantKey } = await seedPendingRetranslation(t);
       const orphanTextId = await t.run(async (ctx) => {
         const collectionId = await ctx.db.insert('collections', {
           name: 'tmp',
@@ -449,6 +464,7 @@ describe('features/cardEditAudit', () => {
         translatedText: 'anything',
         voiceName: TEST_VOICE,
         replaceExisting: true,
+        variantKey,
         expectedClaimId: claimId,
         retranslationAuditId: auditId,
       });
@@ -459,7 +475,7 @@ describe('features/cardEditAudit', () => {
 
     it('marks a result refused by the user-created backstop', async () => {
       const t = convexTest(schema, modules);
-      const { textId, translationId, auditId, claimId } =
+      const { textId, translationId, auditId, claimId, variantKey } =
         await seedPendingRetranslation(t);
       // The text became user-created while the job was in flight (no live
       // path enqueues against one, so this simulates the defence-in-depth
@@ -474,6 +490,7 @@ describe('features/cardEditAudit', () => {
         translatedText: 'Overwrite attempt',
         voiceName: TEST_VOICE,
         replaceExisting: true,
+        variantKey,
         expectedClaimId: claimId,
         retranslationAuditId: auditId,
       });
@@ -522,7 +539,8 @@ describe('features/cardEditAudit', () => {
 
     it('survives an audit row that was purged while the job was in flight', async () => {
       const t = convexTest(schema, modules);
-      const { textId, auditId, claimId } = await seedPendingRetranslation(t);
+      const { textId, auditId, claimId, variantKey } =
+        await seedPendingRetranslation(t);
       await t.run(async (ctx) => ctx.db.delete(auditId));
 
       // Losing the audit trail must never fail the translation it describes.
@@ -532,12 +550,13 @@ describe('features/cardEditAudit', () => {
         translatedText: 'Hey there',
         voiceName: TEST_VOICE,
         replaceExisting: true,
+        variantKey,
         expectedClaimId: claimId,
         retranslationAuditId: auditId,
       });
 
       const translation = await t.run(async (ctx) =>
-        liveTranslation(ctx, textId, 'en'),
+        liveTranslation(ctx, textId, 'en', variantKey),
       );
       expect(translation?.translatedText).toBe('Hey there');
     });

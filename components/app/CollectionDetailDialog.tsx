@@ -29,6 +29,7 @@ import { getTextDirection } from '@/lib/languages';
 import { TUTORIAL_ANCHORS } from '@/lib/tutorials/anchors';
 import { getCollectionDescription } from './CollectionCarouselUI';
 import { AudioButton } from '@/components/app/learning/AudioButton';
+import { FormChips } from '@/components/app/learning/formChips';
 import {
   PREVIEW_ACTION_ICON_CLASS,
   PREVIEW_ACTION_PANEL_CLASS,
@@ -612,6 +613,9 @@ function PreviewTextRow({
               renderLine(translation, false),
             )}
           </div>
+          {/* The same chips the card header shows: what the served wording
+              IS on each axis, from the classifier stamps. */}
+          <FormChips translations={row.translations} className="mt-2" />
         </div>
       </div>
 

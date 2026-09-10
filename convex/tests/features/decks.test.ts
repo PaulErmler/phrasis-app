@@ -6,7 +6,7 @@ import schema from '../../schema';
 import { api, internal } from '../../_generated/api';
 import type { Id } from '../../_generated/dataModel';
 import {
-  scheduleMissingContent,
+  ensureTextContent,
   scheduleAudioForLanguage,
 } from '../../features/decks';
 import {
@@ -17,6 +17,7 @@ import {
   SOURCE_VERBATIM_TRANSLATION_SOURCE,
   USER_PROVIDED_TRANSLATION_SOURCE,
 } from '../../../lib/translationProvenance';
+import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
 // The workpools are module-mocked globally (tests/convexTestSetup.ts):
 // `enqueueAction` is a vi.fn() resolving to unique fake workIds
 // ('test-tts-work-N'), so tests can assert the enqueue payload directly.
@@ -31,7 +32,12 @@ import {
   getMixedAccentTextLanguage,
   getCurrentTranslationVersion,
 } from '../../../lib/languages';
-import { liveTranslation } from '../../db/translationReads';
+import {
+  liveTranslation,
+  audioPointer,
+  renderingTextOf,
+} from '../../db/translationReads';
+import { primaryRenderingKey } from '../../../lib/preferenceResolution';
 
 // Partial module mock: every real language's voice pickers only ever return
 // curated apiCodes, so `scheduleAudioForLanguage`'s "not in the curated voice
@@ -602,6 +608,7 @@ describe('features/decks', () => {
               userCreated: false,
               collectionId,
               collectionRank: i,
+              metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
             }),
           );
         }
@@ -657,6 +664,7 @@ describe('features/decks', () => {
               userCreated: false,
               collectionId,
               collectionRank: i,
+              metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
             }),
           );
         }
@@ -1306,16 +1314,18 @@ describe('features/decks', () => {
     });
   });
 
-  describe('scheduleMissingContent: gender-drift translation sweep', () => {
+  describe('ensureTextContent: gender stamps never retire a rendering', () => {
     // Seed a definitive-gender source text (female) plus one Spanish
     // translation row, and optionally a Spanish audio row. Both
     // `speakerGender` and `audioSpeakerGender` are 'female', so the gender
-    // resolution at the top of scheduleMissingContent is a no-op and the
-    // resolved voice gender the sweep compares against is 'female'.
+    // resolution at the top of ensureTextContent is a no-op and the
+    // resolved voice gender is 'female'.
     //
-    // `userCreated` defaults to false (premade content): the sweep only ever
-    // rewrites machine output on premade texts, so that is the case these
-    // deletion tests must exercise. Pass true for the user-owned cases.
+    // Renderings are cached per voice (docs/architecture/translation-
+    // variants.md): a premade row or clip in the other gender is kept, and a
+    // course that wants the other voice reads a rendering variant. Only a
+    // USER-WRITTEN text, which has no variants, still re-voices its clip
+    // when the classifier lands a definitive gender after the coin flip.
     async function seedTextWithSpanish(
       t: TestConvex<typeof schema>,
       args: {
@@ -1362,7 +1372,9 @@ describe('features/decks', () => {
             voiceName: 'es-test-voice',
             storageId,
             ttsQuality: 'validated',
-            ttsProvider: 'google',
+            // The language's CURRENT provider: a provider mismatch is its own
+            // (unrelated) retirement trigger.
+            ttsProvider: 'gemini',
             voiceGender: args.audio.voiceGender,
           });
         }
@@ -1380,32 +1392,47 @@ describe('features/decks', () => {
     ) {
       return t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
-        await scheduleMissingContent(ctx, textId, text, ['en'], ['es']);
+        await ensureTextContent(ctx, textId, text, ['en'], ['es']);
         return liveTranslation(ctx, textId, 'es');
       });
     }
 
-    it("deletes a stamped translation whose gender drifted from the card's voice gender", async () => {
+    it("keeps a stamped translation whose gender differs from the card's voice gender", async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedTextWithSpanish(t, {
-        // Stamped 'male' but the card's audioSpeakerGender is 'female' → drift.
+        // Stamped 'male' while the card's audioSpeakerGender is 'female':
+        // no longer drift, the row is a valid rendering.
         translation: {
           speakerGender: 'male',
           translationSource: 'google-translate-v2',
         },
       });
-      expect(await runSweepAndGetSpanish(t, textId)).toBeNull();
+      expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
     });
 
-    it('deletes a legacy (unstamped) translation when its audio drifted gender', async () => {
+    it('keeps a legacy translation and its other-gender clip on a premade text', async () => {
       const t = convexTest(schema, modules);
       const { textId } = await seedTextWithSpanish(t, {
-        // No speakerGender (legacy row) + a male-voiced audio row that drifts
-        // from the female card → the audio-drift signal authorizes deletion.
         translation: { translationSource: 'google-translate-v2' },
         audio: { voiceGender: 'male' },
       });
-      expect(await runSweepAndGetSpanish(t, textId)).toBeNull();
+      expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
+      const audio = await t.run((ctx) => audioPointer(ctx, textId, 'es'));
+      expect(audio).not.toBeNull();
+    });
+
+    it('re-voices an other-gender clip on a USER-WRITTEN text', async () => {
+      const t = convexTest(schema, modules);
+      const { textId } = await seedTextWithSpanish(t, {
+        translation: { translationSource: 'user-provided' },
+        audio: { voiceGender: 'male' },
+        userCreated: true,
+      });
+      expect(await runSweepAndGetSpanish(t, textId)).toBeTruthy();
+      // The male clip is dropped (asset kept in the cache) so the sweep can
+      // re-voice the sentence in the card's female voice.
+      const audio = await t.run((ctx) => audioPointer(ctx, textId, 'es'));
+      expect(audio).toBeNull();
     });
 
     it('keeps a legacy translation when there is no audio-drift signal', async () => {
@@ -1466,7 +1493,7 @@ describe('features/decks', () => {
       });
       const audio = await t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
-        await scheduleMissingContent(ctx, textId, text, ['en'], ['es']);
+        await ensureTextContent(ctx, textId, text, ['en'], ['es']);
         return ctx.db
           .query('audioRecordings')
           .withIndex('by_text_and_language', (q) =>
@@ -1478,7 +1505,7 @@ describe('features/decks', () => {
     });
   });
 
-  describe('scheduleMissingContent: TTS version regen', () => {
+  describe('ensureTextContent: TTS version regen', () => {
     // `pt_pt` is bumped to ttsVersion 2 in lib/languages.ts (the European
     // Portuguese prompt fix). Audio stamped below that should be deleted +
     // re-synthesized; audio stamped at/above current, or unstamped. Survives.
@@ -1523,7 +1550,7 @@ describe('features/decks', () => {
     ) {
       return t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
-        const result = await scheduleMissingContent(
+        const result = await ensureTextContent(
           ctx,
           textId,
           text,
@@ -1564,7 +1591,7 @@ describe('features/decks', () => {
     });
   });
 
-  describe('scheduleMissingContent: translation version regen', () => {
+  describe('ensureTextContent: translation version regen', () => {
     // A row stamped at 0 is strictly below every language's current version,
     // so the stale branch fires. `speakerGender` matches `audioSpeakerGender`
     // so ONLY the version check fires (no gender drift), and the audio matches
@@ -1582,10 +1609,19 @@ describe('features/decks', () => {
           text: 'Hello',
           language: 'en',
           userCreated,
+          ...(userCreated ? { userId: 'user_A' } : {}),
           speakerGender: 'female',
           audioSpeakerGender: 'female',
+          metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
           collectionId,
           collectionRank: 1,
+        });
+        // A keyed row: only rows written under a key are ever regenerated
+        // (a legacy row is frozen for the cards still on it).
+        const esKey = primaryRenderingKey({
+          text: renderingTextOf((await ctx.db.get(textId))!),
+          textId,
+          code: 'es',
         });
         const storageId = await ctx.storage.store(
           new Blob([new Uint8Array([1, 2, 3])]),
@@ -1596,6 +1632,7 @@ describe('features/decks', () => {
           translatedText: 'Hola',
           speakerGender: 'female', // matches audioSpeakerGender → no drift
           translationVersion: 0, // strictly below current (1) → stale
+          variantKey: esKey,
         });
         const { rowId: audioId } = await insertAudioFixture(ctx, {
           textId,
@@ -1604,22 +1641,28 @@ describe('features/decks', () => {
           storageId,
           ttsProvider: 'gemini', // matches current → no provider-mismatch regen
           voiceGender: 'female', // matches card → no gender-drift regen
+          spokenText: 'Hola',
+          variantKey: esKey,
         });
-        return { textId, trId, audioId };
+        return { textId, trId, audioId, esKey };
       });
     }
 
-    async function runSweep(t: TestConvex<typeof schema>, textId: Id<'texts'>) {
+    async function runSweep(
+      t: TestConvex<typeof schema>,
+      textId: Id<'texts'>,
+      esKey: string,
+    ) {
       return t.run(async (ctx) => {
         const text = (await ctx.db.get(textId))!;
-        const result = await scheduleMissingContent(
+        const result = await ensureTextContent(
           ctx,
           textId,
           text,
           ['en'],
           ['es'],
         );
-        const tr = await liveTranslation(ctx, textId, 'es');
+        const tr = await liveTranslation(ctx, textId, 'es', esKey);
         const audio = await ctx.db
           .query('audioRecordings')
           .withIndex('by_text_and_language', (q) =>
@@ -1632,8 +1675,11 @@ describe('features/decks', () => {
 
     it('regenerates a premade stale translation IN PLACE: row and audio keep serving, replacement job scheduled', async () => {
       const t = convexTest(schema, modules);
-      const { textId, trId, audioId } = await seedStaleTranslation(t, false);
-      const { result, tr, audio } = await runSweep(t, textId);
+      const { textId, trId, audioId, esKey } = await seedStaleTranslation(
+        t,
+        false,
+      );
+      const { result, tr, audio } = await runSweep(t, textId, esKey);
       // Nothing is deleted up front: the old wording (and its audio) serves
       // until the version-bump replacement lands, and the write choke point
       // then archives it for existing cards (see translationArchive.test.ts).
@@ -1654,8 +1700,8 @@ describe('features/decks', () => {
 
     it('keeps a user-created stale translation (the !userCreated guard) and its audio', async () => {
       const t = convexTest(schema, modules);
-      const { textId } = await seedStaleTranslation(t, true);
-      const { tr, audio } = await runSweep(t, textId);
+      const { textId, esKey } = await seedStaleTranslation(t, true);
+      const { tr, audio } = await runSweep(t, textId, esKey);
       // userCreated translations are user-owned → never version-regenerated.
       expect(tr).not.toBeNull();
       expect(audio).not.toBeNull();
@@ -1702,8 +1748,12 @@ describe('features/decks', () => {
           collectionRank: 1,
           speakerGender: 'female',
           audioSpeakerGender: 'female',
+          // Complete content includes a current classifier verdict: an
+          // unclassified curriculum text is exactly what the sweep asks
+          // the sentence-metadata classifier for.
+          metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
           // Complete cards carry IPA now (part of hasMissingContent / the
-          // scheduleMissingContent annotation sweep).
+          // ensureTextContent annotation sweep).
           ipaText: 'həlˈoʊ ðɛr',
         });
         await ctx.db.insert('cards', {
@@ -1927,7 +1977,7 @@ describe('features/decks', () => {
         });
         // Card 1 (earliest due) uses the sentinel language routed to an
         // uncurated voice (see the lib/voices partial mock above), so its
-        // scheduleMissingContent throws. Healthy cards are English-source
+        // ensureTextContent throws. Healthy cards are English-source
         // (target es rides the mocked llmPool; en source audio rides the
         // mocked ttsPool), so the scheduled fan-out stays fully mocked.
         const languages = ['zz_uncurated', 'en', 'en'];

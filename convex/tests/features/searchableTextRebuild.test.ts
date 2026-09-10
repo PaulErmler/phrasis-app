@@ -6,6 +6,11 @@ import schema from '../../schema';
 import { internal } from '../../_generated/api';
 import type { Id } from '../../_generated/dataModel';
 import { buildCardSearchableText } from '../../lib/cardContent';
+import {
+  renderingForView,
+  renderingTextOf,
+  viewOfCard,
+} from '../../db/translationReads';
 
 const modules = import.meta.glob('/convex/**/*.ts');
 
@@ -304,5 +309,102 @@ describe('scheduleSearchableTextRebuild: per-text debounce', () => {
     expect(after.searchableText).toContain('zhende');
     const text = await t.run(async (ctx) => (await ctx.db.get(textId))!);
     expect(text.searchableRebuildScheduledAt).toBeUndefined();
+  });
+});
+
+describe('the search string follows the served rendering', () => {
+  it('indexes the politeness variant a card shows, not the canonical wording', async () => {
+    const t = convexTest(schema, modules);
+    const { courseId, textId, cardId } = await seedCourseCardText(t, {
+      sourceText: 'Are you coming?',
+      sourceLanguage: 'en',
+      baseLanguages: ['en'],
+      targetLanguages: ['de'],
+      translation: { lang: 'de', text: 'Kommst du?' },
+    });
+    // A course set to formal, and a card created after the feature, so it
+    // follows the setting.
+    await t.run(async (ctx) => {
+      await ctx.db.insert('courseSettings', {
+        courseId,
+        initialReviewCount: 3,
+        politenessLevels: ['formal'],
+      });
+      await ctx.db.patch(cardId, { followsCoursePreferences: true });
+    });
+    expect((await getCard(t, cardId)).searchableText).toContain('Kommst du');
+
+    // The rewrite lands under the card's rendering key.
+    await t.run(async (ctx) => {
+      const text = (await ctx.db.get(textId))!;
+      const card = (await ctx.db.get(cardId))!;
+      await ctx.db.insert('translations', {
+        textId,
+        targetLanguage: 'de',
+        translatedText: 'Kommen Sie?',
+        variantKey: renderingForView(
+          viewOfCard(card, { politenessLevels: ['formal'] }),
+          renderingTextOf(text),
+          textId,
+          'de',
+        ).key,
+      });
+    });
+    await t.mutation(internal.features.decks.rebuildSearchableTextForText, {
+      textId,
+    });
+    await drainScheduled(t);
+
+    const after = await getCard(t, cardId);
+    expect(after.searchableText).toContain('Kommen Sie');
+    expect(after.searchableText).not.toContain('Kommst du');
+  });
+});
+
+describe('the card-add and refresh builders follow the served rendering too', () => {
+  it('indexes an existing politeness variant for a following card and the canonical words for a legacy card', async () => {
+    // The fan-out rebuild followed the rendering since 2026-09-09, but the
+    // builder that card creation, the review-time refresh and accept-latest
+    // use read canonical rows, so a card added after the preview had already
+    // generated its variant was found by "du" and missed by "Sie", and
+    // nothing rebuilt it (the only rebuild trigger is a variant write).
+    const t = convexTest(schema, modules);
+    const { textId } = await seedCourseCardText(t, {
+      sourceText: 'Are you coming?',
+      sourceLanguage: 'en',
+      baseLanguages: ['en'],
+      targetLanguages: ['de'],
+      translation: { lang: 'de', text: 'Kommst du?' },
+    });
+    await t.run(async (ctx) => {
+      const text = (await ctx.db.get(textId))!;
+      await ctx.db.insert('translations', {
+        textId,
+        targetLanguage: 'de',
+        translatedText: 'Kommen Sie?',
+        variantKey: renderingForView(
+          {
+            settings: { politenessLevels: ['formal'] },
+            card: { followsCoursePreferences: true },
+          },
+          renderingTextOf(text),
+          textId,
+          'de',
+        ).key,
+      });
+    });
+    const build = (card: { followsCoursePreferences?: true } | null) =>
+      t.run(async (ctx) =>
+        buildCardSearchableText(ctx, textId, ['en', 'de'], {
+          text: await ctx.db.get(textId),
+          view: { settings: { politenessLevels: ['formal'] }, card },
+        }),
+      );
+    const following = await build({ followsCoursePreferences: true });
+    expect(following.searchableText).toContain('Kommen Sie');
+    expect(following.searchableText).not.toContain('Kommst du');
+    const legacy = await build({});
+    expect(legacy.searchableText).toContain('Kommst du');
+    expect(legacy.searchableText).not.toContain('Kommen Sie');
   });
 });

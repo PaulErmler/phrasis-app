@@ -1,6 +1,10 @@
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
 import { isAudioAssetReferenced, resolveAudioPayload } from './audioAssets';
+import {
+  audioPointer,
+  audioPointersForTextLanguage,
+} from '../db/translationReads';
 
 /**
  * Delete an `audioRecordings` pointer row; when it was the LAST pointer at
@@ -14,16 +18,18 @@ import { isAudioAssetReferenced, resolveAudioPayload } from './audioAssets';
  *
  * `opts.keepAsset` detaches the pointer but PRESERVES the asset + blob even
  * when this was the last pointer. Use it whenever the audio itself is still
- * correct and only this text stops needing it. Card edits, retranslations,
- * and speaker-gender re-voicing, so the content-addressed `audioAssets`
- * cache keeps serving the string for other texts and future re-creation.
- * Full garbage collection (the default) is reserved for audio that is
- * OBSOLETE as audio: the manual regenerate button and TTS-system migrations
- * (provider/ttsVersion changes).
+ * correct and only this text stops needing it: card edits, retranslations,
+ * speaker-gender re-voicing, accent drift, and provider or ttsVersion
+ * changes, which are a new TTS setup rather than obsolescence (every clip
+ * is kept per text + gender + accent + provider + version so a setup change
+ * can be rolled forward or back cheaply, see convex/lib/audioAssets.ts).
+ * The content-addressed `audioAssets` cache keeps serving the string for
+ * other texts and for a roll-back. Full garbage collection (the default) is
+ * reserved for the manual regenerate button and the orphan cascades.
  *
  * `opts.blobAlreadyGone` skips the storage delete when the blob is already
  * known to be missing (`storage.getUrl` returned null), as in
- * `scheduleMissingContent`'s stale-file cleanup. Row/asset bookkeeping still
+ * `ensureTextContent`'s stale-file cleanup. Row/asset bookkeeping still
  * runs, but there is no blob left to delete.
  */
 export async function deleteAudioRow(
@@ -45,22 +51,35 @@ export async function deleteAudioRow(
 }
 
 /**
- * Delete every `audioRecordings` row for one (text, language) via the
- * reference-aware `deleteAudioRow`. The `take(10)` cap bounds the read; a
- * language has at most a couple of rows (one per voice) in practice.
+ * Delete the `audioRecordings` pointers of one (text, language) that speak
+ * the wording of one rendering, via the reference-aware `deleteAudioRow`.
+ * `variantKey` undefined is the legacy pointer; a key names that key's
+ * pointer. Every OTHER key keeps its clip: each keyed row is its own
+ * wording, and a wording change on one rendering says nothing about the
+ * others (docs/architecture/rendering-keys.md).
  */
 export async function deleteAudioRowsForTextLanguage(
   ctx: MutationCtx,
   textId: Id<'texts'>,
   language: string,
+  opts?: { keepAsset?: boolean; variantKey?: string },
+): Promise<void> {
+  const row = await audioPointer(ctx, textId, language, opts?.variantKey);
+  if (row) await deleteAudioRow(ctx, row, opts);
+}
+
+/**
+ * Delete EVERY pointer of (text, language), legacy and keyed alike. For the
+ * manual regenerate button and the cascades that drop a text's audio
+ * wholesale.
+ */
+export async function deleteAllAudioRowsForTextLanguage(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  language: string,
   opts?: { keepAsset?: boolean },
 ): Promise<void> {
-  const rows = await ctx.db
-    .query('audioRecordings')
-    .withIndex('by_text_and_language', (q) =>
-      q.eq('textId', textId).eq('language', language),
-    )
-    .take(10);
+  const rows = await audioPointersForTextLanguage(ctx, textId, language);
   for (const row of rows) {
     await deleteAudioRow(ctx, row, opts);
   }
@@ -119,14 +138,7 @@ export async function getAudioForText(
   languages: string[],
 ): Promise<AudioResult[]> {
   const records = await Promise.all(
-    languages.map((lang) =>
-      ctx.db
-        .query('audioRecordings')
-        .withIndex('by_text_and_language', (q) =>
-          q.eq('textId', textId).eq('language', lang),
-        )
-        .first(),
-    ),
+    languages.map((lang) => audioPointer(ctx, textId, lang)),
   );
 
   const payloads = await Promise.all(

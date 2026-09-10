@@ -78,6 +78,27 @@ export const translationValidator = v.object({
    * "regenerate audio". That flow has no LLM phase.
    */
   retranslating: v.optional(v.boolean()),
+  // The chips (see CardTranslationContent in convex/lib/cardContent.ts).
+  voiceGender: v.optional(v.union(v.literal('male'), v.literal('female'))),
+  politenessLevel: v.optional(
+    v.union(v.literal('casual'), v.literal('polite'), v.literal('formal')),
+  ),
+  /**
+   * The code whose politeness config names `politenessLevel`, which on a
+   * mixed code is the served row's own dialect rather than the course
+   * language. `es_mixed` has no config of its own, and Spain and Latin
+   * America map the levels onto different forms, so the chip needs the row's
+   * answer. Sent only alongside `politenessLevel`.
+   */
+  formLanguage: v.optional(v.string()),
+  /**
+   * The course's sentence-form settings ask for a rendering of this language
+   * that has not landed yet, so `text` is the canonical wording and is about
+   * to change. Surfaces show it as pending rather than presenting the current
+   * sentence as the answer (2026-09-08 review: a learner who set "formal" was
+   * shown the casual wording with nothing to say so).
+   */
+  formPending: v.optional(v.boolean()),
 });
 
 export const audioRecordingValidator = v.object({
@@ -400,6 +421,22 @@ export function sumOriginBuckets(split: NewCardsByOrigin): number {
  * rather than inferred from the row's shape: the three gestures have different
  * retranslation policies and are the unit later analytics will group by.
  */
+/**
+ * What a learner ticked in the Flag dialog. Multi-select; stored on the
+ * `cardEdits` row of the gesture. Each reason decides different work in
+ * `flagTranslation` (features/scheduling.ts).
+ */
+export const FLAG_REASON_VALUES = [
+  'wrong_translation',
+  'wrong_gender',
+  'wrong_politeness',
+  'other',
+] as const;
+export const flagReasonValidator = v.union(
+  ...FLAG_REASON_VALUES.map((value) => v.literal(value)),
+);
+export type FlagReason = (typeof FLAG_REASON_VALUES)[number];
+
 export const cardEditKindValidator = v.union(
   v.literal('manual_edit'), // the Edit Card dialog (features/scheduling:editCard)
   v.literal('chat_also_correct'), // chat replace (chat/cardApprovals)
@@ -523,6 +560,29 @@ export const ADDRESSEE_NUMBER_VALUES = [
 const literalUnion = <T extends readonly string[]>(values: T) =>
   v.union(...values.map((value: T[number]) => v.literal(value)));
 
+// The politeness preference (lib/languageForms.ts, lib/preferenceResolution.ts).
+// Stored on courseSettings and onboardingProgress; undefined = each
+// sentence's primary form. `politenessLevels` is a SET of global levels; the
+// UI never writes an empty array.
+export const POLITENESS_LEVEL_VALUES = ['casual', 'polite', 'formal'] as const;
+export const politenessLevelValidator = literalUnion(POLITENESS_LEVEL_VALUES);
+export const politenessLevelsValidator = v.array(politenessLevelValidator);
+/** The settings as readers and job args carry them. */
+export const renderingSettingsValidator = v.object({
+  politenessLevels: v.optional(politenessLevelsValidator),
+});
+/**
+ * The `cards` fields the resolver reads (`RenderingCard` in
+ * lib/preferenceResolution.ts), as the per-card ensure jobs carry them.
+ */
+export const renderingCardValidator = v.object({
+  followsCoursePreferences: v.optional(v.literal(true)),
+  renderingGenderOverride: v.optional(voiceGenderValidator),
+  renderingPolitenessOverride: v.optional(politenessLevelValidator),
+  // `cards.accentLanguage`: the source clip the rendering sweep voices is
+  // the accent row's when the card reads one (`SweepCard`).
+  accentLanguage: v.optional(v.string()),
+});
 export const proposedCardMetadataValidator = v.object({
   speakerGender: v.optional(literalUnion(SPEAKER_GENDER_VALUES)),
   register: v.optional(literalUnion(REGISTER_VALUES)),

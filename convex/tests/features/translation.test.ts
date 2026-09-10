@@ -2,6 +2,52 @@
 import { describe, it, expect, vi } from 'vitest';
 import { generateKeyPairSync } from 'node:crypto';
 import { romanizeText } from '../../features/translation';
+import { TransientAnnotationError } from '../../lib/textAnnotations';
+
+/**
+ * Stub Google auth plus the romanize endpoint; `romanize` answers each call
+ * in turn (1-based). Returns the call counter.
+ */
+function stubGoogle(romanize: (call: number) => Response) {
+  const { privateKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+  });
+  vi.stubEnv(
+    'GOOGLE_SERVICE_ACCOUNT_KEY',
+    JSON.stringify({
+      client_email: 'tester@example.iam.gserviceaccount.com',
+      private_key: privateKey as unknown as string,
+      project_id: 'test-project',
+    }),
+  );
+  let calls = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string | URL | Request) => {
+      const u = typeof url === 'string' ? url : url.toString();
+      if (u.includes('oauth2.googleapis.com')) {
+        return new Response(JSON.stringify({ access_token: 'fake-token' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (u.includes('translation.googleapis.com')) {
+        calls++;
+        return romanize(calls);
+      }
+      throw new Error(`Unexpected fetch to ${u}`);
+    }),
+  );
+  return { calls: () => calls };
+}
+
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
 
 // translation.ts exposes shared helpers (no Convex functions).
 // Only the zh/el/ko paths are pure (local libs); the v2/v3 Google paths
@@ -95,26 +141,28 @@ describe('features/translation helpers', () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it('romanizes Arabic locally via arabic-transliterate (no network call)', async () => {
-      // Arabic was moved OFF Google v3 after a production regression where
-      // the endpoint started returning `{"romanizations":[{}]}` for short
-      // Arabic strings. arabic-transliterate is now the local source of
-      // truth. Guard against accidentally re-routing `ar*` back to Google.
+    it('routes Arabic to Google v3, not to a local library', async () => {
+      // Arabic returned to Google v3 in Sep 2026 (Paul's call). It had been
+      // moved off after a production regression where the endpoint answered
+      // `{"romanizations":[{}]}` for short Arabic strings — that is exactly
+      // what ROMANIZE_MAX_ATTEMPTS was added for, and the retry loop is what
+      // makes the route survivable now.
+      //
+      // `arabic-transliterate` is gone: it produced IJMES academic output
+      // ("shkra jzyal-" for شكرا جزيلا), which scored 65% against
+      // data_preparation/romanization_eval and is not a learner reading aid.
       const fetchMock = vi.fn(async () => {
-        throw new Error(
-          'romanizeText hit the network for Arabic — local path regressed',
-        );
+        throw new Error('google call attempted');
       });
       vi.stubGlobal('fetch', fetchMock);
       try {
-        const out = await romanizeText('مرحبا', 'ar');
-        // Library output is deterministic IJMES; assert non-empty + Latin.
-        expect(out.length).toBeGreaterThan(0);
-        expect(/[A-Za-zāēīōū]/.test(out)).toBe(true);
+        await expect(romanizeText('مرحبا', 'ar')).rejects.toThrow();
       } finally {
         vi.unstubAllGlobals();
       }
-      expect(fetchMock).not.toHaveBeenCalled();
+      // The point of the test: it reached the network rather than answering
+      // from a local library.
+      expect(fetchMock).toHaveBeenCalled();
     });
 
     it('romanizes Telugu locally (no network call) because Google v3 400s on te', async () => {
@@ -151,22 +199,22 @@ describe('features/translation helpers', () => {
       expect(fetchMock).not.toHaveBeenCalled();
     });
 
-    it('Arabic dialect codes (ar_sa / ar_eg / ar_iq / ar_lev) also use the local path', async () => {
+    it('Arabic dialect codes (ar_sa / ar_eg / ar_iq / ar_lev) follow ar to Google v3', async () => {
+      // The dialect tail collapses to `ar` via GOOGLE_TRANSLATE_CODE_MAP, so
+      // all five codes must take the same route. A dialect left behind on a
+      // different engine would romanize the same script two ways.
       const fetchMock = vi.fn(async () => {
-        throw new Error(
-          'Arabic dialect romanization hit the network — local path regressed',
-        );
+        throw new Error('google call attempted');
       });
       vi.stubGlobal('fetch', fetchMock);
       try {
         for (const code of ['ar_sa', 'ar_eg', 'ar_iq', 'ar_lev'] as const) {
-          const out = await romanizeText('هلو', code);
-          expect(out.length).toBeGreaterThan(0);
+          await expect(romanizeText('هلو', code)).rejects.toThrow();
         }
       } finally {
         vi.unstubAllGlobals();
       }
-      expect(fetchMock).not.toHaveBeenCalled();
+      expect(fetchMock).toHaveBeenCalled();
     });
 
     it('Google v3 callers (Russian) get retried up to 3 times before failing', async () => {
@@ -282,6 +330,51 @@ describe('features/translation helpers', () => {
         vi.unstubAllEnvs();
       }
       expect(romanizeCalls).toBe(2);
+    });
+
+    it('an empty Google reply leaves the row open rather than taking the sentinel', async () => {
+      // The Arabic flake: `{"romanizations":[{}]}` from one backend
+      // instance while another answers. Not a fact about the text, so the
+      // runners must not record the permanent '' for it.
+      const google = stubGoogle(() => json({ romanizations: [{}] }));
+      try {
+        await expect(romanizeText('مرحبا', 'ar')).rejects.toBeInstanceOf(
+          TransientAnnotationError,
+        );
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
+      expect(google.calls()).toBe(3);
+    });
+
+    it('a 5xx is transient; a 400 is final even when its body mentions a 5xx-looking number', async () => {
+      // The transient test used to match `\b5\d\d\b` anywhere in the
+      // message, so a 400 whose body said "exceeds 512" was re-attempted on
+      // every view.
+      let google = stubGoogle(() =>
+        json({ error: { code: 503, message: 'backend unavailable' } }, 503),
+      );
+      try {
+        await expect(romanizeText('привет', 'ru')).rejects.toBeInstanceOf(
+          TransientAnnotationError,
+        );
+        expect(google.calls()).toBe(3);
+        vi.unstubAllGlobals();
+        google = stubGoogle(() =>
+          json(
+            { error: { code: 400, message: 'Text exceeds 512 characters.' } },
+            400,
+          ),
+        );
+        const err: unknown = await romanizeText('привет', 'ru').catch((e) => e);
+        expect(err).toBeInstanceOf(Error);
+        expect(err).not.toBeInstanceOf(TransientAnnotationError);
+        expect(google.calls()).toBe(1);
+      } finally {
+        vi.unstubAllGlobals();
+        vi.unstubAllEnvs();
+      }
     });
 
     it('does not retry Google v3 400 INVALID_ARGUMENT (unsupported source language)', async () => {

@@ -205,12 +205,11 @@ describe('resolveCardSpeakerGenders', () => {
       'seed-custom',
     );
     expect(['male', 'female']).toContain(r.audioSpeakerGender);
-    // Never patches speakerGender for custom (LLM owns it); only audio.
-    expect(r.genderPatch.speakerGender).toBeUndefined();
-    expect(r.genderPatch.audioSpeakerGender).toBe(r.audioSpeakerGender);
+    // Never patches speakerGender (the classifier owns it); only the voice.
+    expect(r.genderPatch).toEqual({ audioSpeakerGender: r.audioSpeakerGender });
   });
 
-  it('premade + undefined coin-flips BOTH fields to the same value', () => {
+  it('premade + undefined flips the voice only, never speakerGender', () => {
     const r = resolveCardSpeakerGenders(
       {
         speakerGender: undefined,
@@ -219,8 +218,8 @@ describe('resolveCardSpeakerGenders', () => {
       },
       'seed-premade',
     );
-    expect(r.genderPatch.speakerGender).toBe(r.audioSpeakerGender);
-    expect(r.genderPatch.audioSpeakerGender).toBe(r.audioSpeakerGender);
+    expect(r.genderPatch).toEqual({ audioSpeakerGender: r.audioSpeakerGender });
+    expect('speakerGender' in r.genderPatch).toBe(false);
   });
 
   it('is deterministic per seed (retry-stable, no re-roll)', () => {
@@ -253,5 +252,33 @@ describe('resolveCardSpeakerGenders', () => {
       'seed-x',
     );
     expect(r.audioSpeakerGender).toBe('female');
+  });
+});
+
+describe('resolveCardSpeakerGenders on a classified curriculum text', () => {
+  it('keeps a neutral verdict instead of writing the coin flip over it', () => {
+    const r = resolveCardSpeakerGenders(
+      {
+        speakerGender: 'neutral',
+        audioSpeakerGender: undefined,
+        userCreated: false,
+        metadataSource: 'gemini-3.1-flash-lite-v1',
+      },
+      'seed-classified',
+    );
+    expect(['male', 'female']).toContain(r.audioSpeakerGender);
+    expect(r.genderPatch).toEqual({ audioSpeakerGender: r.audioSpeakerGender });
+  });
+
+  it('flips only the voice on an unclassified premade text too', () => {
+    const r = resolveCardSpeakerGenders(
+      {
+        speakerGender: 'neutral',
+        audioSpeakerGender: undefined,
+        userCreated: false,
+      },
+      'seed-legacy',
+    );
+    expect(r.genderPatch).toEqual({ audioSpeakerGender: r.audioSpeakerGender });
   });
 });

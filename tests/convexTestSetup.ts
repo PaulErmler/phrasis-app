@@ -12,7 +12,7 @@ process.env.OPENROUTER_API_KEY = 'test-openrouter-key';
  * which convex-test can only provide via `t.registerComponent` (flagged
  * fragile in this project, same reasoning as the rateLimiter module mock in
  * individual test files). Any mutation that enqueues content generation
- * (`enqueueTtsJob`, `enqueueLlmTranslation`, `scheduleMissingContent` callers)
+ * (`enqueueTtsJob`, `enqueueLlmTranslation`, `ensureTextContent` callers)
  * would otherwise crash on the missing component.
  *
  * Each enqueue resolves to a unique fake workId so tests can assert the
@@ -179,3 +179,32 @@ vi.mock('lindera-wasm-nodejs-ipadic', () => {
   }
   return { TokenizerBuilder };
 });
+
+/**
+ * Stub the OpenRouter PROVIDER for every suite, so no test can reach the
+ * network. `generateText` itself stays real.
+ *
+ * The setup above fakes `OPENROUTER_API_KEY` on the assumption, true until
+ * 2026-09, that every suite reaching an LLM declares its own mock. Two
+ * scheduled actions broke it:
+ * `sentenceMetadata.classifyCurriculumText` (the sweep's metadata gate)
+ * and `sentenceMetadata.fetchSentenceMetadata` (the custom-card paths) are
+ * scheduled by `ensureTextContent` and by the translation write choke
+ * point, so any suite that lands a translation now fires them. Unmocked they made a real
+ * HTTP call, which outlives `drainSchedulerAfterEach`'s macrotask drain and
+ * resumes inside the NEXT test, where convex-test's scheduled-function
+ * continuation pops a write frame off that test's transaction. Symptom: a
+ * row pointing at a document that does not exist, in a test that passes in
+ * isolation and fails after any test that bumps a translation version.
+ *
+ * Stubbing the provider rather than `generateText`: several suites
+ * (chat/messages.test.ts) mock this module themselves with a model that
+ * drives the REAL `generateText`, and a global `generateText` stub would
+ * silently defeat them. A file-level `vi.mock` takes precedence over this
+ * registration, exactly like the aggregate stub above. Suites with no mock
+ * of their own now get a model object the SDK rejects, which fails fast and
+ * locally inside the drain window instead of going out over the wire.
+ */
+vi.mock('@openrouter/ai-sdk-provider', () => ({
+  createOpenRouter: () => (modelSlug: string) => ({ modelId: modelSlug }),
+}));

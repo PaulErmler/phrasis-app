@@ -7,7 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { getTextDirection, languageName } from '@/lib/languages';
-import type { CardEditKind, RetranslationStatus } from '@/convex/types';
+import type {
+  CardEditKind,
+  FlagReason,
+  RetranslationStatus,
+} from '@/convex/types';
 
 /**
  * QC feed for the card-edit audit log. Two questions per row: was the user's
@@ -29,6 +33,13 @@ const KIND_LABELS: Record<CardEditKind, string> = {
   chat_also_correct: 'chat replace',
   flag: 'flag',
   accept_latest: 'accepted latest wording',
+};
+
+const FLAG_REASON_LABELS: Record<FlagReason, string> = {
+  wrong_translation: 'wrong translation',
+  wrong_gender: 'wrong speaker gender',
+  wrong_politeness: 'wrong politeness',
+  other: 'other',
 };
 
 // Green = the retranslation landed. Amber = still in flight or deliberately
@@ -119,8 +130,22 @@ export function CardEditsBrowser() {
                       own sentence
                     </Badge>
                   )}
+                  {edit.flagReasons?.map((reason) => (
+                    <Badge
+                      key={reason}
+                      variant="outline"
+                      className="text-[10px]"
+                    >
+                      {FLAG_REASON_LABELS[reason]}
+                    </Badge>
+                  ))}
                 </div>
               </div>
+              {edit.flagNote && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  &ldquo;{edit.flagNote}&rdquo;
+                </p>
+              )}
 
               <div className="mt-2 space-y-1.5">
                 {edit.changes.map((change) => (

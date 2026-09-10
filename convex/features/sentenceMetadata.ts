@@ -22,48 +22,20 @@ import {
   openrouterCostUsd,
   openrouterGenerationId,
 } from '../lib/posthogAi';
-import {
-  getLanguageByCode,
-  resolveAudioSpeakerGender,
-} from '../../lib/languages';
+import { resolveAudioSpeakerGender, seededIndex } from '../../lib/languages';
 import { isUserCreatedText } from '../../lib/translationProvenance';
+import { deleteAudioRow } from '../lib/audio';
+import { parseRenderingKey, renderingKey } from '../../lib/preferenceResolution';
 import { retrier } from '../retrier';
 import { stripJsonFences } from '../lib/llmJson';
 
-const METADATA_SYSTEM_PROMPT = `You analyze a sentence and return strict linguistic metadata as JSON.
-
-You will receive one or more renderings of the SAME sentence in different languages. Use cross-lingual signals — gendered morphology in any one of the supplied translations is enough to fix the sentence's gender. Treat the renderings as semantically identical: do not invent extra meaning that no rendering supports.
-
-Return ONLY a valid JSON object with EXACTLY these five keys and no others, no markdown, no explanation:
-
-{
-  "register": "formal" | "informal" | "neutral",
-  "addresseeNumber": "singular" | "plural" | "not_applicable",
-  "speakerGender": "male" | "female" | "neutral",
-  "addresseeGender": "male" | "female" | "neutral" | "not_applicable",
-  "addressesSomeone": true | false
-}
-
-FIELD DEFINITIONS:
-
-- register: The formality level of the sentence. "formal" for polite/respectful forms (Spanish "usted", French "vous", German "Sie", Japanese です/ます, Korean 해요체/합쇼체, Hindi आप). "informal" for casual/familiar forms (Spanish "tú/vosotros", French "tu", German "du", Japanese plain form, Korean 반말, Hindi तुम). "neutral" only when there is no addressee or no formality marking at all.
-
-- addresseeNumber: How many people are being addressed. "singular" if the sentence speaks to one person. "plural" if it speaks to more than one. "not_applicable" if the sentence has no addressee (e.g. "It is raining.", "The book is on the table.", a first-person statement with no "you"). This field NEVER takes "neutral" — its no-addressee value is "not_applicable".
-
-- speakerGender: The grammatical gender of the speaker. Return "male" or "female" ONLY when at least one supplied translation contains gender-marked morphology referring to the speaker. Examples that fix the gender:
-  * Spanish/Italian/Portuguese/French past participles or adjectives agreeing with a first-person subject ("estoy cansada" = female, "sono andato" = male).
-  * Russian past-tense verbs with first-person subject ("я пошёл" = male, "я пошла" = female).
-  * Arabic verb conjugations and pronoun suffixes referring to the speaker.
-  * Hebrew verb forms in first person.
-  * Hindi verb agreement with first-person subject.
-  * Polish/Czech past tense gendered forms.
-  Otherwise return "neutral". Do NOT guess based on topic or stereotype.
-
-- addresseeGender: Same rule, but for the person being addressed. "not_applicable" if there is no addressee. "neutral" if there is an addressee but no rendering grammatically marks their gender.
-
-- addressesSomeone: Boolean. true if the sentence speaks to a 2nd-person addressee (imperatives, direct questions, vocatives, sentences containing "you"/"your", commands, requests, greetings). false otherwise (descriptive/narrative sentences like "It is raining.", "The Pacific Ocean is the largest body of water on Earth.", first-person statements with no second-person reference). When addressesSomeone is false, addresseeNumber should be "not_applicable" and addresseeGender should be "not_applicable".
-
-Be strict: if no rendering forces a value, return "neutral" / "not_applicable". Do not invent gender information.`;
+// The classifier prompt lives in convex/lib/sentenceMetadataPrompt.ts
+// (Convex-runtime-free) so `pnpm eval:metadata` grades the exact production
+// prompt; change it there.
+import {
+  buildMetadataSystemPrompt,
+  buildMetadataUserPrompt,
+} from '../lib/sentenceMetadataPrompt';
 
 // Value sets, `Metadata`, and the strict validator live in
 // lib/sentenceMetadataShape.ts (Convex-runtime-free, so the autofill prompt
@@ -74,6 +46,7 @@ export {
   ALLOWED_ADDRESSEE_NUMBER,
   ALLOWED_SPEAKER_GENDER,
   ALLOWED_ADDRESSEE_GENDER,
+  ALLOWED_REFERENT_GENDER,
   validateSentenceMetadata,
   type Metadata,
 } from '../lib/sentenceMetadataShape';
@@ -82,6 +55,8 @@ import {
   ALLOWED_ADDRESSEE_NUMBER,
   ALLOWED_SPEAKER_GENDER,
   ALLOWED_ADDRESSEE_GENDER,
+  ALLOWED_REFERENT_GENDER,
+  CURRENT_SENTENCE_METADATA_SOURCE,
   type Metadata,
 } from '../lib/sentenceMetadataShape';
 
@@ -135,6 +110,7 @@ function safeExtractMetadata(raw: string): Partial<Metadata> {
   pickField(stringOut, obj, 'addresseeNumber', ALLOWED_ADDRESSEE_NUMBER);
   pickField(stringOut, obj, 'speakerGender', ALLOWED_SPEAKER_GENDER);
   pickField(stringOut, obj, 'addresseeGender', ALLOWED_ADDRESSEE_GENDER);
+  pickField(stringOut, obj, 'referentGender', ALLOWED_REFERENT_GENDER);
   Object.assign(out, stringOut);
   // addressesSomeone is the only boolean field. Handle separately.
   if (typeof obj.addressesSomeone === 'boolean') {
@@ -187,7 +163,7 @@ const metadataJobArgs = v.object({
  *      validated are patched onto the row and `prepareCardContent` is re-scheduled
  *      so any audio whose voice gender no longer matches the now-resolved
  *      `audioSpeakerGender` is invalidated and regenerated by the existing logic
- *      in `decks.ts:scheduleMissingContent`.
+ *      in `ensureTextContent` (convex/lib/contentScheduling.ts).
  */
 export const generateSentenceMetadata = internalAction({
   args: metadataJobArgs.fields,
@@ -243,6 +219,35 @@ export const generateSentenceMetadata = internalAction({
 });
 
 /**
+ * Entry point of the content sweep for a CURRICULUM text
+ * (`requestSentenceMetadataIfNeeded` in convex/lib/contentScheduling.ts):
+ * the classifier on the source sentence alone, through the retrier, with no
+ * unblock call. The sweep waits for the verdict before it computes a
+ * rendering key, so the row's voice and form are decided from data, never
+ * from a guess a verdict could overturn (docs/architecture/rendering-keys.md).
+ */
+export const classifyCurriculumText = internalAction({
+  args: metadataJobArgs.fields,
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    try {
+      await retrier.run(
+        ctx as unknown as Parameters<typeof retrier.run>[0],
+        internal.features.sentenceMetadata.fetchSentenceMetadata,
+        args,
+      );
+      return null;
+    } catch (error) {
+      await trackException(ctx, error, args.userId, {
+        textId: args.textId,
+        source: 'classifyCurriculumText',
+      });
+      throw error;
+    }
+  },
+});
+
+/**
  * Run the OpenRouter LLM to infer linguistic metadata and patch whatever
  * fields validate onto the row. Only transient infrastructure failures from
  * `generateText` bubble up and trigger retrier backoff. A bad-but-parseable
@@ -259,21 +264,14 @@ export const fetchSentenceMetadata = internalAction({
         return null;
       }
 
-      const renderings = args.translations
-        .map((t) => {
-          const lang = getLanguageByCode(t.language);
-          return `[${lang?.name ?? t.language}]: ${t.text}`;
-        })
-        .join('\n');
-
-      const userPrompt = `Renderings of the same sentence:\n${renderings}\n\nReturn the metadata JSON now.`;
+      const userPrompt = buildMetadataUserPrompt(args.translations);
 
       const openrouter = getOpenRouter();
 
       const startedAt = Date.now();
       const { text, usage, providerMetadata } = await generateText({
         model: openrouter(OPENROUTER_MODELS.sentenceMetadata),
-        system: METADATA_SYSTEM_PROMPT,
+        system: buildMetadataSystemPrompt(),
         prompt: userPrompt,
       });
 
@@ -325,8 +323,8 @@ export const fetchSentenceMetadata = internalAction({
 
 /**
  * Patch the texts row with linguistic metadata, resolve audioSpeakerGender,
- * stamp that gender onto the text's translations, and (optionally) schedule
- * prepareCardContent so audio is regenerated to match.
+ * move a user-written text's keyed rows onto the voice when it changed, and
+ * (optionally) schedule prepareCardContent so content is generated to match.
  *
  * Idempotent: safe to call twice (once with `metadata: undefined` to unblock,
  * then again with real metadata after a retry success). The audioSpeakerGender
@@ -334,9 +332,7 @@ export const fetchSentenceMetadata = internalAction({
  *
  * Exported as a plain helper (not only the internalMutation below) so the
  * chat "also correct" replace path (cardApprovals.ts) can apply model-proposed
- * metadata inside its own transaction. The prepareCardContent pass this
- * schedules is what re-voices audio after a speaker-gender change (payload
- * voiceGender mismatch check in decks.ts).
+ * metadata inside its own transaction.
  */
 export async function applyTextMetadata(
   ctx: MutationCtx,
@@ -348,6 +344,7 @@ export async function applyTextMetadata(
       speakerGender?: string;
       addresseeGender?: string;
       addressesSomeone?: boolean;
+      referentGender?: string;
     };
     schedulePrepareCard: boolean;
     baseLanguages: string[];
@@ -378,7 +375,8 @@ export async function applyTextMetadata(
   ) {
     audioSpeakerGender = text.audioSpeakerGender;
   } else {
-    audioSpeakerGender = resolveAudioSpeakerGender(incomingGender);
+    // The same flip the content sweep would take (`resolveCardSpeakerGenders`).
+    audioSpeakerGender = resolveAudioSpeakerGender(incomingGender, args.textId);
   }
 
   // Build the metadata patch from whatever the LLM committed to.
@@ -397,6 +395,14 @@ export async function applyTextMetadata(
   }
   if (args.metadata?.addressesSomeone !== undefined) {
     metadataPatch.addressesSomeone = args.metadata.addressesSomeone;
+  }
+  // A definitive third-party gender ("my sister", "her husband") replaces
+  // whatever coin flip stood there; "neutral" leaves the flip below to it.
+  if (
+    args.metadata?.referentGender === 'male' ||
+    args.metadata?.referentGender === 'female'
+  ) {
+    metadataPatch.referentGender = args.metadata.referentGender;
   }
 
   // ── addresseeGender coin-flip ──
@@ -419,7 +425,10 @@ export async function applyTextMetadata(
     const alreadyCommitted =
       text.addresseeGender === 'male' || text.addresseeGender === 'female';
     if (needsCoinFlip && !alreadyCommitted) {
-      metadataPatch.addresseeGender = Math.random() < 0.5 ? 'male' : 'female';
+      // Seeded on the text so two concurrent passes agree (the speaker flip
+      // is seeded for the same reason).
+      metadataPatch.addresseeGender =
+        seededIndex(`${args.textId}|addressee`, 2) === 0 ? 'male' : 'female';
     } else if (needsCoinFlip && alreadyCommitted) {
       // Preserve the prior commit even if the LLM tried to write neutral.
       metadataPatch.addresseeGender = text.addresseeGender as string;
@@ -427,59 +436,90 @@ export async function applyTextMetadata(
   }
 
   // ── referentGender coin-flip ──
-  // Always pick a gender for the third-party referent, so gendered nouns
-  // (translator → Übersetzer/-in, doctor → Arzt/Ärztin) get a consistent
-  // assignment that's stable across target languages. Once set, never re-roll.
-  if (text.referentGender !== 'male' && text.referentGender !== 'female') {
-    metadataPatch.referentGender = Math.random() < 0.5 ? 'male' : 'female';
+  // When the classifier fixed no third party's gender, pick one so gendered
+  // nouns (translator → Übersetzer/-in, doctor → Arzt/Ärztin) get a
+  // consistent assignment that's stable across target languages. Once set,
+  // never re-roll; only a definitive verdict above replaces it.
+  if (
+    metadataPatch.referentGender === undefined &&
+    text.referentGender !== 'male' &&
+    text.referentGender !== 'female'
+  ) {
+    metadataPatch.referentGender =
+      seededIndex(`${args.textId}|referent`, 2) === 0 ? 'male' : 'female';
   }
+
+  // The source stamp says "these fields are the current classifier's
+  // verdict". Only a verdict that reached the speaker gender earns it: the
+  // unblock call (`metadata: undefined`) and a degraded partial patch leave
+  // the row unstamped, so a curriculum text's coin flip is never mistaken
+  // for evidence and the sweep asks again after the cooldown.
+  const classified = args.metadata?.speakerGender !== undefined;
 
   await ctx.db.patch(args.textId, {
     audioSpeakerGender,
     ...metadataPatch,
+    ...(classified
+      ? {
+          metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
+          metadataRequestedAt: undefined,
+          metadataAttempts: undefined,
+        }
+      : {}),
   });
 
-  // Finish the record this step owns: stamp the resolved gender onto the
-  // translations that were inserted alongside the text.
-  //
-  // Chat approval and custom-text creation write their translation rows
-  // BEFORE any gender exists, so they landed unstamped, "legacy" to every
-  // consumer of `translations.speakerGender`. That is not what legacy means:
-  // these rows are current, and their gender is precisely the one resolved
-  // here (for chat cards the metadata LLM *infers* the gender by reading
-  // these very translations). Leaving them unstamped is what let the
-  // gender-drift sweep treat them as suspect.
-  //
-  // Re-stamped on every call, so the retry that lands a definitive gender
-  // keeps text and translations in agreement instead of turning "legacy"
-  // rows into "drifted" ones. Only rows that disagree are patched, so the
-  // common re-run writes nothing.
-  //
-  // Restricted to user-created cards, whose wording is never regenerated.
-  // There the stamp records the card's gender rather than licensing a
-  // rewrite. On a PREMADE text the same stamp would be actively harmful: it
-  // clears both `isLegacy` and `isDrifted` for rows that really were written
-  // under the old gender, suppressing the `isLegacyAlongsideDriftedAudio`
-  // heal path in `scheduleMissingContent`. The audio gets re-voiced while
-  // the wrong-grammar text survives, which is the exact failure that branch
-  // exists to prevent. Every caller creates user-created cards today, so
-  // this is a guard on an invariant rather than a live branch; it is here so
-  // a future premade caller fails safe instead of silently mislabelling.
-  if (isUserCreatedText(text)) {
+  // A user-written text has one rendering per language, keyed by its voice
+  // (`<voice>|none`, docs/architecture/rendering-keys.md), inserted before
+  // any verdict exists. When the verdict moves the voice, the rows follow it
+  // in this same transaction so the card keeps finding them; the clips do
+  // not, and the ensure pass below re-voices them under the new key. A
+  // legacy row of a user text (from before the keys) carries the voice in
+  // `speakerGender` alone, which its chip reads, so that stamp follows too.
+  // A curriculum text's rows are never touched here: they are generated
+  // for a voice only after the verdict (the sweep's metadata gate).
+  const previousVoice = text.audioSpeakerGender;
+  if (isUserCreatedText(text) && previousVoice !== audioSpeakerGender) {
     const translations = await ctx.db
       .query('translations')
       .withIndex('by_textId', (q) => q.eq('textId', args.textId))
       .collect();
     for (const translation of translations) {
-      if (translation.speakerGender !== audioSpeakerGender) {
-        await ctx.db.patch(translation._id, {
-          speakerGender: audioSpeakerGender,
-        });
+      if (translation.variantKey === undefined) {
+        if (translation.speakerGender !== audioSpeakerGender) {
+          await ctx.db.patch(translation._id, {
+            speakerGender: audioSpeakerGender,
+          });
+        }
+        continue;
       }
+      const { voice, formId } = parseRenderingKey(translation.variantKey);
+      if (voice !== previousVoice) continue;
+      await ctx.db.patch(translation._id, {
+        variantKey: renderingKey(audioSpeakerGender, formId),
+        speakerGender: audioSpeakerGender,
+      });
+    }
+    const pointers = await ctx.db
+      .query('audioRecordings')
+      .withIndex('by_textId', (q) => q.eq('textId', args.textId))
+      .collect();
+    for (const pointer of pointers) {
+      if (pointer.variantKey === undefined) continue;
+      if (parseRenderingKey(pointer.variantKey).voice !== previousVoice) {
+        continue;
+      }
+      await deleteAudioRow(ctx, pointer, { keepAsset: true });
     }
   }
 
   if (args.schedulePrepareCard) {
+    // The pass buys audio only when the text is somebody's card: a
+    // collection preview requested this verdict for a text nobody studies
+    // yet, and a browse surface never buys a clip.
+    const cardForText = await ctx.db
+      .query('cards')
+      .withIndex('by_textId', (q) => q.eq('textId', args.textId))
+      .first();
     await ctx.scheduler.runAfter(
       0,
       internal.features.decks.prepareCardContent,
@@ -490,6 +530,7 @@ export async function applyTextMetadata(
         priority: args.priority,
         llmPriority: args.llmPriority,
         requestedByUserId: args.requestedByUserId,
+        skipTts: cardForText === null,
       },
     );
   }
@@ -507,6 +548,7 @@ export const applyMetadataAndPrepareCard = internalMutation({
         speakerGender: v.optional(v.string()),
         addresseeGender: v.optional(v.string()),
         addressesSomeone: v.optional(v.boolean()),
+        referentGender: v.optional(v.string()),
       }),
     ),
     schedulePrepareCard: v.boolean(),

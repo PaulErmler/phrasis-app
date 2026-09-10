@@ -13,7 +13,7 @@ import { SUPPORTED_LANGUAGES } from '../../lib/languages';
  *      every placement-test sentence (idempotent: skips rows already
  *      translated). The downstream pipeline triggers TTS automatically.
  *   2. `ensureAudioForTestTranslations` (60s delay): backstop sweep that
- *      re-runs `scheduleMissingContent` for any (sentence, language) pair
+ *      re-runs `ensureTextContent` for any (sentence, language) pair
  *      where the first pass left a row without audio.
  *
  * English-family targets (`en`, `en_gb`, …) are skipped. Placement sentences

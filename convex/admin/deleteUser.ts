@@ -130,6 +130,8 @@ export const USER_TABLES = [
   // so it can be drained here by one indexed read.
   'cardEdits',
   'cardEditRetranslations',
+  // Per-month flag-reward counters; nothing to keep past the account.
+  'flagRewards',
 ] as const;
 type UserTable = (typeof USER_TABLES)[number];
 
@@ -305,6 +307,13 @@ const USER_TABLE_DRAINS: Record<UserTable, UserTableDrain> = {
       await ctx.db
         .query('cardEditRetranslations')
         .withIndex('by_userId', (q) => q.eq('userId', u))
+        .take(ROW_BATCH),
+    ),
+  flagRewards: async (ctx, u) =>
+    ids(
+      await ctx.db
+        .query('flagRewards')
+        .withIndex('by_user_and_period', (q) => q.eq('userId', u))
         .take(ROW_BATCH),
     ),
 };
