@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import { useTranslations } from 'next-intl';
 import { Plus, GripVertical, X } from 'lucide-react';
 import {
   DndContext,
@@ -24,10 +25,22 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  LANGUAGE_CATEGORY_ORDER,
   getLanguageByCode,
   getLocalizedLanguageNameByCode,
   languageName,
+  languageSearchText,
   SUPPORTED_LANGUAGES,
+  type Language,
+  type LanguageCategory,
 } from '@/lib/languages';
 import { cn } from '@/lib/utils';
 
@@ -57,6 +70,91 @@ interface DualLanguageEditorProps {
 function getDisplayName(code: string, locale?: string): string {
   if (locale) return getLocalizedLanguageNameByCode(code, locale);
   return languageName(code);
+}
+
+/**
+ * The "add a language" picker: a searchable list grouped by family, in
+ * place of one long scroll of every language. Search matches what every
+ * picker matches (`languageSearchText`).
+ */
+function AddLanguagePicker({
+  languages,
+  locale,
+  onPick,
+}: {
+  languages: Language[];
+  locale?: string;
+  onPick: (code: string) => void;
+}) {
+  const t = useTranslations('LanguageSelector');
+  const grouped = useMemo(() => {
+    const buckets = new Map<LanguageCategory, Language[]>();
+    for (const lang of languages) {
+      const list = buckets.get(lang.category) ?? [];
+      list.push(lang);
+      buckets.set(lang.category, list);
+    }
+    const out: { category: LanguageCategory; languages: Language[] }[] = [];
+    for (const category of LANGUAGE_CATEGORY_ORDER) {
+      const list = buckets.get(category);
+      if (!list || list.length === 0) continue;
+      const sorted = [...list].sort((a, b) =>
+        getDisplayName(a.code, locale).localeCompare(
+          getDisplayName(b.code, locale),
+          locale,
+        ),
+      );
+      out.push({ category, languages: sorted });
+    }
+    return out;
+  }, [languages, locale]);
+
+  return (
+    <Command
+      className="bg-transparent"
+      filter={(value, search) =>
+        value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+      }
+    >
+      <CommandInput
+        autoFocus
+        placeholder={t('searchPlaceholder')}
+        aria-label={t('searchPlaceholder')}
+      />
+      <CommandList className="max-h-64">
+        <CommandEmpty>{t('noResults')}</CommandEmpty>
+        {grouped.map(({ category, languages: list }) => (
+          <CommandGroup key={category} heading={t(`categories.${category}`)}>
+            {list.map((lang) => {
+              const displayName = getDisplayName(lang.code, locale);
+              return (
+                <CommandItem
+                  key={lang.code}
+                  value={languageSearchText(lang, locale ?? 'en')}
+                  onSelect={() => onPick(lang.code)}
+                  data-testid={`language-option-${lang.code}`}
+                  className="cursor-pointer gap-2 rounded-lg px-2.5 py-2"
+                >
+                  <span className="text-lg">{lang.flag}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium leading-tight">
+                      {displayName}
+                    </span>
+                    {lang.nativeName.toLowerCase() !==
+                    displayName.toLowerCase() ? (
+                      <span className="block text-muted-xs">
+                        {lang.nativeName}
+                      </span>
+                    ) : null}
+                  </span>
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        ))}
+      </CommandList>
+    </Command>
+  );
 }
 
 function SortableItem({
@@ -232,6 +330,7 @@ function DroppableGroup({
             size="sm"
             className="w-full gap-1.5 h-8"
             onClick={() => setShowSelector(true)}
+            data-testid={`add-language-${id}-open`}
           >
             <Plus className="h-3.5 w-3.5" />
             {addLabel}
@@ -240,25 +339,21 @@ function DroppableGroup({
       )}
 
       {showSelector && (
-        <div className="pt-1 rounded-xl border bg-card p-2 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div
+          className="pt-1 rounded-xl border bg-card p-1.5 space-y-1 animate-in fade-in slide-in-from-top-2 duration-200"
+          data-testid={`add-language-${id}`}
+        >
           {availableLanguages.length === 0 ? (
             <p className="text-muted-xs text-center py-2">{noMoreLabel}</p>
           ) : (
-            availableLanguages.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => {
-                  onAdd(lang.code);
-                  setShowSelector(false);
-                }}
-                className="w-full flex items-center gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-muted/50 transition-colors"
-              >
-                <span className="text-lg">{lang.flag}</span>
-                <span className="text-sm font-medium">
-                  {getDisplayName(lang.code, locale)}
-                </span>
-              </button>
-            ))
+            <AddLanguagePicker
+              languages={availableLanguages}
+              locale={locale}
+              onPick={(code) => {
+                onAdd(code);
+                setShowSelector(false);
+              }}
+            />
           )}
           <Button
             variant="ghost"

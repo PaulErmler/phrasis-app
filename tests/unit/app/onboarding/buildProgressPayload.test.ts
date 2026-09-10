@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildProgressPayload } from '@/app/app/onboarding/page';
+import { buildProgressPayload } from '@/app/app/onboarding/OnboardingWizard';
 import {
   EMPTY_ONBOARDING_DATA,
   type OnboardingData,

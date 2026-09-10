@@ -1401,8 +1401,11 @@
     },
     "politeness": {
       "title": "Which politeness levels do you want to learn?",
-      "subtitle": "Choose one level, or several to mix them.",
-      "levels": { "casual": "Casual", "polite": "Polite", "formal": "Formal" },
+      "levels": {
+        "casual": "Casual",
+        "polite": "Polite",
+        "formal": "Formal"
+      },
       "levelWords": {
         "casual": "casual",
         "polite": "polite",
@@ -1414,7 +1417,13 @@
         "none": "Pick at least one level.",
         "single": "Every sentence is {level}.",
         "mixed": "Sentences alternate between {levels} where applicable."
-      }
+      },
+      "all": {
+        "title": "All levels",
+        "badge": "Recommended",
+        "description": "Sentences alternate between the levels, so you learn to understand and use each one."
+      },
+      "orPick": "Or pick the levels yourself"
     }
   },
   "Tutorial": {

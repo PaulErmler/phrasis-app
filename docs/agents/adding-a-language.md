@@ -21,7 +21,13 @@ Two files, one language.
   which sentences can change between levels: `predicate` every full
   sentence (ja, ko), `particle` any sentence in dialogue (th, fil),
   `pronoun` sentences with a pronoun, first person included (vi, id, ms),
-  `address` only sentences with a "you" (every T-V language).
+  `address` only sentences with a "you" (every T-V language). The
+  create-course dialog and the course languages sheet ask the setting for
+  every marked target (`courseAsksPoliteness`); the onboarding wizard asks
+  it only for the targets in `ONBOARDING_POLITENESS_TARGETS` (ja, ko;
+  `onboardingAsksPoliteness`) and starts every other target on every
+  level. A new marked language is therefore not asked at sign-up unless
+  it is added to that list.
 - `firstPersonMarking?: true` when a first-person sentence's wording
   changes with the speaker's gender (verbs, adjectives, participles,
   pronouns, self-reference words). Every language follows the card's voice

@@ -12,8 +12,10 @@ import {
   CommandItem,
 } from '@/components/ui/command';
 import {
+  LANGUAGE_CATEGORY_ORDER,
   SUPPORTED_LANGUAGES,
   getLocalizedLanguageNameByCode,
+  languageSearchText,
   type Language,
   type LanguageCategory,
 } from '@/lib/languages';
@@ -26,30 +28,6 @@ interface LanguageSelectorProps {
   excludeLanguages?: string[];
   onToggleLanguage: (languageCode: string) => void;
 }
-
-// Fixed display order. Categories listed top-down in the picker. The
-// LanguageSelector.categories.* i18n keys map to these slugs.
-const CATEGORY_ORDER = [
-  'germanic',
-  'romance',
-  'slavic',
-  'baltic',
-  'asian-east',
-  'asian-southeast',
-  'south-asian',
-  'semitic',
-  'african',
-  'other',
-] as const satisfies readonly LanguageCategory[];
-
-// Compile-time exhaustiveness: if a new value is added to LanguageCategory,
-// this line errors until CATEGORY_ORDER is updated to include it.
-type _CategoryOrderIsExhaustive =
-  Exclude<LanguageCategory, (typeof CATEGORY_ORDER)[number]> extends never
-    ? true
-    : never;
-const _categoryOrderExhaustive: _CategoryOrderIsExhaustive = true;
-void _categoryOrderExhaustive;
 
 // Module-level singleton so `excludeLanguages = EMPTY_EXCLUDE` keeps a stable
 // reference when callers omit the prop, otherwise the inline `= []` default
@@ -86,7 +64,7 @@ export function LanguageSelector({
       buckets.set(cat, list);
     }
     const out: { category: LanguageCategory; languages: Language[] }[] = [];
-    for (const cat of CATEGORY_ORDER) {
+    for (const cat of LANGUAGE_CATEGORY_ORDER) {
       const list = buckets.get(cat);
       if (!list || list.length === 0) continue;
       const sorted = [...list].sort((a, b) =>
@@ -110,9 +88,9 @@ export function LanguageSelector({
       )}
 
       <Command
-        // cmdk runs case-insensitive substring filtering on each item's `value`
-        // We build a composite value below so the English name, native name,
-        // and the user-locale display name all match the search input.
+        // cmdk runs case-insensitive substring filtering on each item's
+        // `value`, which is `languageSearchText` so the English name, native
+        // name, user-locale name and code all match the search input.
         className="flex-1 bg-transparent overflow-hidden"
         filter={(value, search) =>
           value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
@@ -132,21 +110,10 @@ export function LanguageSelector({
                   language.code,
                   locale,
                 );
-                // Searchable haystack: English name + native name +
-                // user-locale name + internal code, all joined so cmdk's
-                // substring filter hits any of them.
-                const haystack = [
-                  language.name,
-                  language.nativeName,
-                  localizedName,
-                  language.code,
-                ]
-                  .filter(Boolean)
-                  .join(' • ');
                 return (
                   <CommandItem
                     key={language.code}
-                    value={haystack}
+                    value={languageSearchText(language, locale)}
                     onSelect={() => onToggleLanguage(language.code)}
                     data-testid={`language-option-${language.code}`}
                     className={cn(

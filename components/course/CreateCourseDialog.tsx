@@ -411,6 +411,7 @@ export function CreateCourseDialog({
                 selected={politenessLevels}
                 onChange={setPolitenessLevels}
                 compact
+                recommendAll
               />
             </div>
           )}

@@ -5,9 +5,11 @@ import { ArrowLeftRight, ChevronLeft, Pencil, Search } from 'lucide-react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Input } from '@/components/ui/input';
 import {
+  LANGUAGE_CATEGORY_ORDER,
   SUPPORTED_LANGUAGES,
   getLanguageByCode,
   getLocalizedLanguageNameByCode,
+  languageSearchText,
   type Language,
   type LanguageCategory,
 } from '@/lib/languages';
@@ -32,21 +34,19 @@ interface Props {
   onTarget: (code: string) => void;
 }
 
-const CATEGORY_ORDER = [
-  'germanic',
-  'romance',
-  'slavic',
-  'baltic',
-  'asian-east',
-  'asian-southeast',
-  'south-asian',
-  'semitic',
-  'african',
-  'other',
-] as const satisfies readonly LanguageCategory[];
-
-/** Pinned at the top; still listed again in their category sections below. */
-const POPULAR_CODES = ['es', 'fr', 'ar', 'zh', 'ja', 'hi', 'de', 'en'] as const;
+/** Pinned at the top; still listed again in their category sections below.
+ *  English is pinned as the UK variant: the mixed-accent `en` stays in its
+ *  category section for learners who want it. */
+const POPULAR_CODES = [
+  'es',
+  'fr',
+  'ar',
+  'zh',
+  'ja',
+  'hi',
+  'de',
+  'en_gb',
+] as const;
 
 const PICKABLE = SUPPORTED_LANGUAGES.filter((l) => !l.hiddenFromPicker);
 
@@ -73,16 +73,8 @@ export function LanguagePairStep({
   const { popular, grouped } = useMemo(() => {
     const available = PICKABLE.filter((l) => l.code !== exclude);
     const q = query.trim().toLowerCase();
-    const matchesQuery = (l: Language) => {
-      if (!q) return true;
-      const localized = getLocalizedLanguageNameByCode(l.code, locale);
-      return (
-        l.name.toLowerCase().includes(q) ||
-        l.nativeName.toLowerCase().includes(q) ||
-        localized.toLowerCase().includes(q) ||
-        l.code.toLowerCase().includes(q)
-      );
-    };
+    const matchesQuery = (l: Language) =>
+      !q || languageSearchText(l, locale).toLowerCase().includes(q);
     const filtered = available.filter(matchesQuery);
     const byCode = new Map(filtered.map((l) => [l.code, l]));
 
@@ -98,7 +90,7 @@ export function LanguagePairStep({
     }
 
     const groups: { category: LanguageCategory; languages: Language[] }[] = [];
-    for (const cat of CATEGORY_ORDER) {
+    for (const cat of LANGUAGE_CATEGORY_ORDER) {
       const list = buckets.get(cat);
       if (!list || list.length === 0) continue;
       const sorted = [...list].sort((a, b) =>

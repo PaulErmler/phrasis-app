@@ -1401,7 +1401,6 @@
     },
     "politeness": {
       "title": "Welche Höflichkeitsstufen möchtest du lernen?",
-      "subtitle": "Wähle eine Stufe oder mehrere, um sie zu mischen.",
       "levels": {
         "casual": "Locker",
         "polite": "Höflich",
@@ -1418,7 +1417,13 @@
         "none": "Wähle mindestens eine Stufe.",
         "single": "Jeder Satz ist {level}.",
         "mixed": "Die Sätze wechseln zwischen {levels}, wo es einen Unterschied macht."
-      }
+      },
+      "all": {
+        "title": "Alle Stufen",
+        "badge": "Empfohlen",
+        "description": "Die Sätze wechseln zwischen den Stufen, sodass du jede verstehen und verwenden lernst."
+      },
+      "orPick": "Oder wähle die Stufen selbst"
     }
   },
   "Tutorial": {

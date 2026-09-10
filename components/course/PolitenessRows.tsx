@@ -5,6 +5,7 @@ import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   POLITENESS_CONFIG,
+  allPolitenessLevels,
   formCopyCode,
   levelsFromTickedRows,
   type PolitenessLevel,
@@ -44,7 +45,9 @@ function joinLevelWords(words: string[], conjunction: string): string {
 
 /**
  * The checkbox rows plus the summary line. Shared by the wizard step, the
- * create-course dialog and the course-languages sheet.
+ * create-course dialog and the course-languages sheet. `recommendAll` puts
+ * an "All levels" card with a Recommended badge above the rows; pressing it
+ * ticks every row, and the rows below stay for narrowing the set.
  */
 export function PolitenessRows({
   rows,
@@ -52,12 +55,14 @@ export function PolitenessRows({
   onChange,
   showExamples,
   compact,
+  recommendAll,
 }: {
   rows: PolitenessRow[];
   selected: PolitenessLevel[];
   onChange: (levels: PolitenessLevel[]) => void;
   showExamples?: boolean;
   compact?: boolean;
+  recommendAll?: boolean;
 }) {
   const t = useTranslations('Onboarding.politeness');
   const { title, subline, levelWord } = usePolitenessRowCopy();
@@ -71,8 +76,57 @@ export function PolitenessRows({
     onChange(levelsFromTickedRows(rows, next));
   };
   const multi = rows.some((row) => row.perLanguage.length > 1);
+  const allTicked = rows.length > 0 && ticked.length === rows.length;
+  const tickAll = () => onChange(allPolitenessLevels(rows));
   return (
     <div className="max-w-md mx-auto w-full text-left">
+      {recommendAll ? (
+        <>
+          <button
+            type="button"
+            aria-pressed={allTicked}
+            data-testid="politeness-all"
+            onClick={tickAll}
+            className={cn(
+              'w-full rounded-xl border text-left transition-all flex items-start gap-3',
+              compact ? 'p-2.5 md:p-3' : 'p-3 md:p-4',
+              'hover:bg-accent',
+              allTicked && 'border-primary bg-primary/5 ring-2 ring-primary/20',
+            )}
+          >
+            <span
+              className={cn(
+                'mt-0.5 h-4 w-4 shrink-0 rounded border-2 flex items-center justify-center',
+                allTicked
+                  ? 'border-primary bg-primary text-primary-foreground'
+                  : 'border-muted-foreground/40',
+              )}
+              aria-hidden
+            >
+              {allTicked ? <Check className="h-3 w-3" /> : null}
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-semibold">{t('all.title')}</span>
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+                  {t('all.badge')}
+                </span>
+              </div>
+              <div className="text-sm text-muted-foreground mt-0.5">
+                {t('all.description')}
+              </div>
+            </div>
+          </button>
+          <p
+            className={cn(
+              'mb-2 px-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground',
+              compact ? 'mt-4' : 'mt-5',
+            )}
+          >
+            {t('orPick')}
+          </p>
+        </>
+      ) : null}
       <div className="space-y-2" role="group">
         {rows.map((row) => {
           const isTicked = ticked.includes(row.level);

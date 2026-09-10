@@ -1524,6 +1524,30 @@ export function courseAsksPoliteness(
   );
 }
 
+/**
+ * The target languages the onboarding wizard asks the politeness question
+ * for. Every other marked language (German, Spanish, ...) starts on every
+ * level, so its sentences alternate, and the learner narrows the set later
+ * in the course languages sheet. Japanese and Korean grade the whole
+ * predicate, so a learner there usually has an opinion before the first
+ * card; for the rest the question was more confusing than useful this early
+ * (Paul, 2026-09-10).
+ */
+export const ONBOARDING_POLITENESS_TARGETS: readonly string[] = ['ja', 'ko'];
+
+/** Whether the onboarding wizard asks the politeness question for these
+ *  TARGET languages. Narrower than `courseAsksPoliteness`, which the
+ *  create-course dialog and the course languages sheet keep using. */
+export function onboardingAsksPoliteness(
+  targetLanguages: readonly string[],
+): boolean {
+  return targetLanguages.some((code) =>
+    concreteLanguageCodes(code).some((c) =>
+      ONBOARDING_POLITENESS_TARGETS.includes(c),
+    ),
+  );
+}
+
 export type PolitenessRow = {
   /** The global level; the row title is its translated word. */
   level: PolitenessLevel;
@@ -1587,6 +1611,16 @@ export function levelsFromTickedRows(
     if (inherited) out.push(level);
   }
   return out;
+}
+
+/** The levels every row ticked stands for: the "all levels" answer. */
+export function allPolitenessLevels(
+  rows: readonly PolitenessRow[],
+): PolitenessLevel[] {
+  return levelsFromTickedRows(
+    rows,
+    rows.map((row) => row.level),
+  );
 }
 
 /** Whether this language's wording changes with the speaker's gender. */

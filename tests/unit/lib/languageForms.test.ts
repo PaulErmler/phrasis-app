@@ -13,6 +13,7 @@ import {
   formCopyCode,
   languageMarksFirstPerson,
   levelsFromTickedRows,
+  onboardingAsksPoliteness,
   politenessFlagMismatches,
   selectedPolitenessForms,
 } from '@/lib/languageForms';
@@ -156,6 +157,18 @@ describe('course helpers', () => {
     expect(courseAsksPoliteness(['en', 'sv'])).toBe(false);
     expect(courseAsksPoliteness(['es_mixed'])).toBe(true);
     expect(courseAsksPoliteness(['fi'])).toBe(false);
+  });
+
+  it('the wizard asks politeness only for Japanese and Korean targets', () => {
+    expect(onboardingAsksPoliteness(['ja'])).toBe(true);
+    expect(onboardingAsksPoliteness(['ko'])).toBe(true);
+    expect(onboardingAsksPoliteness(['en', 'ja'])).toBe(true);
+    // Marked, but not asked at sign-up: these start on every level.
+    expect(onboardingAsksPoliteness(['de'])).toBe(false);
+    expect(onboardingAsksPoliteness(['es_mixed'])).toBe(false);
+    expect(onboardingAsksPoliteness(['vi'])).toBe(false);
+    expect(onboardingAsksPoliteness(['en', 'sv'])).toBe(false);
+    expect(onboardingAsksPoliteness([])).toBe(false);
   });
 
   it('a single two-form language shows two rows carrying its forms', () => {

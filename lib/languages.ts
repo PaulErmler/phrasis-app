@@ -86,6 +86,33 @@ export type LanguageCategory =
   | 'african'
   | 'other';
 
+/** The order the pickers list the categories in. The
+ *  `LanguageSelector.categories.*` i18n keys map to these slugs. */
+export const LANGUAGE_CATEGORY_ORDER = [
+  'germanic',
+  'romance',
+  'slavic',
+  'baltic',
+  'asian-east',
+  'asian-southeast',
+  'south-asian',
+  'semitic',
+  'african',
+  'other',
+] as const satisfies readonly LanguageCategory[];
+
+// Compile-time exhaustiveness: a new LanguageCategory value errors here
+// until LANGUAGE_CATEGORY_ORDER lists it.
+type _CategoryOrderIsExhaustive =
+  Exclude<
+    LanguageCategory,
+    (typeof LANGUAGE_CATEGORY_ORDER)[number]
+  > extends never
+    ? true
+    : never;
+const _categoryOrderExhaustive: _CategoryOrderIsExhaustive = true;
+void _categoryOrderExhaustive;
+
 /** Whether tier-1 LLMs reliably handle this language for translation/teaching. */
 export type LlmSupportTier = 'tier1' | 'tier2';
 
@@ -3386,6 +3413,23 @@ export function getMixedVariantByRegion(
  */
 export function normalizeLanguageCode(code: string): string {
   return code.replace(VARIANT_SUFFIX_RE, '');
+}
+
+/**
+ * What a language picker's search matches against: the English name, the
+ * native name, the user-locale name and the code, joined so a substring
+ * test hits any of them. Shared by every picker so they find the same
+ * languages for the same query.
+ */
+export function languageSearchText(lang: Language, locale: string): string {
+  return [
+    lang.name,
+    lang.nativeName,
+    getLocalizedLanguageNameByCode(lang.code, locale),
+    lang.code,
+  ]
+    .filter(Boolean)
+    .join(' • ');
 }
 
 // ---------------------------------------------------------------------------
