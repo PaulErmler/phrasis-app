@@ -29,7 +29,7 @@ import {
   statForFilter,
   type StatFilter,
 } from '@/lib/statFilter';
-import { formatTimeMs } from '@/lib/formatTime';
+import { formatTimeMsNoDays } from '@/lib/formatTime';
 import { StartLearningButton } from '@/components/app/StartLearningButton';
 import { DailyGoalRing } from '@/components/app/stats/DailyGoalRing';
 import { DailyGoalQuickEdit } from '@/components/app/stats/DailyGoalQuickEdit';
@@ -276,7 +276,7 @@ export function ProgressStatsCard({
   const repsLabel = t(REPS_FILTER_LABEL_KEYS[repsFilter]);
   const cards = stats?.totalCards ?? 0;
   const words = stats?.totalWordCount ?? 0;
-  const time = formatTimeMs(
+  const time = formatTimeMsNoDays(
     statForFilter(
       stats?.totalTimeMs ?? 0,
       stats?.totalTimeMsByMode,
@@ -598,7 +598,7 @@ export function ProgressStatsCard({
                     ? animatedTileTimeMs
                     : undefined
                 }
-                todayFormatter={formatTimeMs}
+                todayFormatter={formatTimeMsNoDays}
                 todayLabel={t('stats.today')}
                 animateToday={statsActuallyChanged}
                 onClick={() => cycleStatFilter('timeStatFilter', timeFilter)}

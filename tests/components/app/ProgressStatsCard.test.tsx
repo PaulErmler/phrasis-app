@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { formatTimeMs } from '@/lib/formatTime';
+import { formatTimeMsNoDays } from '@/lib/formatTime';
 
 /**
  * The reps and time tiles are each one number over three different
@@ -204,7 +204,7 @@ describe('ProgressStatsCard: reps tile filter', () => {
     expect(timeTile().tagName).toBe('BUTTON');
     expect(timeTile()).toHaveAttribute(
       'aria-label',
-      `${formatTimeMs(3_600_000)} stats.time. stats.timeCycleHint`,
+      `${formatTimeMsNoDays(3_600_000)} stats.time. stats.timeCycleHint`,
     );
     // The other two stat columns stay inert divs.
     for (const label of ['stats.sentences', 'stats.words']) {
@@ -223,10 +223,10 @@ describe('ProgressStatsCard: time tile filter', () => {
 
   it('shows all time when the setting is unset', () => {
     renderCard();
-    expect(timeTile()).toHaveTextContent(formatTimeMs(3_600_000));
+    expect(timeTile()).toHaveTextContent(formatTimeMsNoDays(3_600_000));
     expect(timeTile()).toHaveTextContent('stats.time');
     expect(timeTile()).toHaveTextContent(
-      `${formatTimeMs(600_000)} stats.today`,
+      `${formatTimeMsNoDays(600_000)} stats.today`,
     );
   });
 
@@ -240,10 +240,10 @@ describe('ProgressStatsCard: time tile filter', () => {
     for (const [face, total, today, label] of faces) {
       userSettings = { timeStatFilter: face };
       rerender(cardElement());
-      expect(timeTile()).toHaveTextContent(formatTimeMs(total));
+      expect(timeTile()).toHaveTextContent(formatTimeMsNoDays(total));
       expect(timeTile()).toHaveTextContent(label);
       expect(timeTile()).toHaveTextContent(
-        `${formatTimeMs(today)} stats.today`,
+        `${formatTimeMsNoDays(today)} stats.today`,
       );
     }
   });

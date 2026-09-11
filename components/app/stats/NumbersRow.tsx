@@ -11,7 +11,7 @@ import {
   Clock,
   Target,
 } from 'lucide-react';
-import { formatTimeMs } from '@/lib/formatTime';
+import { formatTimeMsNoDays } from '@/lib/formatTime';
 import { getLanguageByCode } from '@/lib/languages';
 import { useAnimatedCounter } from '@/hooks/use-animated-counter';
 import { useStatsSnapshot } from '@/hooks/use-stats-snapshot';
@@ -278,7 +278,7 @@ export function NumbersRow({
 
   const repsDisplay = periodReps > 0 ? `${animReps}` : null;
   const newDisplay = periodNewCards > 0 ? `+${animNew}` : null;
-  const timeDisplay = periodTimeMs > 0 ? formatTimeMs(animTime) : null;
+  const timeDisplay = periodTimeMs > 0 ? formatTimeMsNoDays(animTime) : null;
   const wordsDisplay = periodNewWords > 0 ? `+${animWords}` : null;
 
   return (
@@ -344,7 +344,7 @@ export function NumbersRow({
           <StatCell
             icon={<Clock className="h-3.5 w-3.5" />}
             label={t('time')}
-            value={formatTimeMs(timeMs)}
+            value={formatTimeMsNoDays(timeMs)}
             subDisplay={timeDisplay}
             testId="stats-tile-time"
           />
@@ -367,7 +367,7 @@ export function NumbersRow({
           <StatCell
             icon={<Clock className="h-3.5 w-3.5" />}
             label={t('time')}
-            value={formatTimeMs(timeMs)}
+            value={formatTimeMsNoDays(timeMs)}
             subDisplay={timeDisplay}
             testId="stats-tile-time"
           />

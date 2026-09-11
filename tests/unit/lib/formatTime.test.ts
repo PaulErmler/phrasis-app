@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { countdownDisplay, formatTimeMs } from '@/lib/formatTime';
+import {
+  countdownDisplay,
+  formatTimeMs,
+  formatTimeMsNoDays,
+} from '@/lib/formatTime';
 
 describe('formatTimeMs', () => {
   it('formats sub-minute durations as seconds', () => {
@@ -31,6 +35,29 @@ describe('formatTimeMs', () => {
     // days + hours + 0 minutes → show only days + hours
     const ms = 86_400_000 + 3_600_000 * 3;
     expect(formatTimeMs(ms)).toBe('1d 3h');
+  });
+});
+
+describe('formatTimeMsNoDays', () => {
+  it('matches formatTimeMs below an hour, seconds and all', () => {
+    for (const ms of [0, 45_000, 59_999, 60_000, 90_000, 3_599_999]) {
+      expect(formatTimeMsNoDays(ms)).toBe(formatTimeMs(ms));
+    }
+    expect(formatTimeMsNoDays(90_000)).toBe('1m 30s');
+  });
+
+  it('drops seconds once hours are showing', () => {
+    expect(formatTimeMsNoDays(3_600_000)).toBe('1h');
+    expect(formatTimeMsNoDays(3_600_000 + 5 * 60_000 + 30_000)).toBe('1h 5m');
+  });
+
+  it('keeps counting hours past a day instead of rolling over', () => {
+    expect(formatTimeMsNoDays(86_400_000)).toBe('24h');
+    expect(formatTimeMsNoDays(86_400_000 + 4 * 3_600_000 + 12 * 60_000)).toBe(
+      '28h 12m',
+    );
+    // A year of study still reads in hours.
+    expect(formatTimeMsNoDays(365 * 86_400_000)).toBe('8760h');
   });
 });
 

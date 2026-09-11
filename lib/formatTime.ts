@@ -83,3 +83,16 @@ export function countdownDisplay(remainingMs: number): CountdownDisplay {
     staleInMs: stale(HOUR_MS),
   };
 }
+
+/**
+ * `formatTimeMs` with no day rollover: hours accumulate without bound, so a
+ * lifetime total reads "76h 12m" and never "3d 4h 12m". Below an hour it is
+ * `formatTimeMs` exactly — minutes and seconds — because a short session's
+ * seconds are the part that visibly moves.
+ */
+export function formatTimeMsNoDays(ms: number): string {
+  if (ms < HOUR_MS) return formatTimeMs(ms);
+  const hours = Math.floor(ms / HOUR_MS);
+  const minutes = Math.floor((ms % HOUR_MS) / MINUTE_MS);
+  return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+}

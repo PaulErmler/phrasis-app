@@ -18,7 +18,7 @@ import {
   type ChartConfig,
 } from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
-import { formatTimeMs } from '@/lib/formatTime';
+import { formatTimeMsNoDays } from '@/lib/formatTime';
 import { normalizeLanguageCode } from '@/lib/languages';
 import {
   accumulateFromTotal,
@@ -160,7 +160,7 @@ function yearBucketLabel(
 }
 
 function formatValue(value: number, metric: Metric): string {
-  if (metric === 'time') return formatTimeMs(value);
+  if (metric === 'time') return formatTimeMsNoDays(value);
   return value.toLocaleString();
 }
 
@@ -520,7 +520,7 @@ export function CumulativeLineChart({
                 width={metric === 'time' ? 52 : 36}
                 domain={['dataMin', 'auto']}
                 tickFormatter={(v: number) =>
-                  metric === 'time' ? formatTimeMs(v) : v.toLocaleString()
+                  metric === 'time' ? formatTimeMsNoDays(v) : v.toLocaleString()
                 }
               />
               <ChartTooltip content={renderTooltip} />
