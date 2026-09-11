@@ -1,6 +1,12 @@
 import { MutationCtx } from '../_generated/server';
 import { internal } from '../_generated/api';
 import { Id, Doc } from '../_generated/dataModel';
+import type { HyperliteralWants } from '../../lib/annotationDisplay';
+import {
+  claimHyperliteral,
+  getHyperliteral,
+  hyperliteralState,
+} from './hyperliterals';
 import {
   getMixedAccentTextLanguage,
   getVoiceForText,
@@ -594,6 +600,25 @@ export type ContentSweepOpts = {
    * self-heal sweeps, whose spend stays in the system bucket.
    */
   requestedByUserId?: string;
+  /**
+   * Which languages want a hyperliteral gloss, and in what language to write
+   * it (`hyperliteralWantsFor` in lib/annotationDisplay.ts). Absent means no
+   * gloss is generated at all.
+   *
+   * Romanization, IPA and furigana generate for every supported row whatever
+   * the course settings say, because they are free or near-free and shared.
+   * A gloss is a model call per sentence per gloss language, so it follows the
+   * setting instead — a course with the switch off never pays for one.
+   */
+  hyperliteral?: HyperliteralWants;
+  /**
+   * Where the gloss claims this sweep makes are counted. A mutable box rather
+   * than a return value because the three gloss sites sit in three different
+   * functions of the sweep; `ensureTextContent` supplies one and reports the
+   * total, so a card whose ONLY gap is a gloss reports work scheduled instead
+   * of 0/0 — which `useEnsureContent` reads as a dead claim and re-fires.
+   */
+  glossTally?: { count: number };
 };
 
 type ResolvedAudioPayload = NonNullable<
@@ -952,6 +977,16 @@ async function scheduleSupersededRevisionContent(
       throw new ProbeNeedsWork();
     }
     await scheduleTranslationAnnotations(ctx, revision, revision._id);
+    if (
+      await scheduleHyperliteral(
+        ctx,
+        { translationId: revision._id },
+        { language: lang, wording: revision.translatedText },
+        opts,
+      )
+    ) {
+      if (opts?.glossTally) opts.glossTally.count += 1;
+    }
     // A revision that was never voiced is never served (the reader falls
     // through to the live row), so there is no audio to keep alive.
     if (revision.audioAssetId === undefined) continue;
@@ -1000,6 +1035,49 @@ async function scheduleSupersededRevisionContent(
 }
 
 /**
+ * Claim and schedule this row's hyperliteral gloss, if the course wants one
+ * for this language and the row does not already have a current one.
+ *
+ * Separate from the `TEXT_ANNOTATIONS` loop because a gloss lives in its own
+ * table (see convex/lib/hyperliterals.ts): it is keyed by gloss language, so
+ * one sentence can carry several, which a value+source column pair on the row
+ * cannot express.
+ */
+async function scheduleHyperliteral(
+  ctx: MutationCtx,
+  subject:
+    | { textId: Id<'texts'>; translationId?: undefined }
+    | { translationId: Id<'translations'>; textId?: undefined },
+  row: { language: string; wording: string },
+  opts: ContentSweepOpts | undefined,
+): Promise<boolean> {
+  const wants = opts?.hyperliteral;
+  if (!wants || !wants.languages.includes(row.language)) return false;
+  const existing = await getHyperliteral(ctx, subject, wants.glossLanguage);
+  if (
+    hyperliteralState(
+      existing,
+      { language: row.language, wording: row.wording },
+      Date.now(),
+    ) !== 'missing'
+  ) {
+    return false;
+  }
+  if (opts?.probe) throw new ProbeNeedsWork();
+  const claimed = await claimHyperliteral(ctx, subject, {
+    language: row.language,
+    glossLanguage: wants.glossLanguage,
+    wording: row.wording,
+  });
+  if (claimed === null) return false;
+  await ctx.scheduler.runAfter(0, internal.features.hyperliteral.process, {
+    hyperliteralId: claimed,
+    ...(opts?.requestedByUserId ? { userId: opts.requestedByUserId } : {}),
+  });
+  return true;
+}
+
+/**
  * Schedule missing annotations (romanization, IPA) for the source text.
  * `missingAnnotationKinds` tests `=== undefined` per kind (not `!x`) so the
  * empty-string sentinel the process actions write after a failed attempt is
@@ -1012,6 +1090,16 @@ async function scheduleMissingSourceAnnotations(
   text: Doc<'texts'>,
   opts: ContentSweepOpts | undefined,
 ): Promise<void> {
+  if (
+    await scheduleHyperliteral(
+      ctx,
+      { textId },
+      { language: text.language, wording: text.text },
+      opts,
+    )
+  ) {
+    if (opts?.glossTally) opts.glossTally.count += 1;
+  }
   const kinds = missingAnnotationKinds(text.language, text);
   // A request inside the cooldown is still in flight; see
   // `annotationRequestInFlight`.
@@ -1112,6 +1200,16 @@ async function scheduleLanguageContent(
     throw new ProbeNeedsWork();
   }
   await scheduleTranslationAnnotations(ctx, translation, translation._id);
+  if (
+    await scheduleHyperliteral(
+      ctx,
+      { translationId: translation._id },
+      { language: lang, wording: translation.translatedText },
+      opts,
+    )
+  ) {
+    if (opts?.glossTally) opts.glossTally.count += 1;
+  }
   if (opts?.skipTts) return scheduled;
   if (!hasAudio) {
     // Defer TTS while a job for this key is in flight: it will overwrite
@@ -1159,8 +1257,14 @@ export async function ensureTextContent(
   baseLanguages: string[],
   targetLanguages: string[],
   opts?: ContentSweepOpts,
-): Promise<{ translationsScheduled: number; audioScheduled: number }> {
+): Promise<{
+  translationsScheduled: number;
+  audioScheduled: number;
+  hyperliteralsScheduled: number;
+}> {
   const sourceLanguage = text.language;
+  const glossTally = opts?.glossTally ?? { count: 0 };
+  opts = { ...opts, glossTally };
 
   // The voice, decided once and kept: the sentence's own when it fixes it,
   // else one seeded flip written into `audioSpeakerGender` (lib/voices.ts).
@@ -1241,7 +1345,11 @@ export async function ensureTextContent(
     if (scheduled.translationScheduled) translationsScheduled++;
     if (scheduled.audioScheduled) audioScheduled++;
   }
-  return { translationsScheduled, audioScheduled };
+  return {
+    translationsScheduled,
+    audioScheduled,
+    hyperliteralsScheduled: glossTally.count,
+  };
 }
 
 /**

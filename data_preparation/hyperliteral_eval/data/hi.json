@@ -1,0 +1,166 @@
+{
+ "language": "hi",
+ "curatedAt": "2026-09-11",
+ "notes": "Wikipedia {{interlinear}}.",
+ "items": [
+  {
+   "text": "उसे अपने परिवारवाले पसंद हैं।",
+   "lexical": [
+    "he/she",
+    "self",
+    "family-members",
+    "like",
+    "be"
+   ],
+   "glossRaw": "he/she:DAT self:REFL.PL family-members:NOM like be:3PL:PRS",
+   "free": "She likes her family.",
+   "source": "en.wikipedia/Dative_construction",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Dative_construction"
+  },
+  {
+   "text": "तुमने नाद्या-को खाना दिया?",
+   "lexical": [
+    "you",
+    "nadya",
+    "food",
+    "give"
+   ],
+   "glossRaw": "you.ERG nadya.DAT.FEM food.NOM.MASC give.PFV.PTCP.MASC.SG",
+   "free": "Did you give the food to Nadya?",
+   "source": "en.wikipedia/Pro-drop_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Pro-drop_language"
+  },
+  {
+   "text": "हाँ दे दिया।",
+   "lexical": [
+    "yes",
+    "give",
+    "give"
+   ],
+   "glossRaw": "yes give give.PFV.PTCP.MASC.SG",
+   "free": "yes, (I) gave (her food).",
+   "source": "en.wikipedia/Pro-drop_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Pro-drop_language"
+  },
+  {
+   "text": "तुम्हें खानी हैं ये चीज़ें?",
+   "lexical": [
+    "you",
+    "eat",
+    "be",
+    "these",
+    "things"
+   ],
+   "glossRaw": "you.DAT eat.INF.PTCP.FEM.PL be.3PL these.NOM.PL things.NOM.FEM.PL",
+   "free": "Do you want to eat these things?",
+   "source": "en.wikipedia/Pro-drop_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Pro-drop_language"
+  },
+  {
+   "text": "हाँ खानी हैं।",
+   "lexical": [
+    "yes",
+    "eat",
+    "be"
+   ],
+   "glossRaw": "yes eat.INF.PTCP.FEM.PL be.3PL",
+   "free": "yes, (I) want to.",
+   "source": "en.wikipedia/Pro-drop_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Pro-drop_language"
+  },
+  {
+   "text": "चलोगी देखने फ़िल्म?",
+   "lexical": [
+    "go",
+    "watch",
+    "film"
+   ],
+   "glossRaw": "go.2SG.FUT.FEM watch.INF.OBL film.FEM",
+   "free": "will (you.) go watch a film (with me)?",
+   "source": "en.wikipedia/Pro-drop_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Pro-drop_language"
+  },
+  {
+   "text": "उसने आम खाया",
+   "lexical": [
+    "he/she",
+    "mango",
+    "eat"
+   ],
+   "glossRaw": "he/she.ERG mango.NOM.M eat.PFV.M",
+   "free": "he/she ate the mango",
+   "source": "en.wikipedia/Serial_verb_construction",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Serial_verb_construction"
+  },
+  {
+   "text": "उसने आम खा लिया",
+   "lexical": [
+    "he/she",
+    "mango",
+    "eat",
+    "take"
+   ],
+   "glossRaw": "he/she.ERG mango.NOM.M eat.NF take.PFV.M",
+   "free": "he/she finished eating the mango",
+   "source": "en.wikipedia/Serial_verb_construction",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Serial_verb_construction"
+  },
+  {
+   "text": "उसने आम को खा डाला",
+   "lexical": [
+    "he/she",
+    "mango",
+    null,
+    "eat",
+    "put"
+   ],
+   "glossRaw": "he/she.ERG mango.OBL.M ACC eat.NF put.PFV.M",
+   "free": "he/she devoured the mango",
+   "source": "en.wikipedia/Serial_verb_construction",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Serial_verb_construction"
+  },
+  {
+   "text": "उसने आम नहीं खाया",
+   "lexical": [
+    "he/she",
+    "mango",
+    "not",
+    "eat"
+   ],
+   "glossRaw": "he/she.ERG mango.NOM.M NEG.IND eat.PFV.M",
+   "free": "he/she did not eat the mango",
+   "source": "en.wikipedia/Serial_verb_construction",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Serial_verb_construction"
+  },
+  {
+   "text": "उसने आम खा ना लिया हो",
+   "lexical": [
+    "he/she",
+    "mango",
+    "eat",
+    "not",
+    "take",
+    "be"
+   ],
+   "glossRaw": "he/she.ERG mango.NOM.M eat.NF NEG.SUBJ take.PFV be.3S.SUBJ.PRS",
+   "free": "(I hope that) he/she hasn't eaten the mango",
+   "source": "en.wikipedia/Serial_verb_construction",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Serial_verb_construction"
+  },
+  {
+   "text": "उसने आम खा ना डाला हो",
+   "lexical": [
+    "he/she",
+    "mango",
+    "eat",
+    "not",
+    "put",
+    "be"
+   ],
+   "glossRaw": "he/she.ERG mango.NOM.M eat.NF NEG.SUBJ put.PFV be.3S.SUBJ.PRS",
+   "free": "(I hope that) he/she hasn't devoured the mango",
+   "source": "en.wikipedia/Serial_verb_construction",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Serial_verb_construction"
+  }
+ ]
+}

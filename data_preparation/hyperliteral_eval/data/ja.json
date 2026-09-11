@@ -1,0 +1,750 @@
+{
+ "language": "ja",
+ "curatedAt": "2026-09-11",
+ "notes": "Wikipedia {{interlinear}} / {{fs interlinear}}. Japanese is written without spaces, so the SOURCE here keeps the template's own word segmentation (particles stand as separate units); that segmentation is the reference for the unit-count score. Glosses converted from Leipzig by scripts/leipzig.py.",
+ "items": [
+  {
+   "text": "猫 が いる",
+   "lexical": [
+    "cat",
+    null,
+    "to-exist"
+   ],
+   "glossRaw": "cat SBJ to-exist",
+   "free": "There is a cat.",
+   "source": "en.wikipedia/Animacy",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Animacy"
+  },
+  {
+   "text": "私 に は 猫 が いる",
+   "lexical": [
+    "i",
+    null,
+    "topic",
+    "cat",
+    null,
+    "to-exist"
+   ],
+   "glossRaw": "I LOC TOP cat SBJ to-exist",
+   "free": "I have a cat.",
+   "source": "en.wikipedia/Animacy",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Animacy"
+  },
+  {
+   "text": "猫 は 椅子の上 に いる",
+   "lexical": [
+    "cat",
+    "topic",
+    "chair-above/on",
+    null,
+    "to-exist"
+   ],
+   "glossRaw": "cat TOP chair-GEN-above/on LOC to-exist",
+   "free": "The cat is on the chair.",
+   "source": "en.wikipedia/Animacy",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Animacy"
+  },
+  {
+   "text": "石 が ある",
+   "lexical": [
+    "stone",
+    null,
+    "to-exist"
+   ],
+   "glossRaw": "stone SBJ to-exist",
+   "free": "There is a stone.",
+   "source": "en.wikipedia/Animacy",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Animacy"
+  },
+  {
+   "text": "私 に は 石 が ある",
+   "lexical": [
+    "i",
+    null,
+    "topic",
+    "stone",
+    null,
+    "to-exist"
+   ],
+   "glossRaw": "I LOC TOP stone SBJ to-exist",
+   "free": "I have a stone.",
+   "source": "en.wikipedia/Animacy",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Animacy"
+  },
+  {
+   "text": "石 は 椅子の上 に ある",
+   "lexical": [
+    "stone",
+    "topic",
+    "chair-above/on",
+    null,
+    "to-exist"
+   ],
+   "glossRaw": "stone TOP chair-GEN-above/on LOC to-exist",
+   "free": "The stone is on the chair.",
+   "source": "en.wikipedia/Animacy",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Animacy"
+  },
+  {
+   "text": "ロボット が いる",
+   "lexical": [
+    "robot",
+    null,
+    "to-exist"
+   ],
+   "glossRaw": "robot SBJ to-exist",
+   "free": "There is a robot' (emphasis on its human-like behavior).",
+   "source": "en.wikipedia/Animacy",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Animacy"
+  },
+  {
+   "text": "ロボット が ある",
+   "lexical": [
+    "robot",
+    null,
+    "to-exist"
+   ],
+   "glossRaw": "robot SBJ to-exist",
+   "free": "There is a robot' (emphasis on its status as a nonliving thing).",
+   "source": "en.wikipedia/Animacy",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Animacy"
+  },
+  {
+   "text": "昨日 あの 人が 歩いた。",
+   "lexical": [
+    "yesterday",
+    "that",
+    "person",
+    "walked"
+   ],
+   "glossRaw": "yesterday that person walked",
+   "free": "That person walked yesterday.",
+   "source": "en.wikipedia/Attributive_verb",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Attributive_verb"
+  },
+  {
+   "text": "昨日 歩いた あの 人。",
+   "lexical": [
+    "yesterday",
+    "walked",
+    "that",
+    "person"
+   ],
+   "glossRaw": "yesterday walked that person",
+   "free": "That person who walked yesterday...",
+   "source": "en.wikipedia/Attributive_verb",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Attributive_verb"
+  },
+  {
+   "text": "は 「と した」と った",
+   "lexical": [
+    "taro",
+    "hanako-and",
+    "marry",
+    "say"
+   ],
+   "glossRaw": "Taro-TOP Hanako-and marry-PST-COMP say-PST",
+   "free": "Taro said that he married Hanako.",
+   "source": "en.wikipedia/Complementizer",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Complementizer"
+  },
+  {
+   "text": "私 は 学生 だ。",
+   "lexical": [
+    "i",
+    "topic",
+    "student",
+    "be"
+   ],
+   "glossRaw": "I TOP student COP",
+   "free": "I'm a student.",
+   "source": "en.wikipedia/Copula_(linguistics)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Copula_(linguistics)"
+  },
+  {
+   "text": "これ は ペン です。",
+   "lexical": [
+    "this",
+    "topic",
+    "pen",
+    "be"
+   ],
+   "glossRaw": "this TOP pen COP-POL",
+   "free": "This is a pen.",
+   "source": "en.wikipedia/Copula_(linguistics)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Copula_(linguistics)"
+  },
+  {
+   "text": "ジョンの 昨日の ニューヨークでの 講義",
+   "lexical": [
+    "john",
+    "yesterday",
+    "new-york-in",
+    "lecture"
+   ],
+   "glossRaw": "John-GEN yesterday-GEN New-York-in-GEN lecture",
+   "free": "John's lecture in New York yesterday",
+   "source": "en.wikipedia/Head-directionality_parameter",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Head-directionality_parameter"
+  },
+  {
+   "text": "この ビルは 20メートル 高い",
+   "lexical": [
+    "this",
+    "building",
+    "two-ten-meter",
+    "tall"
+   ],
+   "glossRaw": "this building-TOP two-ten-meter tall",
+   "free": "This building is twenty meters tall.",
+   "source": "en.wikipedia/Head-directionality_parameter",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Head-directionality_parameter"
+  },
+  {
+   "text": "僕が 高須村に 住んでいる",
+   "lexical": [
+    "i",
+    "takasu-village-in",
+    "live"
+   ],
+   "glossRaw": "I-NOM Takasu-village-in live-PRES",
+   "free": "I live in Takasu village.",
+   "source": "en.wikipedia/Head-directionality_parameter",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Head-directionality_parameter"
+  },
+  {
+   "text": "刀で 敵を 斬る。",
+   "lexical": [
+    "katana",
+    "foe",
+    "slay"
+   ],
+   "glossRaw": "katana-INSTR foe-DO slay.NPAST",
+   "free": "(I) slay (my) foe with a katana.",
+   "source": "en.wikipedia/Instrumental_case",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Instrumental_case"
+  },
+  {
+   "text": "何 名 様",
+   "lexical": [
+    "some",
+    "people",
+    "honored-ones"
+   ],
+   "glossRaw": "some people-MW honored-ones",
+   "free": "some guests",
+   "source": "en.wikipedia/Japanese_counter_word",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_counter_word"
+  },
+  {
+   "text": "紙 二 枚",
+   "lexical": [
+    "paper",
+    "two",
+    "flat"
+   ],
+   "glossRaw": "paper two flat-MW",
+   "free": "two sheets of paper",
+   "source": "en.wikipedia/Japanese_counter_word",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_counter_word"
+  },
+  {
+   "text": "三本 の 鉛筆 を 下さい",
+   "lexical": [
+    "three-long-thin",
+    null,
+    "pencil",
+    null,
+    "give-me"
+   ],
+   "glossRaw": "three-long-thin-MW ATTR pencil OBJ give-me-IMP",
+   "free": "Please give me the three pencils",
+   "source": "en.wikipedia/Japanese_counter_word",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_counter_word"
+  },
+  {
+   "text": "鉛筆 を 三本 下さい",
+   "lexical": [
+    "pencil",
+    null,
+    "three-long-thin",
+    "give-me"
+   ],
+   "glossRaw": "pencil OBJ three-long-thin-MW give-me-IMP",
+   "free": "Please give me [any] three pencils",
+   "source": "en.wikipedia/Japanese_counter_word",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_counter_word"
+  },
+  {
+   "text": "猫 の 色",
+   "lexical": [
+    "cat",
+    "of",
+    "color"
+   ],
+   "glossRaw": "cat GEN color",
+   "free": "the cat's (neko no) color",
+   "source": "en.wikipedia/Japanese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_grammar"
+  },
+  {
+   "text": "日本 に 行きました",
+   "lexical": [
+    "japan",
+    null,
+    "go"
+   ],
+   "glossRaw": "Japan LOC go-POL-PFV",
+   "free": "went to Japan",
+   "source": "en.wikipedia/Japanese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_grammar"
+  },
+  {
+   "text": "太陽が 東の 空に 昇る。",
+   "lexical": [
+    "sun",
+    "east",
+    "sky",
+    "rise"
+   ],
+   "glossRaw": "sun-SBJ east-POSS sky-LOC rise",
+   "free": "The sun rises in the eastern sky.",
+   "source": "en.wikipedia/Japanese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_grammar"
+  },
+  {
+   "text": "猫 は 魚 を 食べる",
+   "lexical": [
+    "cat",
+    "topic",
+    "fish",
+    null,
+    "eat"
+   ],
+   "glossRaw": "Cat TOPIC fish OBJECT eat",
+   "free": "A cat eats fish",
+   "source": "en.wikipedia/Japanese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_grammar"
+  },
+  {
+   "text": "テーブルの 上に ある。",
+   "lexical": [
+    "table",
+    "top/up",
+    "exists"
+   ],
+   "glossRaw": "Table-OF top/up-AT exists.",
+   "free": "It's on the table.",
+   "source": "en.wikipedia/Japanese_particles",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_particles"
+  },
+  {
+   "text": "あの 人は、 ギターに ついて 何でも わかる。",
+   "lexical": [
+    "that",
+    "person",
+    "guitar",
+    "concerning",
+    "anything",
+    "knows"
+   ],
+   "glossRaw": "That person-TOPIC guitar-TO concerning anything knows.",
+   "free": "That person knows everything about guitars.",
+   "source": "en.wikipedia/Japanese_particles",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_particles"
+  },
+  {
+   "text": "私 の 手",
+   "lexical": [
+    "me",
+    "of",
+    "hand"
+   ],
+   "glossRaw": "me GEN hand",
+   "free": "My hand.",
+   "source": "en.wikipedia/Japanese_possessives",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_possessives"
+  },
+  {
+   "text": "ジョン の 車",
+   "lexical": [
+    "john",
+    "of",
+    "car"
+   ],
+   "glossRaw": "John GEN car",
+   "free": "John's car.",
+   "source": "en.wikipedia/Japanese_possessives",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_possessives"
+  },
+  {
+   "text": "私 の お母さん",
+   "lexical": [
+    "me",
+    "of",
+    "mother"
+   ],
+   "glossRaw": "me GEN mother",
+   "free": "My mother.",
+   "source": "en.wikipedia/Japanese_possessives",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_possessives"
+  },
+  {
+   "text": "ジョン の 兄",
+   "lexical": [
+    "john",
+    "of",
+    "big-brother"
+   ],
+   "glossRaw": "John GEN big-brother",
+   "free": "John's big brother",
+   "source": "en.wikipedia/Japanese_possessives",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_possessives"
+  },
+  {
+   "text": "これ は ジョン の 物 です",
+   "lexical": [
+    "this",
+    "topic",
+    "john",
+    "of",
+    "one",
+    "be"
+   ],
+   "glossRaw": "this TOP John GEN one COP",
+   "free": "‘This is John’s one.’",
+   "source": "en.wikipedia/Japanese_possessives",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Japanese_possessives"
+  },
+  {
+   "text": "平次が 銭を おとした.",
+   "lexical": [
+    "heiji",
+    "coin",
+    "dropped"
+   ],
+   "glossRaw": "Heiji-NOM coin-ACC dropped",
+   "free": "Heiji dropped the coin.",
+   "source": "en.wikipedia/Labile_verb",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Labile_verb"
+  },
+  {
+   "text": "私 は 花瓶を 壊した",
+   "lexical": [
+    "i",
+    "topic",
+    "vase",
+    "broke"
+   ],
+   "glossRaw": "I TOP vase-ACC broke",
+   "free": "‘I broke the vase’",
+   "source": "en.wikipedia/Nominative–accusative_alignment",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Nominative–accusative_alignment"
+  },
+  {
+   "text": "私達 は 買い物 を した。 後 で ご飯 を 食べた。",
+   "lexical": [
+    "we",
+    "topic",
+    "shopping",
+    null,
+    "did",
+    "after",
+    null,
+    "dinner",
+    null,
+    "ate"
+   ],
+   "glossRaw": "We TOP shopping OBJ did. After COMPL dinner OBJ ate.",
+   "free": "We went shopping. Afterwards, we ate dinner.",
+   "source": "en.wikipedia/Null-subject_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Null-subject_language"
+  },
+  {
+   "text": "今日 は ゲーム の 発売日 なんだ けど、 買おうか どうか 迷っている。",
+   "lexical": [
+    "today",
+    "topic",
+    "game",
+    "of",
+    "release-date",
+    "is",
+    "but",
+    "whether-to-buy",
+    "or-not",
+    "confused"
+   ],
+   "glossRaw": "Today TOP game GEN release-date is but, whether-to-buy or-not confused.",
+   "free": "The game comes out today, but (I) can't decide whether or not to buy (it).",
+   "source": "en.wikipedia/Null-subject_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Null-subject_language"
+  },
+  {
+   "text": "発売日 だけど、 迷っている。",
+   "lexical": [
+    "release-day",
+    "but",
+    "not-sure"
+   ],
+   "glossRaw": "Release-day but not-sure.",
+   "free": "(It's the game's) release day, but (I) can't decide (whether or not to buy it).",
+   "source": "en.wikipedia/Null-subject_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Null-subject_language"
+  },
+  {
+   "text": "花子が 隣の 学生に ピアノを 朝まで 弾かれた。",
+   "lexical": [
+    "hanako",
+    "neighbor",
+    "student",
+    "piano",
+    "morning-until",
+    "played"
+   ],
+   "glossRaw": "Hanako-NOM neighbor-GEN student-DAT piano-ACC morning-until played-PASS-PFV",
+   "free": "Hanako was adversely affected by the neighboring student playing the piano until morning.",
+   "source": "en.wikipedia/Passive_voice",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Passive_voice"
+  },
+  {
+   "text": "この ケーキ は 美味しい。 誰 が 焼いた の？",
+   "lexical": [
+    "this",
+    "cake",
+    "topic",
+    "tasty",
+    "who",
+    null,
+    "bake",
+    "question"
+   ],
+   "glossRaw": "This cake TOP tasty-PRS Who SUBJ bake-PAST Q",
+   "free": "This cake is tasty. Who baked (it)?",
+   "source": "en.wikipedia/Pro-drop_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Pro-drop_language"
+  },
+  {
+   "text": "不 知道。 喜欢 吗?",
+   "lexical": [
+    "not",
+    "know",
+    "like",
+    "question"
+   ],
+   "glossRaw": "Not know. like Q",
+   "free": "(I) don't know. Do (you) like (it)?",
+   "source": "en.wikipedia/Pro-drop_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Pro-drop_language"
+  },
+  {
+   "text": "太郎 は 晴海 を 憎んでいる と 言った。",
+   "lexical": [
+    "taro",
+    "topic",
+    "harumi",
+    null,
+    "hated",
+    null,
+    "said"
+   ],
+   "glossRaw": "Taro TOP Harumi ACC hated COM said",
+   "free": "Taro said that he hated Harumi.\" \"that 'I hated Harumi",
+   "source": "en.wikipedia/Quotation",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Quotation"
+  },
+  {
+   "text": "明日 晴れる -って",
+   "lexical": [
+    "tomorrow",
+    "will-be-fine",
+    null
+   ],
+   "glossRaw": "tomorrow will-be-fine QUOT",
+   "free": "It will be fine tomorrow, I heard.",
+   "source": "en.wikipedia/Quotation",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Quotation"
+  },
+  {
+   "text": "明日 晴れる って/と 言ってた よ",
+   "lexical": [
+    "tomorrow",
+    "will-be-fine",
+    null,
+    "said",
+    null
+   ],
+   "glossRaw": "tomorrow will-be-fine QUOT said FP",
+   "free": "(X) said that it would be fine tomorrow.",
+   "source": "en.wikipedia/Quotation",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Quotation"
+  },
+  {
+   "text": "石田さん は 「トマトが 好きじゃない」 と 言いました。",
+   "lexical": [
+    "mr-ishida",
+    "topic",
+    "tomato",
+    "like",
+    null,
+    "say"
+   ],
+   "glossRaw": "Mr.-Ishida TOP tomato-NOM like-NEG QUOT say-PAST-POL",
+   "free": "Mr. Ishida said that he didn't like tomatoes\" \"that 'I don't like tomatoes",
+   "source": "en.wikipedia/Quotative",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Quotative"
+  },
+  {
+   "text": "彼女 は 僕 に 「あなたが 好き だ」 と 言った。",
+   "lexical": [
+    "she",
+    "topic",
+    "i",
+    null,
+    "you",
+    "like",
+    "be",
+    null,
+    "say"
+   ],
+   "glossRaw": "She TOP I DAT you-NOM like COP QUOT say-PAST",
+   "free": "She told me that she liked me\" \"that 'I like you",
+   "source": "en.wikipedia/Quotative",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Quotative"
+  },
+  {
+   "text": "ジョンが メアリーを 撃ち殺した。",
+   "lexical": [
+    "john",
+    "mary",
+    "shoot-kill"
+   ],
+   "glossRaw": "John-NOM Mary-ACC shoot-kill-PAST",
+   "free": "John shot Mary dead.",
+   "source": "en.wikipedia/Resultative",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Resultative"
+  },
+  {
+   "text": "足跡 を たどって 来た",
+   "lexical": [
+    "footprint",
+    null,
+    "following",
+    "came"
+   ],
+   "glossRaw": "footprint OBJ following came",
+   "free": "I followed him here.",
+   "source": "en.wikipedia/Serial_verb_construction",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Serial_verb_construction"
+  },
+  {
+   "text": "見 させ られ がたい",
+   "lexical": [
+    "see",
+    null,
+    null,
+    "difficult"
+   ],
+   "glossRaw": "see CAUS PASS difficult",
+   "free": "It's difficult to be shown [this]",
+   "source": "en.wikipedia/Synthetic_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Synthetic_language"
+  },
+  {
+   "text": "太郎 は 花子 に 「雨 だ よ」 と 言った。",
+   "lexical": [
+    "taro",
+    "topic",
+    "hanako",
+    null,
+    "rain",
+    "be",
+    "yo",
+    null,
+    "say"
+   ],
+   "glossRaw": "Taro TOP Hanako DAT rain COP yo QUOT say-PST",
+   "free": "Taro said to Hanako, \"It is raining, I tell you.",
+   "source": "en.wikipedia/Verbum_dicendi",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Verbum_dicendi"
+  },
+  {
+   "text": "太郎 は 花子 に 「雨 です」 と 言った。",
+   "lexical": [
+    "taro",
+    "topic",
+    "hanako",
+    null,
+    "rain",
+    "desu",
+    null,
+    "say"
+   ],
+   "glossRaw": "Taro TOP Hanako DAT rain desu QUOT say-PST",
+   "free": "Taro said to Hanako politely, \"It is raining.",
+   "source": "en.wikipedia/Verbum_dicendi",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Verbum_dicendi"
+  },
+  {
+   "text": "太郎 は 自分 が 東京 へ 行く と 言った。",
+   "lexical": [
+    "taro",
+    "topic",
+    "self",
+    null,
+    "tokyo",
+    "to",
+    "go",
+    null,
+    "say"
+   ],
+   "glossRaw": "Taro TOP self NOM Tokyo to go QUOT say-PST.",
+   "free": "Taro said that he would go to Tokyo.",
+   "source": "en.wikipedia/Verbum_dicendi",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Verbum_dicendi"
+  },
+  {
+   "text": "彼 は 泥棒 に 財布 を 盗まれた。",
+   "lexical": [
+    "he",
+    "topic",
+    "thief",
+    null,
+    "wallet",
+    null,
+    "steal"
+   ],
+   "glossRaw": "He TOPIC thief AGENT wallet OBJECT steal-PASSIVE-PAST",
+   "free": "He got his wallet stolen by a thief.",
+   "source": "en.wikipedia/Voice_(grammar)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Voice_(grammar)"
+  },
+  {
+   "text": "僕 は 彼女 に 嘘 を つかれた。",
+   "lexical": [
+    "i",
+    "topic",
+    "her",
+    null,
+    "lie",
+    null,
+    "tell"
+   ],
+   "glossRaw": "I TOPIC her AGENT lie OBJECT tell-PASSIVE-PAST.",
+   "free": "I was told a lie by her.\"",
+   "source": "en.wikipedia/Voice_(grammar)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Voice_(grammar)"
+  },
+  {
+   "text": "ジョンが リンゴを 食べた",
+   "lexical": [
+    "john",
+    "apple",
+    "eat"
+   ],
+   "glossRaw": "John-NOM apple-ACC eat-PAST",
+   "free": "John ate an apple",
+   "source": "en.wikipedia/X-bar_theory",
+   "sourceUrl": "https://en.wikipedia.org/wiki/X-bar_theory"
+  }
+ ]
+}

@@ -42,6 +42,7 @@
     "eval:gender-relevance": "tsx --env-file=.env.local scripts/eval-gender-relevance.ts",
     "eval:stt": "tsx --env-file=.env.local scripts/eval-stt.ts",
     "eval:rom": "tsx --env-file=.env.local scripts/eval-rom.ts",
+    "eval:hyperliteral": "tsx --env-file=.env.local scripts/eval-hyperliteral.ts",
     "eval:swiss": "tsx --env-file=.env.local scripts/eval-swiss-german.mts",
     "eval:qc": "tsx --env-file=.env.local scripts/eval-translation-qc.mts",
     "classify:speaker": "tsx --env-file=.env.local scripts/classify-speaker-gender.mts",

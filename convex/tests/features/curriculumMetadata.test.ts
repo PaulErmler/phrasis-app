@@ -161,6 +161,7 @@ describe('the sweep no longer classifies up front', () => {
     expect(await sweep(t, textId)).toEqual({
       translationsScheduled: 0,
       audioScheduled: 0,
+      hyperliteralsScheduled: 0,
     });
     expect(await pendingJobs(t, 'classifyCurriculumText')).toHaveLength(0);
     expect(llmEnqueues()).toEqual([]);

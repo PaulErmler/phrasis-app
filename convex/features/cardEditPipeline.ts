@@ -3,6 +3,7 @@ import { MutationCtx } from '../_generated/server';
 import { Doc, Id } from '../_generated/dataModel';
 import { asVoiceGender } from '../types';
 import { renderingKey } from '../../lib/preferenceResolution';
+import { deleteHyperliteralsFor } from '../lib/hyperliterals';
 import {
   carriedAnnotationFields,
   clearedAnnotationFields,
@@ -365,6 +366,8 @@ export async function applyInPlaceTextEdit(
       text: submittedMap.get(sourceLanguage)!,
       ...clearedAnnotationFields(),
     });
+    // Glosses live in their own table, so the spread above cannot reach them.
+    await deleteHyperliteralsFor(ctx, { textId: text._id });
   }
 
   for (const lang of allLanguages) {
@@ -376,6 +379,7 @@ export async function applyInPlaceTextEdit(
       // don't match the new text), drop their source tags, and re-tag
       // as user-provided so a future strategy swap doesn't overwrite
       // the user's edit.
+      await deleteHyperliteralsFor(ctx, { translationId: existing._id });
       await ctx.db.patch(existing._id, {
         translatedText: canonicalizeApostrophes(lang, submittedMap.get(lang)!),
         ...clearedAnnotationFields(),

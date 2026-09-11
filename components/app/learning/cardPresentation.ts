@@ -1,3 +1,4 @@
+import type { AnnotationDisplay } from '@/lib/annotationDisplay';
 import type { RefObject } from 'react';
 import type { Id } from '@/convex/_generated/dataModel';
 import type { MergedPlayback } from '@/hooks/use-active-cue';
@@ -48,6 +49,14 @@ export interface CardPresentation {
   showRomanization?: boolean;
   /** IPA line toggle (from courseSettings.showIpa; default OFF). */
   showIpa?: boolean;
+  /**
+   * Per-language reading-aid visibility (lib/annotationDisplay.ts). Supersedes
+   * the course-wide booleans above, which remain the fallback for callers that
+   * pass no record. Resolved per line at render, where the line's language is
+   * in scope, so one card can show romanization under its Korean and not under
+   * its Japanese.
+   */
+  annotationDisplay?: Record<string, AnnotationDisplay>;
   /** Furigana ruby over kanji (courseSettings.showFurigana; default ON). */
   showFurigana?: boolean;
 

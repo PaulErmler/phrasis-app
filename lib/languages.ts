@@ -3058,6 +3058,55 @@ export function languageSupportsStt(code: string): boolean {
 }
 
 /**
+ * Whether a hyperliteral (word-for-word) gloss is offered for a sentence in
+ * `sentenceLanguage` when the gloss is written in `glossLanguage`.
+ *
+ * The one rule is that the two differ: glossing English into English shows a
+ * learner nothing. Variants collapse first, so an `en_gb` base language does
+ * not get an English gloss of an `en_us` sentence. Every other language pair
+ * is offered — a gloss is most useful where the grammar is furthest away
+ * (case, particles, verb-final order), but it still earns its place on a
+ * close pair, where it exposes gendered articles, clitic order and pro-drop.
+ *
+ * Which languages need EXTRA prompt guidance is a separate question, answered
+ * by the convention table in convex/lib/hyperliteralPrompt.ts.
+ */
+export function hyperliteralApplies(
+  sentenceLanguage: string,
+  glossLanguage: string,
+): boolean {
+  return (
+    normalizeLanguageCode(sentenceLanguage) !==
+    normalizeLanguageCode(glossLanguage)
+  );
+}
+
+/**
+ * The language a course's glosses are written in. **Always English for now**
+ * (Paul, 2026-09-11).
+ *
+ * This is the single place that decides: everything downstream already takes
+ * the gloss language as a parameter, and the `hyperliterals` table is keyed by
+ * it. To gloss in the learner's own base language instead, the body becomes:
+ *
+ *     const first = course.baseLanguages?.[0];
+ *     return first ? normalizeLanguageCode(first) : 'en';
+ *
+ * Rows already written in another gloss language survive such a switch in
+ * either direction. They simply stop being looked up, and come back if their
+ * language does, which is the point of keying the table by gloss language
+ * rather than storing one gloss per sentence.
+ *
+ * The `course` argument is kept so that reverting is a body change rather than
+ * a sweep of every call site.
+ */
+export function glossLanguageFor(_course: {
+  baseLanguages?: string[];
+}): string {
+  return 'en';
+}
+
+/**
  * Variant suffixes recognised by `normalizeLanguageCode`, derived from the
  * suffixes actually present in `SUPPORTED_LANGUAGES` codes (the segment after
  * the first underscore, e.g. `es_latam` → `latam`). Adding a dialect variant

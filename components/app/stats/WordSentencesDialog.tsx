@@ -1,5 +1,6 @@
 'use client';
 
+import { annotationLinePropsFromSettings } from '@/lib/annotationDisplay';
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import {
@@ -55,7 +56,6 @@ export function WordSentencesDialog({
   const { preloadedCourseSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords === true;
-  const showIpa = courseSettings?.showIpa === true;
   const showFurigana = resolveShowFurigana(courseSettings);
   const buttonPlayback = useButtonPlayback();
 
@@ -322,9 +322,15 @@ export function WordSentencesDialog({
                               highlightTerm={isWordLanguage ? word : undefined}
                             />
                             <AnnotationLines
+                              text={tr.text}
+                              language={tr.language}
                               romanization={tr.romanization}
+                              hyperliteral={tr.hyperliteral}
                               ipa={tr.ipa}
-                              showIpa={showIpa}
+                              {...annotationLinePropsFromSettings(
+                                courseSettings,
+                                tr.language,
+                              )}
                             />
                           </div>
                           <div className="flex items-center">
@@ -385,9 +391,15 @@ export function WordSentencesDialog({
                               highlightTerm={isWordLanguage ? word : undefined}
                             />
                             <AnnotationLines
+                              text={tr.text}
+                              language={tr.language}
                               romanization={tr.romanization}
+                              hyperliteral={tr.hyperliteral}
                               ipa={tr.ipa}
-                              showIpa={showIpa}
+                              {...annotationLinePropsFromSettings(
+                                courseSettings,
+                                tr.language,
+                              )}
                             />
                           </div>
                           <div className="flex items-center">

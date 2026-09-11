@@ -1,6 +1,11 @@
 'use client';
 
 import {
+  annotationLineProps,
+  showFuriganaFor,
+  type AnnotationDisplay,
+} from '@/lib/annotationDisplay';
+import {
   useState,
   useRef,
   useCallback,
@@ -182,6 +187,7 @@ export function FullReviewCardContent({
     onAudioPlay,
     showRomanization = true,
     showIpa = false,
+    annotationDisplay,
     showFurigana = true,
     mergedPlayback,
     audioSpeedOverrides,
@@ -1047,6 +1053,13 @@ interface TargetLanguageInputProps {
   showRomanization?: boolean;
   /** IPA line toggle (from courseSettings.showIpa; default OFF). */
   showIpa?: boolean;
+  /**
+   * Per-language reading-aid visibility (lib/annotationDisplay.ts). Supersedes
+   * the course-wide booleans above, which stay as the fallback for callers
+   * that have not been given the record. Resolved per line at render, where
+   * the line's language is in scope.
+   */
+  annotationDisplay?: Record<string, AnnotationDisplay>;
   /** Furigana ruby over kanji (courseSettings.showFurigana; default ON). */
   showFurigana?: boolean;
   ignorePunctuation?: boolean;
@@ -1099,6 +1112,7 @@ function TargetLanguageInput({
   firstExposure = false,
   showRomanization = true,
   showIpa = false,
+  annotationDisplay,
   showFurigana = true,
   ignorePunctuation = false,
   highlightEnabled,
@@ -1121,7 +1135,6 @@ function TargetLanguageInput({
   // clip the header carries after submit), each other-accepted row's own.
   const ipaPlay = useLocalPlaySignals();
   const mainPlaySignal = ipaPlay.signalFor('main', playSignal);
-  const playMainFromIpa = () => ipaPlay.bump('main');
   // Nullable. Absent outside learning mode (e.g. landing demo); the Discuss
   // button simply doesn't render then.
   const chatContext = useLearningChatToggle();
@@ -1484,11 +1497,15 @@ function TargetLanguageInput({
   // the action buttons and coach card can't push it down the card.
   const annotations = (
     <AnnotationLines
+      text={translation.text}
+      language={translation.language}
       romanization={translation.romanization}
+      hyperliteral={translation.hyperliteral}
       ipa={translation.ipa}
-      showRomanization={showRomanization}
-      showIpa={showIpa}
-      onIpaClick={playMainFromIpa}
+      {...annotationLineProps(annotationDisplay, translation.language, {
+        showRomanization,
+        showIpa,
+      })}
     />
   );
 
@@ -1523,7 +1540,15 @@ function TargetLanguageInput({
                 hideAccuracy={false}
                 hideErrors={showClean}
                 ignorePunctuation={ignorePunctuation}
-                furigana={showFurigana ? translation.furigana : undefined}
+                furigana={
+                  showFuriganaFor(
+                    annotationDisplay,
+                    translation.language,
+                    showFurigana,
+                  )
+                    ? translation.furigana
+                    : undefined
+                }
                 afterText={annotations}
               />
             </div>
@@ -1547,7 +1572,15 @@ function TargetLanguageInput({
               clockBinding={isActive ? clockBinding : undefined}
               isActive={isActive}
               enabled={highlightEnabled}
-              furigana={showFurigana ? translation.furigana : undefined}
+              furigana={
+                showFuriganaFor(
+                  annotationDisplay,
+                  translation.language,
+                  showFurigana,
+                )
+                  ? translation.furigana
+                  : undefined
+              }
               className="body-large text-muted-foreground"
             />
             {annotations}
@@ -1566,11 +1599,15 @@ function TargetLanguageInput({
   const diffAnnotations = correctedForDiff ? (
     diffTargetItem ? (
       <AnnotationLines
+        text={diffTargetItem.text}
+        language={translation.language}
         romanization={diffTargetItem.romanization}
+        hyperliteral={diffTargetItem.hyperliteral}
         ipa={diffTargetItem.ipa}
-        showRomanization={showRomanization}
-        showIpa={showIpa}
-        onIpaClick={playMainFromIpa}
+        {...annotationLineProps(annotationDisplay, translation.language, {
+          showRomanization,
+          showIpa,
+        })}
       />
     ) : null
   ) : (
@@ -1637,7 +1674,15 @@ function TargetLanguageInput({
                   clockBinding={isActive ? clockBinding : undefined}
                   isActive={isActive}
                   enabled={highlightEnabled}
-                  furigana={showFurigana ? translation.furigana : undefined}
+                  furigana={
+                    showFuriganaFor(
+                      annotationDisplay,
+                      translation.language,
+                      showFurigana,
+                    )
+                      ? translation.furigana
+                      : undefined
+                  }
                   className="body-large text-muted-foreground"
                 />
                 {annotations}
@@ -1687,15 +1732,31 @@ function TargetLanguageInput({
                     localTime={0}
                     isActive={false}
                     enabled={false}
-                    furigana={showFurigana ? item.furigana : undefined}
+                    furigana={
+                      showFuriganaFor(
+                        annotationDisplay,
+                        translation.language,
+                        showFurigana,
+                      )
+                        ? item.furigana
+                        : undefined
+                    }
                     className="text-sm text-muted-foreground"
                   />
                   <AnnotationLines
+                    text={item.text}
+                    language={translation.language}
                     romanization={item.romanization}
+                    hyperliteral={item.hyperliteral}
                     ipa={item.ipa}
-                    showRomanization={showRomanization}
-                    showIpa={showIpa}
-                    onIpaClick={() => ipaPlay.bump(item.text)}
+                    {...annotationLineProps(
+                      annotationDisplay,
+                      translation.language,
+                      {
+                        showRomanization,
+                        showIpa,
+                      },
+                    )}
                   />
                 </div>
                 <div
@@ -1768,7 +1829,15 @@ function TargetLanguageInput({
                 clockBinding={isActive ? clockBinding : undefined}
                 isActive={isActive}
                 enabled={highlightEnabled}
-                furigana={showFurigana ? translation.furigana : undefined}
+                furigana={
+                  showFuriganaFor(
+                    annotationDisplay,
+                    translation.language,
+                    showFurigana,
+                  )
+                    ? translation.furigana
+                    : undefined
+                }
                 className="body-large text-muted-foreground"
               />
               {annotations}

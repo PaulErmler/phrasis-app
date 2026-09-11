@@ -322,7 +322,10 @@ export const checkSpeakerGender = internalAction({
 
 export const getTextForSpeakerCheck = internalQuery({
   args: { textId: v.id('texts') },
-  returns: v.union(v.null(), v.object({ text: v.string(), language: v.string() })),
+  returns: v.union(
+    v.null(),
+    v.object({ text: v.string(), language: v.string() }),
+  ),
   handler: async (ctx, args) => {
     const text = await ctx.db.get(args.textId);
     return text ? { text: text.text, language: text.language } : null;

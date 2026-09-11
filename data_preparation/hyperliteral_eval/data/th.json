@@ -1,0 +1,260 @@
+{
+ "language": "th",
+ "curatedAt": "2026-09-11",
+ "notes": "Wikipedia {{interlinear}}. Source keeps the template's word segmentation; Thai is written without spaces.",
+ "items": [
+  {
+   "text": "นักเรียน คน ที่ สอง",
+   "lexical": [
+    "student",
+    "people",
+    "ordinal-particle",
+    "two"
+   ],
+   "glossRaw": "student CL:people ordinal-particle two",
+   "free": "The second student",
+   "source": "en.wikipedia/Classifier_(linguistics)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Classifier_(linguistics)"
+  },
+  {
+   "text": "หนังสือ เล่ม ใหม่",
+   "lexical": [
+    "book",
+    "books-and-knives",
+    "new"
+   ],
+   "glossRaw": "book CL:books-and-knives new",
+   "free": "The new book",
+   "source": "en.wikipedia/Classifier_(linguistics)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Classifier_(linguistics)"
+  },
+  {
+   "text": "เรือ ลำ ใหญ่ ลำ นั้น",
+   "lexical": [
+    "boat",
+    "boats-and-planes",
+    "large",
+    "boats-and-planes",
+    "that"
+   ],
+   "glossRaw": "boat CL:boats-and-planes large CL:boats-and-planes that",
+   "free": "that large boat",
+   "source": "en.wikipedia/Classifier_(linguistics)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Classifier_(linguistics)"
+  },
+  {
+   "text": "เรือ ลำ ใหญ่ สาม ลำ",
+   "lexical": [
+    "boat",
+    "boats-and-planes",
+    "large",
+    "three",
+    "boats-and-planes"
+   ],
+   "glossRaw": "boat CL:boats-and-planes large three CL:boats-and-planes",
+   "free": "three large boats",
+   "source": "en.wikipedia/Classifier_(linguistics)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Classifier_(linguistics)"
+  },
+  {
+   "text": "เรือ ลำ ใหญ่ สาม ลำ นั้น",
+   "lexical": [
+    "boat",
+    "boats-and-planes",
+    "large",
+    "three",
+    "boats-and-planes",
+    "that"
+   ],
+   "glossRaw": "boat CL:boats-and-planes large three CL:boats-and-planes that",
+   "free": "those three large boats",
+   "source": "en.wikipedia/Classifier_(linguistics)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Classifier_(linguistics)"
+  },
+  {
+   "text": "เขา อ่าน หนังสือ ให้",
+   "lexical": [
+    null,
+    "read",
+    "book",
+    null
+   ],
+   "glossRaw": "3SG read book DAT",
+   "free": "He reads book for (us).",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "เขา ให้ อ่าน หนังสือ",
+   "lexical": [
+    null,
+    null,
+    "read",
+    "book"
+   ],
+   "glossRaw": "3SG DAT read book",
+   "free": "He obligates (us) to read book.",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "เขา ให้ หนังสือ นักเรียน",
+   "lexical": [
+    null,
+    null,
+    "book",
+    "student"
+   ],
+   "glossRaw": "3SG DAT book student",
+   "free": "He gives book to student.",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "ฉัน ฟัง ไม่ เข้าใจ",
+   "lexical": [
+    "i",
+    "listen",
+    "not",
+    "understand"
+   ],
+   "glossRaw": "I listen not understand",
+   "free": "I don't understand what was said",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "ครู ห้า คน",
+   "lexical": [
+    "teacher",
+    "five",
+    "person"
+   ],
+   "glossRaw": "teacher five person",
+   "free": "five teachers",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "ลูก ของ แม่",
+   "lexical": [
+    "child",
+    "belonging-to",
+    "mother"
+   ],
+   "glossRaw": "child belonging-to mother",
+   "free": "mother's child",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "ผู้หญิง สอง คน",
+   "lexical": [
+    "woman",
+    "two",
+    "classifier"
+   ],
+   "glossRaw": "woman two CL",
+   "free": "two women",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "แก้ว หนึ่ง ใบ",
+   "lexical": [
+    "glass",
+    "one",
+    "classifier"
+   ],
+   "glossRaw": "glass one CL",
+   "free": "one glass\"",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "แก้ว ใบ หนึ่ง",
+   "lexical": [
+    "glass",
+    "classifier",
+    "one"
+   ],
+   "glossRaw": "glass CL one",
+   "free": "a glass\"",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "นักเรียน ทุก คน",
+   "lexical": [
+    "student",
+    "every",
+    "classifier"
+   ],
+   "glossRaw": "student every CL",
+   "free": "every student",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "ครู บาง คน",
+   "lexical": [
+    "teacher",
+    "some",
+    "classifier"
+   ],
+   "glossRaw": "teacher some CL",
+   "free": "some teacher",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "วาง ถ้วย บน นั้น",
+   "lexical": [
+    "wang",
+    "thuai",
+    "bon",
+    "nan"
+   ],
+   "glossRaw": "wang thuai bon nan",
+   "free": "put a bowl on there",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "แมว ตัว ไหน",
+   "lexical": [
+    "cat",
+    "classifier",
+    "question"
+   ],
+   "glossRaw": "cat CL INT",
+   "free": "which cat?",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "จอด ที่ ไหน",
+   "lexical": [
+    "park",
+    null,
+    "question"
+   ],
+   "glossRaw": "park PREP INT",
+   "free": "where to park?",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  },
+  {
+   "text": "พัก ตอน ไหน",
+   "lexical": [
+    "rest",
+    "since",
+    "question"
+   ],
+   "glossRaw": "rest since INT",
+   "free": "when to rest?",
+   "source": "en.wikipedia/Thai_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Thai_language"
+  }
+ ]
+}

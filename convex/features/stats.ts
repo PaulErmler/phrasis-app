@@ -41,7 +41,7 @@ import {
 import { DEFAULT_INITIAL_REVIEW_COUNT } from '../../lib/scheduling';
 import type { Doc } from '../_generated/dataModel';
 import { getDailyStats } from '../db/stats/dailyStats';
-import { getCourseSettings } from '../db/courseSettings';
+import { getCourseSettings, glossOptFor } from '../db/courseSettings';
 import { type FsrsStateLabel } from '../lib/fsrsStates';
 import { buildTextContentBatchForLanguages } from '../lib/cardContent';
 import { annotationFieldsOf } from '../lib/textAnnotations';
@@ -768,11 +768,13 @@ export const getSentencesForWord = query({
       })
       .filter((input): input is NonNullable<typeof input> => input !== null);
 
+    const glossOpt = await glossOptFor(ctx, active.course);
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
       inputs,
       baseLanguages,
       targetLanguages,
+      glossOpt,
     );
 
     const sentences = inputs.map((input) => {

@@ -18,7 +18,8 @@ export type AiFeature =
   | 'tts_validation_judge'
   | 'word_timing_backfill'
   | 'machine_translation'
-  | 'writing_feedback';
+  | 'writing_feedback'
+  | 'hyperliteral';
 
 /**
  * Features routed to the plain `ai_cost` event instead of `$ai_generation`.
@@ -40,6 +41,7 @@ const PIPELINE_FEATURES: ReadonlySet<AiFeature> = new Set([
   'tts_synthesis',
   'tts_validation_judge',
   'word_timing_backfill',
+  'hyperliteral',
 ]);
 
 export type CaptureGenerationArgs = {

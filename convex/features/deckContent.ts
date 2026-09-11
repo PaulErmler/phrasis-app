@@ -6,6 +6,10 @@ import { getActiveCourseForUser } from '../db/courses';
 import { getDeckByCourseId, getCardByDeckAndText } from '../db/decks';
 import { getCourseSettings } from '../db/courseSettings';
 import {
+  hyperliteralWantsFor,
+  type HyperliteralWants,
+} from '../../lib/annotationDisplay';
+import {
   schedulingTrackFromSettings,
   type SchedulingMode,
   type SchedulingTrack,
@@ -29,25 +33,43 @@ import { getNextAddableTextsFromRank } from './collectionCardAdding';
  * per-text sweep lives in convex/lib/contentScheduling.ts.
  */
 
+/** Nothing to do: the caller has no course, deck, card or text. */
+const NOTHING_SCHEDULED = {
+  translationsScheduled: 0,
+  audioScheduled: 0,
+  hyperliteralsScheduled: 0,
+} as const;
+
 /** Handler body of `ensureCardContent`. */
 export async function ensureCardContentHandler(
   ctx: MutationCtx,
   args: { textId: Id<'texts'> },
-): Promise<{ translationsScheduled: number; audioScheduled: number }> {
+): Promise<{
+  translationsScheduled: number;
+  audioScheduled: number;
+  hyperliteralsScheduled: number;
+}> {
   const userId = await requireAuthUserId(ctx);
 
   const active = await getActiveCourseForUser(ctx, userId);
-  if (!active) return { translationsScheduled: 0, audioScheduled: 0 };
+  if (!active) return NOTHING_SCHEDULED;
 
   const deck = await getDeckByCourseId(ctx, active.course._id);
-  if (!deck) return { translationsScheduled: 0, audioScheduled: 0 };
+  if (!deck) return NOTHING_SCHEDULED;
 
   // Verify the user actually has a card for this text in their deck
   const card = await getCardByDeckAndText(ctx, deck._id, args.textId);
-  if (!card) return { translationsScheduled: 0, audioScheduled: 0 };
+  if (!card) return NOTHING_SCHEDULED;
 
   const text = await ctx.db.get(args.textId);
-  if (!text) return { translationsScheduled: 0, audioScheduled: 0 };
+  if (!text) return NOTHING_SCHEDULED;
+
+  // Course settings decide whether a hyperliteral gloss is generated at all
+  // and in which language (`hyperliteralWantsFor`). The other three
+  // annotations generate for every supported row whatever the settings say;
+  // a gloss is a paid model call per sentence, so it follows the setting.
+  const courseSettings = await getCourseSettings(ctx, active.course._id);
+  const hyperliteral = hyperliteralWantsFor(active.course, courseSettings);
 
   // The learner has this card, so its wording AND its voice are card
   // demand; the sweep resolves the card's rendering key per language
@@ -58,7 +80,10 @@ export async function ensureCardContentHandler(
     text,
     active.course.baseLanguages,
     active.course.targetLanguages,
-    { card: renderingCardOf(card) },
+    {
+      card: renderingCardOf(card),
+      ...(hyperliteral ? { hyperliteral } : {}),
+    },
   );
 }
 
@@ -145,6 +170,15 @@ async function scheduleContentForUpcomingCards(
   cards: Doc<'cards'>[],
 ): Promise<number> {
   let processed = 0;
+  // The gloss follows the course setting rather than the language, so the
+  // probe has to know about it too: without this a card whose only gap is a
+  // gloss probes clean and never gets prepared. This is the review path —
+  // `ensureCardContent` (the library's) is a different entry point, and
+  // wiring only that one is exactly how the gloss failed to appear in review.
+  const hyperliteral = hyperliteralWantsFor(
+    active.course,
+    await getCourseSettings(ctx, active.course._id),
+  );
   // Batch-load the texts up front (one concurrent read round, not one
   // sequential get per card) before the sequential probe loop.
   const texts = await Promise.all(cards.map((card) => ctx.db.get(card.textId)));
@@ -161,7 +195,11 @@ async function scheduleContentForUpcomingCards(
         text,
         active.course.baseLanguages,
         active.course.targetLanguages,
-        { probe: true, card: renderingCard },
+        {
+          probe: true,
+          card: renderingCard,
+          ...(hyperliteral ? { hyperliteral } : {}),
+        },
       );
     } catch (error) {
       if (error instanceof ProbeNeedsWork) {
@@ -187,6 +225,7 @@ async function scheduleContentForUpcomingCards(
           baseLanguages: active.course.baseLanguages,
           targetLanguages: active.course.targetLanguages,
           renderingCard,
+          ...(hyperliteral ? { hyperliteral } : {}),
         },
       );
       processed++;
@@ -303,6 +342,13 @@ export async function prepareCardContentHandler(
     renderingCard?: NonNullable<SweepCard>;
     /** Translation-only pass; see ContentSweepOpts. */
     skipTts?: boolean;
+    /**
+     * Which languages want a hyperliteral gloss, and in which language. The
+     * caller resolves it from course settings, because this mutation is
+     * scheduled from a probe that already has them and re-reading here would
+     * be a second lookup per card.
+     */
+    hyperliteral?: HyperliteralWants;
   },
 ): Promise<null> {
   const text = await ctx.db.get(args.textId);
@@ -319,6 +365,7 @@ export async function prepareCardContentHandler(
       requestedByUserId: args.requestedByUserId,
       card: args.renderingCard ?? null,
       skipTts: args.skipTts,
+      hyperliteral: args.hyperliteral,
     },
   );
   return null;

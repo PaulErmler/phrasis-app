@@ -27,7 +27,7 @@ import { Id, Doc } from '../_generated/dataModel';
 import { getAuthUserId, getUserSettings, requireAuthUserId } from '../db/users';
 import { studyDayFromSettings } from '../lib/dueSlots';
 import { getActiveCourseForUser } from '../db/courses';
-import { getCourseSettings } from '../db/courseSettings';
+import { getCourseSettings, glossOptFor } from '../db/courseSettings';
 import { hasPendingCustomCardsToAdd } from '../db/collections';
 import { getDeckByCourseId } from '../db/decks';
 import { trackEvent } from '../db/stats/dailyStats';
@@ -378,12 +378,19 @@ export const getCardForReview = query({
     });
     // Review is the one reader whose self-heal generates rendering
     // variants (wording and voice), so their gaps count as missing content.
+    // `settings` is already in hand from above; passing it saves a second
+    // read of the same row on the hottest query in the app.
+    const glossOpt = await glossOptFor(ctx, course, settings);
     const contentByKey = await buildTextContentBatchForLanguages(
       ctx,
       contentInputs,
       course.baseLanguages,
       course.targetLanguages,
-      { rawRomanization: true, ignoreMissingWordTimings: true },
+      {
+        rawRomanization: true,
+        ignoreMissingWordTimings: true,
+        ...glossOpt,
+      },
     );
 
     // AI-feedback accepted alternatives, card-scoped (unlike the shared text

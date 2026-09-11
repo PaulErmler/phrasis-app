@@ -1,0 +1,335 @@
+{
+ "language": "de",
+ "curatedAt": "2026-09-11",
+ "notes": "Wikipedia {{interlinear}}. Mostly verb-second and case examples from syntax articles, so the sentences are short and constructed rather than natural prose.",
+ "items": [
+  {
+   "text": "Neben ihm saß der dünnhaarige Pianist, den Kopf im Nacken, und lauschte.",
+   "lexical": [
+    "next-to",
+    "him",
+    "sat",
+    "the",
+    "thin-haired",
+    "pianist",
+    "the",
+    "head",
+    "in-the",
+    "neck",
+    "and",
+    "listened"
+   ],
+   "glossRaw": "next-to him sat the thin-haired pianist the-MASC.ACC.SG head in-the neck and listened",
+   "free": "The thin-haired pianist, his head back ( his head in his neck), sat next to him and listened.",
+   "source": "en.wikipedia/Accusative_absolute",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Accusative_absolute"
+  },
+  {
+   "text": "der König kam an der Burg an",
+   "lexical": [
+    "the",
+    "king",
+    "come",
+    "at",
+    "the",
+    "castle",
+    "on"
+   ],
+   "glossRaw": "the.NOM.SG.M king.NOM.SG come.PST.3SG at the.DAT.SG.F castle.DAT.SG on",
+   "free": "The King arrived (lit. \"on-came\") at the castle.",
+   "source": "en.wikipedia/German_sentence_structure",
+   "sourceUrl": "https://en.wikipedia.org/wiki/German_sentence_structure"
+  },
+  {
+   "text": "Auguste Viktoria verlässt uns, denn Wilhelm dankt ab",
+   "lexical": [
+    "auguste",
+    "viktoria",
+    "leaves",
+    "us",
+    "because",
+    "wilhelm",
+    "thanks",
+    "off"
+   ],
+   "glossRaw": "Auguste Viktoria.NOM leaves.PRS-3SG us.1PL.ACC because Wilhelm.NOM thanks.PRS.3SG off",
+   "free": "Auguste Viktoria leaves us because Wilhelm abdicates ( \"thanks off\").",
+   "source": "en.wikipedia/German_sentence_structure",
+   "sourceUrl": "https://en.wikipedia.org/wiki/German_sentence_structure"
+  },
+  {
+   "text": "siehst du den Baum",
+   "lexical": [
+    "see",
+    "you",
+    "the",
+    "tree"
+   ],
+   "glossRaw": "see.PRS.2SG you.SG the.ACC.SG.M tree.ACC.SG",
+   "free": "Do you see the tree?",
+   "source": "en.wikipedia/German_sentence_structure",
+   "sourceUrl": "https://en.wikipedia.org/wiki/German_sentence_structure"
+  },
+  {
+   "text": "Ich weiß dass Erna hier ist",
+   "lexical": [
+    "i",
+    "know",
+    "that",
+    "erna",
+    "here",
+    "be"
+   ],
+   "glossRaw": "I.NOM know.PRS.1SG that Erna.NOM here be.PRS.3SG",
+   "free": "I know that Erna is here.",
+   "source": "en.wikipedia/German_sentence_structure",
+   "sourceUrl": "https://en.wikipedia.org/wiki/German_sentence_structure"
+  },
+  {
+   "text": "dass zwei größer als eins ist, ist selbstverständlich",
+   "lexical": [
+    "that",
+    "two",
+    "greater",
+    "than",
+    "one",
+    "be",
+    "be",
+    "obvious"
+   ],
+   "glossRaw": "that two greater than one be.PRS.3SG be.PRS.3SG obvious",
+   "free": "That two is greater than one is obvious.",
+   "source": "en.wikipedia/German_sentence_structure",
+   "sourceUrl": "https://en.wikipedia.org/wiki/German_sentence_structure"
+  },
+  {
+   "text": "Wir glauben Kaffeehäuser bilden noch",
+   "lexical": [
+    "we",
+    "believe",
+    "coffeehouses",
+    "educate",
+    "still"
+   ],
+   "glossRaw": "We.NOM believe.PRS.1PL coffeehouses.NOM educate.PRS.3PL still",
+   "free": "We believe coffeehouses are still educational.",
+   "source": "en.wikipedia/German_sentence_structure",
+   "sourceUrl": "https://en.wikipedia.org/wiki/German_sentence_structure"
+  },
+  {
+   "text": "das Landhaus in dem ich auf der Alm wohne ist alt",
+   "lexical": [
+    "the",
+    "chalet",
+    "in",
+    null,
+    "i",
+    "on",
+    "the",
+    "alp",
+    "live",
+    "be",
+    "old"
+   ],
+   "glossRaw": "the.NOM.SG.N chalet.NOM.SG in REL.DAT.SG.N I.NOM on the.DAT.SG.F. alp.NOM.SG live.PRS.1SG be.PRS.3SG old",
+   "free": "The chalet ( country house) in which I live on the alp is old.",
+   "source": "en.wikipedia/German_sentence_structure",
+   "sourceUrl": "https://en.wikipedia.org/wiki/German_sentence_structure"
+  },
+  {
+   "text": "alles was Jakob macht gelingt ihm",
+   "lexical": [
+    "everything",
+    "what",
+    "jakob",
+    "make",
+    "turn-out-well",
+    null
+   ],
+   "glossRaw": "everything.NOM.SG.N what.ACC.SG Jakob.NOM make.PRS.3SG turn-out-well.PRS.3SG 3SG.DAT",
+   "free": "Everything Jakob does ( \"makes\") is a success ( \"turns out well to him\").",
+   "source": "en.wikipedia/German_sentence_structure",
+   "sourceUrl": "https://en.wikipedia.org/wiki/German_sentence_structure"
+  },
+  {
+   "text": "Man beschimpfte den Boten, der den Befehl überbrachte",
+   "lexical": [
+    "one",
+    "insulted",
+    "the",
+    "messenger",
+    "who",
+    "the",
+    "command",
+    "delivered"
+   ],
+   "glossRaw": "one insulted the messenger who the command delivered",
+   "free": "The messenger, who delivered the command, was insulted.",
+   "source": "en.wikipedia/Head-directionality_parameter",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Head-directionality_parameter"
+  },
+  {
+   "text": "der auf seine Kinder stolze Vater",
+   "lexical": [
+    "the",
+    "of",
+    "his",
+    "children",
+    "proud",
+    "father"
+   ],
+   "glossRaw": "the of his children proud father",
+   "free": "the father (who is) proud of his children",
+   "source": "en.wikipedia/Head-directionality_parameter",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Head-directionality_parameter"
+  },
+  {
+   "text": "Peter legt das Buch auf den Tisch",
+   "lexical": [
+    "peter",
+    "puts",
+    "the",
+    "book",
+    "on",
+    "the",
+    "table"
+   ],
+   "glossRaw": "Peter puts the book on the.ACC table",
+   "free": "Peter puts the book on the table.",
+   "source": "en.wikipedia/Head-directionality_parameter",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Head-directionality_parameter"
+  },
+  {
+   "text": "Die Schnecke kroch das Dach hinauf",
+   "lexical": [
+    "the",
+    "snail",
+    "crept",
+    "the",
+    "roof",
+    "up"
+   ],
+   "glossRaw": "the snail crept the roof up",
+   "free": "The snail crept up the roof",
+   "source": "en.wikipedia/Head-directionality_parameter",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Head-directionality_parameter"
+  },
+  {
+   "text": "dass Lisa eine Blume gepflanzt hat",
+   "lexical": [
+    "that",
+    "lisa",
+    "a",
+    "flower",
+    "planted",
+    "has"
+   ],
+   "glossRaw": "that Lisa a flower planted has",
+   "free": "that Lisa planted a flower",
+   "source": "en.wikipedia/Head-directionality_parameter",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Head-directionality_parameter"
+  },
+  {
+   "text": "Die Tür öffnete sich.",
+   "lexical": [
+    "the",
+    "door",
+    "open",
+    "self"
+   ],
+   "glossRaw": "the door open REFL",
+   "free": "The door opened.",
+   "source": "en.wikipedia/Labile_verb",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Labile_verb"
+  },
+  {
+   "text": "Die Vase zerbrach.",
+   "lexical": [
+    "the",
+    "vase",
+    "broke"
+   ],
+   "glossRaw": "the vase broke",
+   "free": "The vase broke.",
+   "source": "en.wikipedia/Lexical_semantics",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Lexical_semantics"
+  },
+  {
+   "text": "Hans zerbrach die Vase.",
+   "lexical": [
+    "john",
+    "broke",
+    "the",
+    "vase"
+   ],
+   "glossRaw": "John broke the vase",
+   "free": "John broke the vase.",
+   "source": "en.wikipedia/Lexical_semantics",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Lexical_semantics"
+  },
+  {
+   "text": "Hans öffnete die Tür.",
+   "lexical": [
+    "john",
+    "opened",
+    "the",
+    "door"
+   ],
+   "glossRaw": "John opened the door",
+   "free": "John opened the door.",
+   "source": "en.wikipedia/Lexical_semantics",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Lexical_semantics"
+  },
+  {
+   "text": "Ich kann mir davon nichts leisten.",
+   "lexical": [
+    "i",
+    "can",
+    "me",
+    "thereof",
+    "nothing",
+    "afford"
+   ],
+   "glossRaw": "I can me thereof nothing afford.",
+   "free": "I can't afford any of those.",
+   "source": "en.wikipedia/Preposition_stranding",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Preposition_stranding"
+  },
+  {
+   "text": "Er hat jemandem geschmeichelt, aber ich weiß nicht, wem.",
+   "lexical": [
+    "he",
+    "has",
+    "someone",
+    "flattered",
+    "but",
+    "i",
+    "know",
+    "not",
+    "who"
+   ],
+   "glossRaw": "he has someone.DAT flattered but I know not who.DAT",
+   "free": "He flattered someone, but I don't know who.",
+   "source": "en.wikipedia/Sluicing",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Sluicing"
+  },
+  {
+   "text": "Hans will jemandem helfen, aber ich weiß nicht wem.",
+   "lexical": [
+    "hans",
+    "wants",
+    "someone",
+    "help",
+    "but",
+    "i",
+    "know",
+    "not",
+    "whom"
+   ],
+   "glossRaw": "Hans wants someone help but I know not whom.",
+   "free": "Hans wants to help someone, but I don't know whom.",
+   "source": "en.wikipedia/Sluicing",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Sluicing"
+  }
+ ]
+}

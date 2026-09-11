@@ -352,6 +352,9 @@ export const ensureCardContent = mutation({
   returns: v.object({
     translationsScheduled: v.number(),
     audioScheduled: v.number(),
+    // Counted so a card whose ONLY gap is a gloss reports work scheduled.
+    // `useEnsureContent` reads 0/0 as a dead claim and re-fires.
+    hyperliteralsScheduled: v.number(),
   }),
   handler: ensureCardContentHandler,
 });
@@ -400,6 +403,15 @@ export const prepareCardContent = internalMutation({
     // See prepareCardContentHandler.
     renderingCard: v.optional(renderingCardValidator),
     skipTts: v.optional(v.boolean()),
+    // See prepareCardContentHandler: resolved by the caller from course
+    // settings, because the gloss follows the setting rather than the
+    // language.
+    hyperliteral: v.optional(
+      v.object({
+        glossLanguage: v.string(),
+        languages: v.array(v.string()),
+      }),
+    ),
   },
   returns: v.null(),
   handler: prepareCardContentHandler,

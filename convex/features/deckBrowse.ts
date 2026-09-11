@@ -8,7 +8,7 @@ import { QueryCtx } from '../_generated/server';
 import { Id } from '../_generated/dataModel';
 import { getAuthUserId, getUserSettings } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
-import { getCourseSettings } from '../db/courseSettings';
+import { getCourseSettings, glossOptFor } from '../db/courseSettings';
 import { getDeckByCourseId } from '../db/decks';
 import {
   getActiveDataset,
@@ -102,11 +102,13 @@ export async function getDeckCardsHandler(
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
 
+  const glossOpt = await glossOptFor(ctx, course);
   const contentMap = await buildTextContentBatchForLanguages(
     ctx,
     inputs,
     course.baseLanguages,
     course.targetLanguages,
+    glossOpt,
   );
 
   const result = cards.map((card, i) => {

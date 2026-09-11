@@ -1,0 +1,246 @@
+{
+ "language": "ko",
+ "curatedAt": "2026-09-11",
+ "notes": "Wikipedia {{interlinear}}. Thin (Wikipedia's Korean examples are mostly romanized).",
+ "items": [
+  {
+   "text": "너-는 저 학생-을 아-니 모르-니?",
+   "lexical": [
+    "you",
+    "that",
+    "student",
+    "know",
+    "not-know"
+   ],
+   "glossRaw": "you-TOP that student-ACC know-COMP not.know-COMP",
+   "free": "Do you know that student or not?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "지우-는 집-에 있니 없니?",
+   "lexical": [
+    "jiwoo",
+    "home",
+    "be",
+    "not-be"
+   ],
+   "glossRaw": "Jiwoo-TOP home-LOC be-COMP not.be-COMP",
+   "free": "Is Jiwoo at home or not?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "이게 네 책-이-니 아니-니",
+   "lexical": [
+    "this",
+    "you",
+    "book-be",
+    "not-be"
+   ],
+   "glossRaw": "this you book-be-COMP not.be-COMP",
+   "free": "IS this your book or not?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "우리-는 잘-까 말-까?",
+   "lexical": [
+    "we",
+    "sleep",
+    "not"
+   ],
+   "glossRaw": "we-TOP sleep-PROP-COMP not.PROP-COMP",
+   "free": "Should or shouldn't we go to bed?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "너-는 콘서트-에 갈-래 말-래?",
+   "lexical": [
+    "you",
+    "concert",
+    "go",
+    "not"
+   ],
+   "glossRaw": "you-TOP concert-LOC go-DES-COMP not.DES-COMP",
+   "free": "Are (you) going to the concert or not?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "버스 표 열 장",
+   "lexical": [
+    "bus",
+    "ticket",
+    "ten",
+    "sheets"
+   ],
+   "glossRaw": "bus ticket ten 'sheets'",
+   "free": "ten bus tickets",
+   "source": "en.wikipedia/Korean_count_word",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Korean_count_word"
+  },
+  {
+   "text": "많이들 먹다가들 가거라",
+   "lexical": [
+    "a-lot",
+    "eat-and",
+    "go"
+   ],
+   "glossRaw": "a-lot-ADV-PL eat-and-PL go-IMP",
+   "free": "You guys eat well and go.",
+   "source": "en.wikipedia/Korean_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Korean_grammar"
+  },
+  {
+   "text": "학생들이 풍선을 하나씩 샀어요",
+   "lexical": [
+    "student",
+    "balloon",
+    "one-each",
+    "buy"
+   ],
+   "glossRaw": "student-PL-NOM balloon-ACC one-each buy-PRET-INT-POL",
+   "free": "The students bought a balloon each.",
+   "source": "en.wikipedia/Korean_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Korean_grammar"
+  },
+  {
+   "text": "경찰은 철수를 죽였습니다.",
+   "lexical": [
+    "police",
+    "cheolsu",
+    "died-made"
+   ],
+   "glossRaw": "police-TOP Cheolsu-ACC died-made",
+   "free": "The police killed (made dead) Cheolsu.",
+   "source": "en.wikipedia/Labile_verb",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Labile_verb"
+  },
+  {
+   "text": "주현-씨 는 저 에게 \"니가 좋아\" 라고 말했어요.",
+   "lexical": [
+    "ms-joohyun",
+    "topic",
+    "i",
+    null,
+    "you",
+    "like",
+    null,
+    "say"
+   ],
+   "glossRaw": "Ms.-Joohyun TOP I DAT \"you-NOM like\" QUOT say-PAST-POL",
+   "free": "Joohyun told me that she liked me.\" \"that 'I like you.",
+   "source": "en.wikipedia/Quotative",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Quotative"
+  },
+  {
+   "text": "주현-씨 는 저 에게 제가 좋다고 했어요.",
+   "lexical": [
+    "ms-joohyun",
+    "topic",
+    "i",
+    null,
+    "i",
+    "like",
+    "say"
+   ],
+   "glossRaw": "Ms.-Joohyun TOP I DAT I-NOM like-QUOT say-PAST-POL",
+   "free": "Joohyun told me that she liked me.",
+   "source": "en.wikipedia/Quotative",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Quotative"
+  },
+  {
+   "text": "경수-씨 는 저 에게 아직 학생이라고 했어요.",
+   "lexical": [
+    "mr-kyungsoo",
+    "topic",
+    "i",
+    null,
+    "still",
+    "student",
+    "say"
+   ],
+   "glossRaw": "Mr.-Kyungsoo TOP I DAT still student-COP-QUOT say-PAST-POL",
+   "free": "Kyungsoo told me that he's still a student.",
+   "source": "en.wikipedia/Quotative",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Quotative"
+  },
+  {
+   "text": "저 는 윤아-씨 에게 망고 를 먹어본 적이 있냐고 물어봤어요.",
+   "lexical": [
+    "i",
+    "topic",
+    "ms-yoona",
+    null,
+    "mango",
+    null,
+    "eat-try",
+    "experience",
+    "have",
+    "ask"
+   ],
+   "glossRaw": "I TOP Ms.-Yoona DAT mango SUBJ eat-try-PAST-ATTR experience-SUBJ have-Q-QUOT ask-PAST-POL",
+   "free": "I asked Yoona if she has tried mango.\" \"has the experience of eating mango",
+   "source": "en.wikipedia/Quotative",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Quotative"
+  },
+  {
+   "text": "저 는 종대-씨 에게 공원 으로 가고 싶으냐고 물어봤어요.",
+   "lexical": [
+    "i",
+    "topic",
+    "mr-jongdae",
+    null,
+    "park",
+    "towards",
+    "go-to",
+    "want",
+    "ask"
+   ],
+   "glossRaw": "I TOP Mr.-Jongdae DAT park towards go-to want-Q-QUOT ask-PAST-POL",
+   "free": "I asked Jongdae whether he would like to go to the park.",
+   "source": "en.wikipedia/Quotative",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Quotative"
+  },
+  {
+   "text": "철수에게가 돈이 필요하다",
+   "lexical": [
+    "chulsoo",
+    "money",
+    "need"
+   ],
+   "glossRaw": "Chulsoo-DAT-NOM money-NOM need-IN",
+   "free": "Chulsoo needs money.\"",
+   "source": "en.wikipedia/Suffixaufnahme",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Suffixaufnahme"
+  },
+  {
+   "text": "나에게만이 뱀이 무섭다",
+   "lexical": [
+    "i-only",
+    "snake",
+    "fearful"
+   ],
+   "glossRaw": "I-DAT-only-NOM snake-NOM fearful",
+   "free": "Only I am afraid of snakes.'",
+   "source": "en.wikipedia/Suffixaufnahme",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Suffixaufnahme"
+  },
+  {
+   "text": "학교 는 저기 에 있다.",
+   "lexical": [
+    "school",
+    "topic",
+    "over-there",
+    null,
+    "is"
+   ],
+   "glossRaw": "school TOP over-there LOC is",
+   "free": "(The) school is over there.",
+   "source": "en.wikipedia/Topic_marker",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Topic_marker"
+  }
+ ]
+}

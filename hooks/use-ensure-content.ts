@@ -43,7 +43,8 @@ export function useEnsureContent(
         .then((result) => {
           if (
             result.translationsScheduled === 0 &&
-            result.audioScheduled === 0
+            result.audioScheduled === 0 &&
+            (result.hyperliteralsScheduled ?? 0) === 0
           ) {
             setTimeout(
               () => ensuredGlobal.delete(card.textId),

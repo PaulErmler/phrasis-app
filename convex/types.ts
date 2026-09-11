@@ -50,6 +50,12 @@ export const translationValidator = v.object({
    */
   furigana: v.optional(v.string()),
   /**
+   * Hyperliteral (word-for-word) gloss in the course's base language, keeping
+   * the sentence's own word order. Rendered as a line under the text, like
+   * romanization. Only populated when the course asks for glosses.
+   */
+  hyperliteral: v.optional(v.string()),
+  /**
    * The user's stored AI-feedback accepted alternatives for this card +
    * language (writingAlternatives table, max WRITING_ALTERNATIVES_MAX).
    * Only populated by getCardForReview — alternatives are card-scoped, so
@@ -64,6 +70,7 @@ export const translationValidator = v.object({
         romanization: v.optional(v.string()),
         ipa: v.optional(v.string()),
         furigana: v.optional(v.string()),
+        hyperliteral: v.optional(v.string()),
         audioUrl: v.optional(v.union(v.string(), v.null())),
       }),
     ),

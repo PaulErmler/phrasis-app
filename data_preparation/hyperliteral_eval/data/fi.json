@@ -1,0 +1,1697 @@
+{
+ "language": "fi",
+ "curatedAt": "2026-09-11",
+ "notes": "GlossLM only: the Finnish grammar article on Wikipedia glosses in prose, not templates. Morpheme hyphens closed up; `transcriptionRaw` keeps the segmented original.",
+ "items": [
+  {
+   "text": "mun kavereitten kaa",
+   "lexical": [
+    null,
+    "friend",
+    "with"
+   ],
+   "glossRaw": "1SG-GEN friend-GEN-PL with",
+   "free": "with my friends",
+   "source": "en.wikipedia/Comitative_case",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Comitative_case"
+  },
+  {
+   "text": "Älköön ketään pidätettäkö mielivaltaisesti",
+   "lexical": [
+    "not",
+    "anyone",
+    "arrest",
+    "arbitrarily"
+   ],
+   "glossRaw": "NEG.IMP.3SG anyone.PART arrest.IMP arbitrarily",
+   "free": "No one shall be arrested arbitrarily\"",
+   "source": "en.wikipedia/Irrealis_mood",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Irrealis_mood"
+  },
+  {
+   "text": "Suklaata se kyllä suostuu syömään",
+   "lexical": [
+    "chocolate",
+    null,
+    "question",
+    "consent",
+    "eat"
+   ],
+   "glossRaw": "chocolate.PTV 3.SG INT 3SG.consent.PRS.IND eat.ILL",
+   "free": "Chocolate he does agree to eat.",
+   "source": "en.wikipedia/Object–subject–verb_word_order",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Object–subject–verb_word_order"
+  },
+  {
+   "text": "Ne yritti yhdistää sulle",
+   "lexical": [
+    "they",
+    "try",
+    "connect",
+    "you"
+   ],
+   "glossRaw": "they try-PST.3SG connect-INF you-ALL",
+   "free": "they tried to connect you",
+   "transcriptionRaw": "Ne yritt-i yhdistää su-lle",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Otin kirjan pöydän päältä",
+   "lexical": [
+    "take",
+    "book",
+    "table",
+    "on"
+   ],
+   "glossRaw": "take-PST-1SG book-GEN table-GEN on-ELA",
+   "free": "I took the book from the table",
+   "transcriptionRaw": "Ot-i-n kirja-n pöydä-n päältä",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Pekan herätessä Liisa lähtee töihin",
+   "lexical": [
+    "pekka",
+    "wake",
+    "liisa",
+    "go",
+    "work"
+   ],
+   "glossRaw": "Pekka-GEN wake-INF-INE Liisa go-3SG work-ILL",
+   "free": "When Pekka wakes up Liisa goes to work",
+   "transcriptionRaw": "Peka-n herät-e-ssä Liisa lähte-e töi-hin",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Varas löi naista ja juoksi pois",
+   "lexical": [
+    "thief",
+    "hit",
+    "woman",
+    "and",
+    "run",
+    "away"
+   ],
+   "glossRaw": "thief hit-PST.3SG woman-PRT and run-PST.3SG away",
+   "free": "The thief hit the woman and ran away",
+   "transcriptionRaw": "Varas lö-i nais-ta ja juoks-i pois",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ensi kesänä minä uin",
+   "lexical": [
+    "next",
+    "summer",
+    null,
+    "swim"
+   ],
+   "glossRaw": "next summer-ESS 1SG swim-1SG",
+   "free": "Next summer I will swim",
+   "transcriptionRaw": "Ensi kesä-nä minä ui-n",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Juna on lähtemässä",
+   "lexical": [
+    "train",
+    "be",
+    "leave"
+   ],
+   "glossRaw": "train be.3SG leave-SUP-INE",
+   "free": "The train is about to leave",
+   "transcriptionRaw": "Juna on lähte-mä-ssä",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Kun saavuin, hän oli jo lähtenyt",
+   "lexical": [
+    "when",
+    "arrive",
+    null,
+    "be",
+    "already",
+    "leave"
+   ],
+   "glossRaw": "when arrive-PST-1SG 3SG be-PST.3SG already leave-ACT.PST.PTCP.SG",
+   "free": "When I arrived, s/he had already left",
+   "transcriptionRaw": "Kun saavu-i-n , hän ol-i jo lähte-nyt",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Lukisin kirjan, jos minulla olisi aikaa",
+   "lexical": [
+    "read",
+    "book",
+    "if",
+    null,
+    "be",
+    "time"
+   ],
+   "glossRaw": "read-COND-1SG book-GEN if 1SG-ADE be-COND.3SG time-PRT",
+   "free": "I would read a book if I had the time",
+   "transcriptionRaw": "Luk-isi-n kirja-n , jos minu-lla ol-isi aika-a",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Jos olisit leiponut kakun, söisin sen",
+   "lexical": [
+    "if",
+    "be",
+    "bake",
+    "cake",
+    "eat",
+    "it"
+   ],
+   "glossRaw": "if be-COND-2SG bake-ACT.PST.PTCP cake-GEN eat-COND-1SG it-GEN",
+   "free": "If you had baked a cake, I would eat it",
+   "transcriptionRaw": "Jos ol-isi-t leipo-nut kaku-n , sö-isi-n se-n",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Asia ratkennee huomenna",
+   "lexical": [
+    "thing",
+    "resolve",
+    "tomorrow"
+   ],
+   "glossRaw": "thing resolve-POT.3SG tomorrow",
+   "free": "The thing should be resolved tomorrow",
+   "transcriptionRaw": "Asia ratken-nee huomenna",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Väittävät hänen olevan fiksu",
+   "lexical": [
+    "claim",
+    null,
+    "be",
+    "smart"
+   ],
+   "glossRaw": "claim-3PL 3SG-GEN be-ACT.PRS.PTCP-GEN smart",
+   "free": "It is claimed that s/he is smart",
+   "transcriptionRaw": "Väittä-vät häne-n ole-va-n fiksu",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Lähden Unkariin oppimaan unkarin kieltä",
+   "lexical": [
+    "go",
+    "hungary",
+    "learn",
+    "hungarian",
+    "language"
+   ],
+   "glossRaw": "go-1SG Hungary-ILL learn-SUP-ILL Hungarian-GEN language-PRT",
+   "free": "I go to Hungary in order to learn the Hungarian language",
+   "transcriptionRaw": "Lähde-n Unkari-in oppi-ma-an unkari-n kiel-tä",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hän on opettaja",
+   "lexical": [
+    null,
+    "be",
+    "teacher"
+   ],
+   "glossRaw": "3SG be.3SG teacher",
+   "free": "S/he is a teacher",
+   "transcriptionRaw": "Hän on opettaja",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hän oli opettaja",
+   "lexical": [
+    null,
+    "be",
+    "teacher"
+   ],
+   "glossRaw": "3SG be.3SG teacher",
+   "free": "S/he was teacher",
+   "transcriptionRaw": "Hän ol-i opettaja",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Siellä elettiin hyvin",
+   "lexical": [
+    "there",
+    "live",
+    "well"
+   ],
+   "glossRaw": "there live-PASS.PST well",
+   "free": "People lived well there",
+   "transcriptionRaw": "Siellä elettiin hyvin",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Puhuin eilen lähetetyistä kirjeistä",
+   "lexical": [
+    "speak",
+    "yesterday",
+    "send",
+    "letter"
+   ],
+   "glossRaw": "speak-PST-1SG yesterday send-PTCP.PST-PL-ELA letter-PL-ELA",
+   "free": "I was speaking about the letters that were sent yesterday",
+   "transcriptionRaw": "Puhuin eilen lähete-ty-i-stä kirje-i-stä",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Älä kirjaa unohda!",
+   "lexical": [
+    "not",
+    "book",
+    "forget"
+   ],
+   "glossRaw": "NEG.IMP.2SG book.PRT forget.CNG",
+   "free": "Don't forget the book!",
+   "transcriptionRaw": "Älä kirjaa unohda !",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Vihollisen kaupungin valloittaminen",
+   "lexical": [
+    "enemy",
+    "city",
+    "conquest"
+   ],
+   "glossRaw": "enemy-GEN city-GEN conquest-NMLZ",
+   "free": "the conquest of the enemy's city / the enemy's conquest of the city",
+   "transcriptionRaw": "Vihollise-n kaupungi-n valloitta-minen",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Pojat ovat pitkiä",
+   "lexical": [
+    "boys",
+    "be",
+    "tall"
+   ],
+   "glossRaw": "boys-PL be.3PL tall-PL-PRT",
+   "free": "The boys are tall",
+   "transcriptionRaw": "Poja-t ovat pitk-i-ä",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Minä haluan sinut",
+   "lexical": [
+    null,
+    "want",
+    "you"
+   ],
+   "glossRaw": "1SG want-1SG you-ACC",
+   "free": "I want you",
+   "transcriptionRaw": "Minä halua-n sinu-t",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Lähdin töihin käsilaukutta",
+   "lexical": [
+    "leave",
+    "work",
+    "handbag"
+   ],
+   "glossRaw": "leave-PST-1SG work-ILL handbag-ABE",
+   "free": "I left for work without a/the handbag",
+   "transcriptionRaw": "Lähd-i-n töi-hin käsilauku-tta",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hän kirjoitti kynineen",
+   "lexical": [
+    null,
+    "write",
+    "pen"
+   ],
+   "glossRaw": "3SG write.PST.3SG pen-PL-COM-POSS.3",
+   "free": "S/he wrote with a pen",
+   "transcriptionRaw": "Hän kirjoitti kyn-i-ne-en",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hän opiskeli opettajaksi",
+   "lexical": [
+    null,
+    "study",
+    "teacher"
+   ],
+   "glossRaw": "3SG study-PST.3SG teacher-TRA",
+   "free": "S/he studied to become a teacher",
+   "transcriptionRaw": "Hän opiskel-i opettaja-ksi",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hän työskentelee opettajana",
+   "lexical": [
+    null,
+    "work",
+    "teacher"
+   ],
+   "glossRaw": "3SG work-3SG teacher-ESS",
+   "free": "She works as a teacher",
+   "transcriptionRaw": "Hän työskentelee opettaja-na",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mä aattelin et se ei mahu",
+   "lexical": [
+    null,
+    "think",
+    "that",
+    "it",
+    "not",
+    "fit"
+   ],
+   "glossRaw": "1SG think-PST-1SG that it NEG.3SG fit",
+   "free": "I thought s/he will not fit",
+   "transcriptionRaw": "Mä aattelin et se ei mahu",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "kirjailija poltti viimeisen käsikirjoituksen",
+   "lexical": [
+    "writer",
+    "burn",
+    "last",
+    "manuscript"
+   ],
+   "glossRaw": "writer burn-PST.3SG last-GEN manuscript-GEN",
+   "free": "The writer burned the last manuscript",
+   "transcriptionRaw": "kirjailija poltt-i viimeise-n käsikirjoitukse-n",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "kirja on kassissa",
+   "lexical": [
+    "book",
+    "be",
+    "bag"
+   ],
+   "glossRaw": "book be.3SG bag-INE",
+   "free": "The book is in the bag",
+   "transcriptionRaw": "kirja on kassi-ssa",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "meille tulee vieraita kaukaa=kin",
+   "lexical": [
+    null,
+    "come",
+    "visitor",
+    "far"
+   ],
+   "glossRaw": "1PL-PL-ALL come-3SG visitor-PL-PRT far=PTCL",
+   "free": "We will have visitors from afar",
+   "transcriptionRaw": "me-i-lle tule-e viera-i-ta kaukaa=kin",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "kulkea läpi kaupungin",
+   "lexical": [
+    null,
+    "through",
+    "city"
+   ],
+   "glossRaw": "pass-INF through city-GEN",
+   "free": "to pass through the city",
+   "transcriptionRaw": "kulke-a läpi kaupungi-n",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "äiti nukuttaa lapset",
+   "lexical": [
+    "mother",
+    "sleep",
+    "child"
+   ],
+   "glossRaw": "mother sleep-CAUS-3SG child-PL",
+   "free": "Mother puts children to sleep",
+   "transcriptionRaw": "äiti nuku-tta-a lapse-t",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "sinä olet paras ystäväni",
+   "lexical": [
+    null,
+    "be",
+    "best",
+    "friend"
+   ],
+   "glossRaw": "2SG be-2SG best friend-POSS.1SG",
+   "free": "You are my best friend",
+   "transcriptionRaw": "sinä ole-t paras ystävä-ni",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "kipinöitä sinkoili ympäriinsä",
+   "lexical": [
+    "spark",
+    "fly",
+    "around"
+   ],
+   "glossRaw": "spark-PL-PRT fly-PST.3SG around",
+   "free": "sparks were flying around",
+   "transcriptionRaw": "kipinö-i-tä sinkoil-i ympäriinsä",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "talonmies siirsi pöydän",
+   "lexical": [
+    "caretaker",
+    "move",
+    "table"
+   ],
+   "glossRaw": "caretaker move-PST.3SG table-GEN",
+   "free": "The caretaker moved the table.",
+   "transcriptionRaw": "talonmies siir-si pöydä-n",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "minun täytyy ihmetellä oliko tuo kaikki työ turhaa",
+   "lexical": [
+    null,
+    "need",
+    "wonder",
+    "be",
+    null,
+    null,
+    "work",
+    "useless"
+   ],
+   "glossRaw": "1SG-GEN need-3SG wonder-INF be-PST.3SG-Q DIST.DEM all work useless-PRT",
+   "free": "I have to wonder, was all that work for nothing?",
+   "transcriptionRaw": "minu-n täyty-y ihmetel-lä ol-i-ko tuo kaikki työ turha-a",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "tuo punainen kukka",
+   "lexical": [
+    "that",
+    "red",
+    "flower"
+   ],
+   "glossRaw": "that red flower",
+   "free": "that red flower",
+   "transcriptionRaw": "tuo punainen kukka",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "minulla ei ole rahaa",
+   "lexical": [
+    null,
+    "not",
+    "be",
+    "money"
+   ],
+   "glossRaw": "1SG-ADE NEG.3SG be.CNG money-PRT",
+   "free": "I don't have any money",
+   "transcriptionRaw": "minu-lla ei ole raha-a",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "onko täällä ketään",
+   "lexical": [
+    "be",
+    "here",
+    "nobody"
+   ],
+   "glossRaw": "be.3SG-Q here nobody",
+   "free": "Is anybody here?",
+   "transcriptionRaw": "on-ko täällä ketään",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "hän on lapsista vanhempi",
+   "lexical": [
+    null,
+    "be",
+    "child",
+    "old"
+   ],
+   "glossRaw": "3SG be.3SG child.PL-ELA old-COMP",
+   "free": "He/she is older than the children",
+   "transcriptionRaw": "hän on lapsi-sta vanhe-mpi",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "minun autoni on isompi kuin sinun",
+   "lexical": [
+    null,
+    "auto",
+    "be",
+    "big",
+    "than",
+    null
+   ],
+   "glossRaw": "1SG-GEN auto-POSS.1SG be.3SG big-CMPR than 2SG-GEN",
+   "free": "My car is bigger than yours",
+   "transcriptionRaw": "minu-n auto-ni on iso-mpi kuin sinu-n",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "olet minua vanhempi",
+   "lexical": [
+    "be",
+    null,
+    "old"
+   ],
+   "glossRaw": "be-2SG 1SG-PRT old-CMPR",
+   "free": "You are older than me",
+   "transcriptionRaw": "ole-t minu-a vanhe-mpi",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Esko ja Mikko kehuvat toisiaan",
+   "lexical": [
+    "esko",
+    "and",
+    "mikko",
+    "praise",
+    "each-other"
+   ],
+   "glossRaw": "Esko and Mikko praise-3PL each.other-PRT-POSS.3",
+   "free": "Esko and Mikko praise each other",
+   "transcriptionRaw": "Esko ja Mikko kehu-vat toisi-a-an",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "isoäitini joka oli mulle kuin äiti",
+   "lexical": [
+    "grandmother",
+    "who",
+    "be",
+    null,
+    "like",
+    "mother"
+   ],
+   "glossRaw": "grandmother-POSS.1SG who be-PST.3SG 1SG-ALL like mother",
+   "free": "My grandmother, who was like a mother to me",
+   "transcriptionRaw": "isoäiti-ni joka ol-i mu-lle kuin äiti",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "kymmenen: kaksi.kymmentä, kolme.kymmentä, neljä.kymmentä",
+   "lexical": [
+    "ten",
+    "two-ten",
+    "three-ten",
+    "four-ten"
+   ],
+   "glossRaw": "ten: two.ten-PRT, three.ten-PRT, four.ten-PRT",
+   "free": "ten: twenty, thirty, fourty",
+   "transcriptionRaw": "kymmenen: kaksi .kymmen-tä , kolme .kymmen-tä , neljä .kymmen-tä",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "tuo hänet tänne",
+   "lexical": [
+    "bring",
+    null,
+    "here"
+   ],
+   "glossRaw": "bring.IMP.2SG 3SG-ACC here",
+   "free": "Bring him/her here!",
+   "transcriptionRaw": "tuo häne-t tänne",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "te olete EUn ensimmäinen oikeusasiamies",
+   "lexical": [
+    null,
+    "be",
+    null,
+    "first",
+    "ombudsman"
+   ],
+   "glossRaw": "2PL be-2PL EU-GEN first ombudsman",
+   "free": "You are the EU's first ombudsman",
+   "transcriptionRaw": "te ole-te EU-n ensimmäinen oikeusasiamies",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "tiedän että tänään on keskiviikko",
+   "lexical": [
+    "know",
+    "that",
+    "today",
+    "be",
+    "wednesday"
+   ],
+   "glossRaw": "know-1SG that today be.3SG Wednesday",
+   "free": "I know that today is Wednesday",
+   "transcriptionRaw": "tiedä-n että tänään on keskiviikko",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "miehet eivät kuunnelleet vaan raahasivat naiset mukaansa",
+   "lexical": [
+    "man",
+    "not",
+    "listen",
+    "but",
+    "drag",
+    "woman",
+    "along"
+   ],
+   "glossRaw": "man-PL NEG-3PL listen-ACT.PST.PTCP.PL but drag-PST-3PL woman-PL along-POSS.3PL",
+   "free": "The men didn't listen but dragged the women along.",
+   "transcriptionRaw": "miehe-t ei-vät kuunnell-eet vaan raaha-si-vat naise-t mukaa-nsa",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Huomenna saa kahvia.",
+   "lexical": [
+    "tomorrow",
+    "get",
+    "coffee"
+   ],
+   "glossRaw": "tomorrow get.3SG coffee-PTV",
+   "free": "One can get coffee tomorrow.’5",
+   "transcriptionRaw": "Huomenna saa kahvi-a .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Lomaa suunnitellessa kannattaa miettiä esimerkiksi, kaipaanko toimintaa vai lepoa.",
+   "lexical": [
+    "holiday",
+    "plan",
+    "be-worth",
+    "think",
+    "for-example",
+    "miss",
+    "activity",
+    "or",
+    "rest"
+   ],
+   "glossRaw": "holiday-PTV plan-INF-INESS be.worth.3SG think.INF for.example miss-1-Q activity-PTV or rest-PTV",
+   "free": "’When planning a holiday, it’s worth thinking for example whether one needs activities or rest.",
+   "transcriptionRaw": "Loma-a suunnitel-le-ssa kannattaa miettiä esimerkiksi , kaipaa-n-ko toiminta-a vai lepo-a .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Me mentiin Annan kanssa kaupunkiin.",
+   "lexical": [
+    "we",
+    "went",
+    "anna",
+    "with",
+    "town"
+   ],
+   "glossRaw": "we.NOM went.1PL Anna.GEN with town",
+   "free": "Anna and I went into town.’/‘We went into town with Anna.",
+   "transcriptionRaw": "Me mentiin Annan kanssa kaupunkiin .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Näin tytön. Se tyttö itki.",
+   "lexical": [
+    "see",
+    "girl",
+    "it",
+    "girl",
+    "cry"
+   ],
+   "glossRaw": "see-IPFV-1SG girl-ACC it girl cry-IPFV-3SG",
+   "free": "I saw a girl. That girl was crying.",
+   "transcriptionRaw": "Näin tytön . Se tyttö itki .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Nämä kirjat oli halunnut ostaa Merjalta Jari.",
+   "lexical": [
+    "these",
+    "book",
+    "had",
+    "wanted",
+    "to-buy",
+    "from-merja",
+    "jari"
+   ],
+   "glossRaw": "these book-PL.ACC had-3SG wanted to.buy from.Merja Jari.NOM",
+   "free": "Jari had wanted to buy these books from Merja.",
+   "transcriptionRaw": "Nämä kirja-t ol-i halunnut ostaa Merjalta Jari .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Haluan ostaa kirjan.",
+   "lexical": [
+    "want",
+    "to-buy",
+    "book"
+   ],
+   "glossRaw": "want-1SG to.buy book-ACC",
+   "free": "I want to buy a book.",
+   "transcriptionRaw": "Halua-n ostaa kirja-n .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tässä istuu mukavasti.",
+   "lexical": [
+    "in-here",
+    "sit",
+    "comfortably"
+   ],
+   "glossRaw": "in.here sit-3SG comfortably",
+   "free": "One can sit here comfortably.",
+   "transcriptionRaw": "Tässä istu-u mukavasti .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Jari halusi lähteä.",
+   "lexical": [
+    "jari",
+    "wanted",
+    "to-leave"
+   ],
+   "glossRaw": "Jari wanted to.leave",
+   "free": "Jari wanted to leave.",
+   "transcriptionRaw": "Jari halusi lähteä .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Jari halusi Merjan lähtevän.",
+   "lexical": [
+    "jari",
+    "wanted",
+    "merja",
+    "leave"
+   ],
+   "glossRaw": "Jari.NOM wanted Merja-GEN leave-VA/INF",
+   "free": "Jari wanted Merja to leave.",
+   "transcriptionRaw": "Jari halusi Merja-n lähte-vän .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Huomenna haluaa lähteä Pekka.",
+   "lexical": [
+    "tomorrow",
+    "want",
+    "leave",
+    "pekka"
+   ],
+   "glossRaw": "tomorrow want-3SG leave-A/INF Pekka.NOM",
+   "free": "Tomorrow Pekka wants to leave.",
+   "transcriptionRaw": "Huomenna halua-a lähte-ä Pekka .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Pekka pyytää laulamaan.",
+   "lexical": [
+    "pekka",
+    "asks",
+    "to-sing"
+   ],
+   "glossRaw": "Pekka asks to.sing",
+   "free": "Pekka asks (people, one) to sing.",
+   "transcriptionRaw": "Pekka pyytää laulamaan .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Pekka haluaa laulamaan.",
+   "lexical": [
+    "pekka",
+    "wants",
+    "to-sing"
+   ],
+   "glossRaw": "Pekka wants to.sing",
+   "free": "Pekka wants to sing.",
+   "transcriptionRaw": "Pekka haluaa laulamaan .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ei, vaan Lou.",
+   "lexical": [
+    "no",
+    "but",
+    "lou"
+   ],
+   "glossRaw": "no, but Lou",
+   "free": "No, it is Lou.",
+   "transcriptionRaw": "Ei , vaan Lou .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ei, vaan kirjan.",
+   "lexical": [
+    "no",
+    "but",
+    "book"
+   ],
+   "glossRaw": "no but book",
+   "free": "No, it is a book.",
+   "transcriptionRaw": "Ei , vaan kirjan .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Odotapas hetki. Minä en edes tiennyt että joku lähti sinne.",
+   "lexical": [
+    "wait",
+    "moment",
+    "i",
+    "not",
+    "even",
+    "know",
+    "that",
+    "someone",
+    "leave",
+    "there"
+   ],
+   "glossRaw": "wait.IMP moment I NEG even know that someone leave.PST there",
+   "free": "Wait a moment. I did not even know that someone left there.",
+   "transcriptionRaw": "Odotapas hetki . Minä en edes tiennyt että joku lähti sinne .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Kyllä, ja Aino myös.",
+   "lexical": [
+    "yes",
+    "and",
+    "aino",
+    "too"
+   ],
+   "glossRaw": "yes and Aino too",
+   "free": "Yes, and Aino left too.",
+   "transcriptionRaw": "Kyllä , ja Aino myös .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ja sitten oon mä ja kaksi muuta tyttöä.",
+   "lexical": [
+    "and",
+    "then",
+    "be",
+    "i",
+    "and",
+    "two",
+    "other",
+    "girl"
+   ],
+   "glossRaw": "and then be.1SG I and two other-PART girl-PART",
+   "free": "And then there is me and two other girls.",
+   "transcriptionRaw": "Ja sitten oon mä ja kaksi muu-ta tyttö-ä .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Opiskelijat ovat suomalaisia.",
+   "lexical": [
+    "student",
+    "be",
+    "finn"
+   ],
+   "glossRaw": "student.NOM.PL be.PRS.3PL Finn.PARTICLE.PL",
+   "free": "The students are Finns.",
+   "transcriptionRaw": "Opiskelijat ovat suomalaisia .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Meillä on hevonen.",
+   "lexical": [
+    "we",
+    "be",
+    "horse"
+   ],
+   "glossRaw": "we.ALL be.PRS.3SG horse.NOM",
+   "free": "We have a horse",
+   "transcriptionRaw": "Meillä on hevonen .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Olut on kylmää.",
+   "lexical": [
+    "beer",
+    "be",
+    "cold"
+   ],
+   "glossRaw": "beer be.PRS.3SG cold.PARTICLE.SG",
+   "free": "The beer is cold.",
+   "transcriptionRaw": "Olut on kylmää .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Olut on virvoitusjuoma.",
+   "lexical": [
+    "beer",
+    "be",
+    "beverage"
+   ],
+   "glossRaw": "beer.NOM.SG be.PRS.3SG beverage.NOM.SG",
+   "free": "Beer is a beverage.",
+   "transcriptionRaw": "Olut on virvoitusjuoma .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Jari sanoo että tässä istuu mukavasti.",
+   "lexical": [
+    "jari",
+    "say",
+    "that",
+    "here",
+    "sit",
+    "comfortably"
+   ],
+   "glossRaw": "Jari say:3 that here sit:3 comfortably",
+   "free": "Jari says that one can sit comfortably here.",
+   "transcriptionRaw": "Jari sanoo että tässä istuu mukavasti .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Nyt täytyy pestä auntonsa.",
+   "lexical": [
+    "now",
+    "must",
+    "wash",
+    "car"
+   ],
+   "glossRaw": "Now must:3 wash car:POSS;RFL",
+   "free": "One must wash one’s car now.",
+   "transcriptionRaw": "Nyt täytyy pestä auntonsa .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Sitä huolestuu helposti.",
+   "lexical": [
+    null,
+    "get-worried",
+    "easily"
+   ],
+   "glossRaw": "EXPL get.worried easily",
+   "free": "One gets worried easily.",
+   "transcriptionRaw": "Sitä huolestuu helposti .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Sitä ei tiedä milloin kuolee.",
+   "lexical": [
+    null,
+    "not",
+    "know",
+    "when",
+    "die"
+   ],
+   "glossRaw": "EXPL not know:3 when die:3",
+   "free": "One doesn’t know when one dies.",
+   "transcriptionRaw": "Sitä ei tiedä milloin kuolee .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "NAMA LAPSET sitä olisivat oppineet uimaan.",
+   "lexical": [
+    "these",
+    "children",
+    "sitä",
+    "have",
+    "learn",
+    "to-swim"
+   ],
+   "glossRaw": "these children SITÄ have.COND.3PL learn to.swim",
+   "free": "THESE CHILDREN would have learned to swim.",
+   "transcriptionRaw": "NAMA LAPSET sitä olisivat oppineet uimaan .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Wien is dadde?",
+   "lexical": [
+    "who",
+    "is",
+    "that"
+   ],
+   "glossRaw": "who is that",
+   "free": "Who’s that?",
+   "transcriptionRaw": "Wien is dadde ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hän on vanha.",
+   "lexical": [
+    "he",
+    "be",
+    "old"
+   ],
+   "glossRaw": "he.NOM be.3SG old.NOM",
+   "free": "He is old.",
+   "transcriptionRaw": "Hän on vanha .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Minulla on hänet.",
+   "lexical": [
+    "i",
+    "be",
+    "him"
+   ],
+   "glossRaw": "I-ADESS be.3SG him-ACC",
+   "free": "I have him.",
+   "transcriptionRaw": "Minu-lla on häne-t .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tytöt istuvat tuolilla.",
+   "lexical": [
+    "girls",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "girls sit-3PL chair.ADE",
+   "free": "The girls sit on the chair.",
+   "transcriptionRaw": "Tytöt istu-vat tuolilla .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tytöt istuivat tuolilla.",
+   "lexical": [
+    "girls",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "girls sit-PAST-3PL chair.ADE",
+   "free": "The girls sat on the chair.",
+   "transcriptionRaw": "Tytöt istu-i-vat tuolilla .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tytöt istuisivat tuolilla.",
+   "lexical": [
+    "girls",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "girls sit-COND-3PL chair.ADE",
+   "free": "The girls would sit on the chair.",
+   "transcriptionRaw": "Tytöt istu-isi-vat tuolilla .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tytöt ovat istuneet tuolilla.",
+   "lexical": [
+    "girls",
+    "be",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "girls be-3PL sit-PTC-3PL chair.ADE",
+   "free": "The girls have sat on the chair.",
+   "transcriptionRaw": "Tytöt o-vat istu-nee-t tuolilla .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "On istuttu tuolilla.",
+   "lexical": [
+    "be",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "be-3SG sit-PASS-PTC chair.ADE",
+   "free": "It has been sat on the chair.’ ‘One has sat on the chair.",
+   "transcriptionRaw": "On istu-tt-u tuolilla .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tytöt olivat istuneet tuolilla.",
+   "lexical": [
+    "girls",
+    "be",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "girls be-PAST-3PL sit-PTC-3PL chair-ADE",
+   "free": "The girls had sat on the chair.",
+   "transcriptionRaw": "Tytöt ol-i-vat istu-nee-t tuolilla .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Oli istuttu tuolilla.",
+   "lexical": [
+    "be",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "be-PAST.3SG sit-PASS-PTC chair.ADE",
+   "free": "It was sat on the chair.",
+   "transcriptionRaw": "Ol-i istu-tt-u tuolilla .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tytöt eivät istuneet tuolilla.",
+   "lexical": [
+    "girls",
+    "not",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "girls not-3PL sit-PTC-PL chair.ADE",
+   "free": "The girls did not sit on the chair.",
+   "transcriptionRaw": "Tytöt ei-vät istu-nee-t tuolilla .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ei istuttu tuolilla.",
+   "lexical": [
+    "not",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "not.3SG sit-PASS-PTC chair.ADE",
+   "free": "It was not sat on the chair.",
+   "transcriptionRaw": "Ei istu-tt-u tuolilla .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tytöt eivät ole istuneet tuolilla.",
+   "lexical": [
+    "girls",
+    "not",
+    "be",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "girls not-3PL be sit-PTC.PL chair.ADE",
+   "free": "The girls have not sat on the chair.",
+   "transcriptionRaw": "Tytöt ei-vät ole istu-neet tuolilla .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ei ole istuttu tuolilla.",
+   "lexical": [
+    "not",
+    "be",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "not-3SG be sit-PASS-PTC chair.ADE",
+   "free": "It has not been sat on the chair.",
+   "transcriptionRaw": "Ei ole istu-tt-u tuolilla .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tytöt eivät olleet istuneet tuolilla.",
+   "lexical": [
+    "girls",
+    "not",
+    "be",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "girls not-3PL be-PTC-PL sit-PTC-PL chair.ADE",
+   "free": "The girls had not sat on the chair.",
+   "transcriptionRaw": "Tytöt ei-vät ol-leet istu-neet tuolilla .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ei ollut istuttu tuolilla.",
+   "lexical": [
+    "not",
+    "be",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "not.3SG be-PTC sit-PASS-PTC chair.ADE",
+   "free": "It had not been sat on the chair.",
+   "transcriptionRaw": "Ei ol-lut istu-tt-u tuolilla .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tyttö ei istunut tuolissa.",
+   "lexical": [
+    "girl",
+    "not",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "girl.NOM not.3SG sit.PASTPTC chair.INE",
+   "free": "The girl did not sit on the chair.",
+   "transcriptionRaw": "Tyttö ei istunut tuolissa .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tytöt eivät istuneet tuolissa.",
+   "lexical": [
+    "girl",
+    "not",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "girl.PL.NOM not.3PL sit.PASTPTC chair.INE",
+   "free": "The girls did not sit on the chair.",
+   "transcriptionRaw": "Tytöt eivät istuneet tuolissa .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tytöt eivät ole istuneet tuolissa.",
+   "lexical": [
+    "girl",
+    "not",
+    "be",
+    "sit",
+    "chair"
+   ],
+   "glossRaw": "girl.PL.NOM not.3PL be sit.PASTPTC chair.INE",
+   "free": "The girl did have not sat on the chair.",
+   "transcriptionRaw": "Tytöt eivät ole istuneet tuolissa .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "eivät ole istuneet",
+   "lexical": [
+    "not",
+    "be",
+    "sit"
+   ],
+   "glossRaw": "not-PL be sit-PASTPTC-PL",
+   "free": "(they) have not sat",
+   "transcriptionRaw": "eivät ole istuneet",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "eivät olleet istuneet",
+   "lexical": [
+    "not",
+    "be",
+    "sit"
+   ],
+   "glossRaw": "not-PL3 be-PASTPTC-PL sit-PASTPTC-PL",
+   "free": "(they) had not sat",
+   "transcriptionRaw": "eivät olleet istuneet",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "ei ollut istuttu",
+   "lexical": [
+    "not",
+    "be",
+    "sit"
+   ],
+   "glossRaw": "not be-PASTPTC sit-PASS-PASTPTC",
+   "free": "it had not been sat",
+   "transcriptionRaw": "ei ollut istuttu",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "ei oltu istuttu",
+   "lexical": [
+    "not",
+    "be",
+    "sit"
+   ],
+   "glossRaw": "not be-PASS-PASTPTC sit-PASS-PTC",
+   "free": "it had not been sat",
+   "transcriptionRaw": "ei oltu istuttu",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Milloin Jussi olisi romaanin kirjoittanut?",
+   "lexical": [
+    "when",
+    "jussi",
+    "would-have",
+    "novel",
+    "written"
+   ],
+   "glossRaw": "when Jussi would-have INDEF-novel written",
+   "free": "When would Jussi have written a novel?",
+   "transcriptionRaw": "Milloin Jussi olisi romaanin kirjoittanut ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Milloin Jussi romaanin kirjoittanut olisi?",
+   "lexical": [
+    "when",
+    "jussi",
+    "novel",
+    "written",
+    "would-have"
+   ],
+   "glossRaw": "When Jussi INDEF-novel written would-have",
+   "free": "When would Jussi have written a novel?",
+   "transcriptionRaw": "Milloin Jussi romaanin kirjoittanut olisi ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Milloin Jussi kirjoittanut romaanin olisi?",
+   "lexical": [
+    "when",
+    "jussi",
+    "written",
+    "novel",
+    "would-have"
+   ],
+   "glossRaw": "when Jussi written INDEF-novel would-have",
+   "free": "When would Jussi have written a novel?",
+   "transcriptionRaw": "Milloin Jussi kirjoittanut romaanin olisi ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tulivatko lapset kotiin?",
+   "lexical": [
+    "come",
+    "children",
+    "home"
+   ],
+   "glossRaw": "come-PST-3PL-Q children home",
+   "free": "Did the children come home?",
+   "transcriptionRaw": "Tul-i-vat-ko lapset kotiin ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Isäskö ja äitiskö sen auton osti?",
+   "lexical": [
+    "father",
+    "and",
+    "mother",
+    "that",
+    "car",
+    "buy-past"
+   ],
+   "glossRaw": "father-poss-Q and mother-poss-Q that-ACC car-ACC buy-3SG.past",
+   "free": "Was it your father and your mother who bought that car?",
+   "transcriptionRaw": "Isä-s-kö ja äiti-s-kö se-n auto-n ost-i ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hän avasi ikkunan.",
+   "lexical": [
+    "he",
+    "open",
+    "window"
+   ],
+   "glossRaw": "he open.3SG.PST window.ACC.SG",
+   "free": "He opened the window.",
+   "transcriptionRaw": "Hän avasi ikkunan .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hän avasi ikkunaa.",
+   "lexical": [
+    "he",
+    "open",
+    "window"
+   ],
+   "glossRaw": "he open.3SG.PST window.PART.SG",
+   "free": "(i) ‘He was opening the window.",
+   "transcriptionRaw": "Hän avasi ikkunaa .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "En syönyt omenaa.",
+   "lexical": [
+    "1s",
+    "eat",
+    "apple"
+   ],
+   "glossRaw": "NEG-1s eat-2PTCP apple-PART",
+   "free": "I didn’t eat/was not eating an apple.",
+   "transcriptionRaw": "En syönyt omena-a .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Kupissa on kahvia.",
+   "lexical": [
+    "cup",
+    "be",
+    "coffee"
+   ],
+   "glossRaw": "cup-INE be.PRS.3SG coffee-PAR",
+   "free": "There is coffee in the cup.",
+   "transcriptionRaw": "Kupi-ssa on kahvi-a .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Leikkikentällä juoksee lapsia.",
+   "lexical": [
+    "playground",
+    "run",
+    "child"
+   ],
+   "glossRaw": "playground-ADE run-PRS.3SG child-PL-PAR",
+   "free": "There are children running in the playground.",
+   "transcriptionRaw": "Leikkikentä-llä juokse-e laps-i-a .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Pöydällä on kirja.",
+   "lexical": [
+    "table",
+    "be",
+    "book"
+   ],
+   "glossRaw": "table-ADE be.PRS.3SG book.NOM",
+   "free": "There is a book on the table.",
+   "transcriptionRaw": "Pöydä-llä on kirja .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Useita sotilaita sai surmansa taistelussa.",
+   "lexical": [
+    "several",
+    "soldier",
+    "get",
+    "death",
+    "battle"
+   ],
+   "glossRaw": "several-PL-PAR soldier-PL-PAR get-PST.3SG death-ACC.3POSS battle-INE",
+   "free": "Several soldiers got killed (literally: ‘got their death’) in the battle.",
+   "transcriptionRaw": "Use-i-ta sotila-i-ta sa-i surma-nsa taistelu-ssa .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Monia ihmisiä odotti sateessa bussia.",
+   "lexical": [
+    "many",
+    "person",
+    "wait",
+    "rain",
+    "bus"
+   ],
+   "glossRaw": "many-PL-PAR person-PL-PAR wait-PST.3SG rain-INE bus-PAR",
+   "free": "Many people were waiting for the bus in the rain.",
+   "transcriptionRaw": "Mon-i-a ihmis-i-ä odott-i satee-ssa bussi-a .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Keittoa seurasi erilaisia liha-, kala ja vihannesruokia.",
+   "lexical": [
+    "soup",
+    "follow",
+    "differentd",
+    "meat",
+    "fish",
+    "and",
+    "vegetable-dish"
+   ],
+   "glossRaw": "soup-PAR follow-PST.3SG differentd-PL-PAR meat fish and vegetable-dish-PL-PAR",
+   "free": "The soup was followed by different dishes of meat, fish, and vegetables.",
+   "transcriptionRaw": "Keitto-a seuras-i erilais-i-a liha-, kala ja vihannes-ruok-i-a .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "tulirokkoa seuraa usein jälkitauteja",
+   "lexical": [
+    "scarlet-fever",
+    "follow",
+    "often",
+    "complication"
+   ],
+   "glossRaw": "scarlet.fever-PAR follow-PRS.3SG often complication-PL-PAR",
+   "free": "Scarlet fever is often followed by complications.",
+   "transcriptionRaw": "tulirokko-a seura-a usein jälkitaute-j-a",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Jotain unkarilaisia esitti siellä kansantansseja.",
+   "lexical": [
+    "some",
+    "hungarian",
+    "perform",
+    "there",
+    "folk-dance"
+   ],
+   "glossRaw": "some-PAR-CLIT Hungarian-PL-PAR perform-PST.3SG there folk-GEN-dance-PL-PAR",
+   "free": "Some Hungarians were performing folk dances there.’",
+   "transcriptionRaw": "Jo-ta-in unkarilais-i-a esitt-i siellä kansa-n-tansse-j-a .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tuhansia ihmisiä seurasi tapahtumia ääneti.",
+   "lexical": [
+    "thousand",
+    "person",
+    "follow",
+    "event",
+    "silently"
+   ],
+   "glossRaw": "thousand-PL-PAR person-PL-PAR follow-PST.3SG event-PL-PAR silently",
+   "free": "Thousands of people were following / followed the events silently.",
+   "transcriptionRaw": "Tuhans-i-a ihmis-i-ä seuras-i tapahtum-i-a ääneti .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "ihmisiä seurasi puhetta esityspaikan ulkopuolellakin.",
+   "lexical": [
+    "person",
+    "follow",
+    "speech",
+    "venue",
+    "outside-also"
+   ],
+   "glossRaw": "person-PL-PAR follow-PST.3SG speech-PAR venue-GEN outside-ADE-also",
+   "free": "(The venue was full, so that) there were people following the speech even outside the venue.",
+   "transcriptionRaw": "ihmis-i-ä seuras-i puhe-tta esityspaika-n ulkopuole-lla-kin .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "sitä seurasi useita voimakkaita räjähdyksiä luolissa.",
+   "lexical": [
+    "it",
+    "follow",
+    "several",
+    "powerful",
+    "explosion",
+    "cave"
+   ],
+   "glossRaw": "it-PAR follow-PST.3SG several-PL-PAR powerful-PL-PAR explosion-PL-PAR cave-PL-INE",
+   "free": "(First a minor explosion was heard and) it was followed by several powerful explosions in the caves.",
+   "transcriptionRaw": "si-tä seuras-i use-i-ta voimakka-i-ta räjähdyks-i-ä luol-i-ssa .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Teoriastasi seuraa ongelmia.",
+   "lexical": [
+    "theory",
+    "follow",
+    "problem"
+   ],
+   "glossRaw": "theory-ELA-2SG.POSS follow-PRS.3SG problem-PL-PAR",
+   "free": "Problems will follow from your theory.",
+   "transcriptionRaw": "Teoria-sta-si seura-a ongelm-i-a .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Tuhansia kelkkoja palvelee matkailua.",
+   "lexical": [
+    "thousand",
+    "sleigh",
+    "serve",
+    "tourism"
+   ],
+   "glossRaw": "thousand-PL-PAR sleigh-PL-PAR serve-PRS.3SG tourism-PAR",
+   "free": "Thousands of sleighs serve tourism.’",
+   "transcriptionRaw": "Tuhans-i-a kelkko-j-a palvele-e matkailu-a .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  }
+ ]
+}

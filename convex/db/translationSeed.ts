@@ -4,6 +4,7 @@ import { internalMutation } from '../_generated/server';
 import { deleteAudioRow } from '../lib/audio';
 import { resolveAudioPayload } from '../lib/audioAssets';
 import { clearedAnnotationFields } from '../lib/textAnnotations';
+import { deleteHyperliteralsFor } from '../lib/hyperliterals';
 import {
   liveTranslation,
   audioPointer,
@@ -172,6 +173,9 @@ export const batchUpsertTranslations = internalMutation({
           // seed omits it, KEEP the existing tag, clearing here would silently
           // untag rows on every text edit once the legacy backfill has run.
           // Seeds from the new pipeline should always carry `translationSource`.
+          // Glosses live in their own table, so the spread below cannot
+          // reach them.
+          await deleteHyperliteralsFor(ctx, { translationId: existing._id });
           await ctx.db.patch(existing._id, {
             translatedText: tr.text,
             // The seed's wording is written for the voice resolved above,

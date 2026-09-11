@@ -250,6 +250,9 @@ export const cutoverUser = internalMutation({
     } else {
       // No courseSettings row yet. Create a minimal one with the marker so
       // future cutover invocations short-circuit.
+      // Deliberately NOT spreading NEW_COURSE_SETTINGS_DEFAULTS: this is a
+      // cutover for an EXISTING user, and a new-user default (the word-for-word
+      // gloss) must not switch itself on behind them.
       await ctx.db.insert('courseSettings', {
         courseId: args.courseId,
         initialReviewCount: 0,

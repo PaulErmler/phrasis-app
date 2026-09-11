@@ -216,41 +216,53 @@
      the chunky native scrollbar (especially the Windows / always-on flavour)
      doesn't crowd the tile grids. Applied via an attribute selector so we
      don't have to thread a class through every step's root. */
-  [data-testid^="onboarding-step-"],
-  [data-testid^="onboarding-step-"] *,
+  [data-testid^='onboarding-step-'],
+  [data-testid^='onboarding-step-'] *,
   .scrollbar-slim,
   .scrollbar-slim * {
     scrollbar-width: thin;
     /* Theme colors are oklch — use color-mix to keep the alpha-blend in
        gamut instead of wrapping in hsl() (which would silently fail). */
-    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent)
+    scrollbar-color: color-mix(
+        in oklch,
+        var(--muted-foreground) 35%,
+        transparent
+      )
       transparent;
   }
-  [data-testid^="onboarding-step-"]::-webkit-scrollbar,
-  [data-testid^="onboarding-step-"] *::-webkit-scrollbar,
+  [data-testid^='onboarding-step-']::-webkit-scrollbar,
+  [data-testid^='onboarding-step-'] *::-webkit-scrollbar,
   .scrollbar-slim::-webkit-scrollbar,
   .scrollbar-slim *::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
-  [data-testid^="onboarding-step-"]::-webkit-scrollbar-track,
-  [data-testid^="onboarding-step-"] *::-webkit-scrollbar-track,
+  [data-testid^='onboarding-step-']::-webkit-scrollbar-track,
+  [data-testid^='onboarding-step-'] *::-webkit-scrollbar-track,
   .scrollbar-slim::-webkit-scrollbar-track,
   .scrollbar-slim *::-webkit-scrollbar-track {
     background: transparent;
   }
-  [data-testid^="onboarding-step-"]::-webkit-scrollbar-thumb,
-  [data-testid^="onboarding-step-"] *::-webkit-scrollbar-thumb,
+  [data-testid^='onboarding-step-']::-webkit-scrollbar-thumb,
+  [data-testid^='onboarding-step-'] *::-webkit-scrollbar-thumb,
   .scrollbar-slim::-webkit-scrollbar-thumb,
   .scrollbar-slim *::-webkit-scrollbar-thumb {
-    background-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent);
+    background-color: color-mix(
+      in oklch,
+      var(--muted-foreground) 35%,
+      transparent
+    );
     border-radius: 9999px;
   }
-  [data-testid^="onboarding-step-"]::-webkit-scrollbar-thumb:hover,
-  [data-testid^="onboarding-step-"] *::-webkit-scrollbar-thumb:hover,
+  [data-testid^='onboarding-step-']::-webkit-scrollbar-thumb:hover,
+  [data-testid^='onboarding-step-'] *::-webkit-scrollbar-thumb:hover,
   .scrollbar-slim::-webkit-scrollbar-thumb:hover,
   .scrollbar-slim *::-webkit-scrollbar-thumb:hover {
-    background-color: color-mix(in oklch, var(--muted-foreground) 55%, transparent);
+    background-color: color-mix(
+      in oklch,
+      var(--muted-foreground) 55%,
+      transparent
+    );
   }
 
   /* Sheet / panel layout */
@@ -289,8 +301,12 @@
   .text-romanization {
     @apply text-xs text-muted-foreground leading-tight mt-0.5;
   }
-  /* Smaller and more faded than .text-romanization on purpose: IPA is a
-     specialist aid line, it should read as a footnote under the sentence. */
+  /* The word-for-word gloss and the IPA line are the same thing typographically:
+     secondary aids under the sentence, more faded than .text-romanization, and
+     neither should pull the eye off the text itself. ONE rule with two
+     selectors, not two rules, so they cannot drift apart again — they were
+     briefly different sizes and it showed. */
+  .text-hyperliteral,
   .text-ipa {
     @apply text-xs text-muted-foreground/75 leading-tight mt-0.5;
   }
@@ -376,7 +392,9 @@
   color: var(--card-foreground) !important;
   border: 1px solid var(--border) !important;
   border-radius: 0.75rem !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05) !important;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.18),
+    0 0 0 1px rgba(0, 0, 0, 0.05) !important;
   max-width: 360px;
   padding: 20px !important;
 }
@@ -459,7 +477,9 @@ body.driver-active::after {
   font-size: 0.875rem;
   font-weight: 500;
   text-shadow: none !important;
-  transition: background-color 0.15s, opacity 0.15s;
+  transition:
+    background-color 0.15s,
+    opacity 0.15s;
 }
 
 .driver-popover .driver-popover-next-btn {

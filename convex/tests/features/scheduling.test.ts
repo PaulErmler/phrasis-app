@@ -337,6 +337,14 @@ describe('features/scheduling', () => {
           romanizedText?: string;
         }>;
         audioLanguages?: string[];
+        /**
+         * Whether this course wants word-for-word glosses. Off here, unlike in
+         * the app, because these are payload and annotation tests: with it on
+         * every card is incomplete until a gloss row exists, and
+         * `hasMissingContent` would stop isolating the gap each test is about.
+         * `convex/tests/features/hyperliteral.test.ts` covers the gloss half.
+         */
+        glosses?: boolean;
       } = {},
     ) {
       const {
@@ -386,6 +394,16 @@ describe('features/scheduling', () => {
           collectionId,
           collectionRank: 1,
         });
+        // AFTER the text: `texts` ids seed the voice coin flip
+        // (resolveCardSpeakerGenders), so a row inserted before them changes
+        // which voice every fixture gets.
+        if (opts.glosses !== true) {
+          await ctx.db.insert('courseSettings', {
+            courseId,
+            initialReviewCount: 5,
+            showHyperliteral: false,
+          });
+        }
         const translationIds: Record<string, Id<'translations'>> = {};
         for (const tr of translations) {
           translationIds[tr.targetLanguage] = await ctx.db.insert(

@@ -1,0 +1,407 @@
+{
+ "language": "vi",
+ "curatedAt": "2026-09-11",
+ "notes": "Wikipedia {{interlinear}}.",
+ "items": [
+  {
+   "text": "蒸 𦀚 吒昆、 吏 於兠 丕台。",
+   "lexical": [
+    "of",
+    "rope",
+    "father-and-son",
+    "again",
+    "where",
+    null
+   ],
+   "glossRaw": "POSS rope father-and-son again where FP",
+   "free": "The bond (relationship) of father and son, where is it now?",
+   "source": "en.wikipedia/Giải_âm",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Giải_âm"
+  },
+  {
+   "text": "特 渃 拱 常 於 蒸 欺 尼 意",
+   "lexical": [
+    "obtain",
+    "country",
+    "also",
+    "usual",
+    "at",
+    null,
+    "when",
+    "this",
+    "that"
+   ],
+   "glossRaw": "obtain country also usual at PREP when this that",
+   "free": "Gaining the country is also common during such times",
+   "source": "en.wikipedia/Giải_âm",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Giải_âm"
+  },
+  {
+   "text": "蒸 政 意 丕， 易 𢧚 如 𣘃 蒲盧 丕。",
+   "lexical": [
+    null,
+    "governance",
+    "that",
+    null,
+    "easy",
+    "accomplish",
+    "like",
+    "classifier",
+    "reeds",
+    "be"
+   ],
+   "glossRaw": "PTCL governance that STV, easy accomplish like CLF reeds COP.",
+   "free": "Oh, that government indeed, [it] easily grows like the reeds.",
+   "source": "en.wikipedia/Giải_âm",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Giải_âm"
+  },
+  {
+   "text": "朋烝 制 准 天曹， 所 固 所 空， 牢乙 瀋 盤泊。",
+   "lexical": [
+    "as-for",
+    "play",
+    "place",
+    "celestial-court",
+    null,
+    "have",
+    null,
+    "empty",
+    "why-must",
+    "deep",
+    "discuss"
+   ],
+   "glossRaw": "as-for play place celestial-court, 3.POSS have 3.POSS empty, why-must deep discuss",
+   "free": "As for that [matter], [going up to] play in the celestial court, whether it exists or does not exist, why one must discuss this so deeply?",
+   "source": "en.wikipedia/Giải_âm",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Giải_âm"
+  },
+  {
+   "text": "耨 𥉰 蒸 所𫜵 之。",
+   "lexical": [
+    "hide",
+    "look",
+    null,
+    "what-one-does",
+    "what"
+   ],
+   "glossRaw": "hide look 3.POSS what-one-does what.",
+   "free": "Secretly looking at what they were doing.",
+   "source": "en.wikipedia/Giải_âm",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Giải_âm"
+  },
+  {
+   "text": "官 太守 体 所 㝵 意",
+   "lexical": [
+    "official",
+    "governor",
+    "saw",
+    null,
+    "person",
+    "that"
+   ],
+   "glossRaw": "official governor saw DEM person that",
+   "free": "The governor saw that person.",
+   "source": "en.wikipedia/Giải_âm",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Giải_âm"
+  },
+  {
+   "text": "𤽗 宗鷟 体 所 𠅜 呐 𡲤 固 理",
+   "lexical": [
+    "focus",
+    "tông-thốc",
+    "see",
+    null,
+    "word",
+    "say",
+    "very",
+    "there-is",
+    "reason"
+   ],
+   "glossRaw": "FOC Tông-Thốc see 3.POSS word say very there-is reason",
+   "free": "Tông Thốc saw (that) his words which he said were very reasonable",
+   "source": "en.wikipedia/Giải_âm",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Giải_âm"
+  },
+  {
+   "text": "槞 所 𤾓 種 穭",
+   "lexical": [
+    "plant",
+    null,
+    "hundred",
+    "variety",
+    "grain"
+   ],
+   "glossRaw": "plant 3.POSS hundred variety grain",
+   "free": "To plant all of your various grains",
+   "source": "en.wikipedia/Giải_âm",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Giải_âm"
+  },
+  {
+   "text": "衆眉 所 𢝙、 𢚸 些 擬 虎。",
+   "lexical": [
+    "you",
+    null,
+    "pleasure",
+    "heart",
+    "i",
+    "self",
+    "shame"
+   ],
+   "glossRaw": "you-all NZ pleasure heart I self shame",
+   "free": "What pleasure you all take in, my heart is ashamed of itself.",
+   "source": "en.wikipedia/Giải_âm",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Giải_âm"
+  },
+  {
+   "text": "㝵 君子 固 所 𠫾",
+   "lexical": [
+    "classifier",
+    "junzi",
+    "have",
+    "place",
+    "go"
+   ],
+   "glossRaw": "CLF junzi have place go",
+   "free": "The junzi has a place to go to.",
+   "source": "en.wikipedia/Giải_âm",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Giải_âm"
+  },
+  {
+   "text": "咹 蒸 蘿 蒌 藾蕭 外内",
+   "lexical": [
+    "eat",
+    "of",
+    "leaves",
+    "vegetable",
+    "mugwort",
+    "wild"
+   ],
+   "glossRaw": "Eat POSS leaves vegetable mugwort wild",
+   "free": "Eating the leaves of wild mugwort.",
+   "source": "en.wikipedia/Giải_âm",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Giải_âm"
+  },
+  {
+   "text": "Giúp người, giúp mình",
+   "lexical": [
+    "help",
+    "others",
+    "help",
+    "oneself"
+   ],
+   "glossRaw": "Help others, help oneself",
+   "free": "Helping others is to help yourself.",
+   "source": "en.wikipedia/Null-subject_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Null-subject_language"
+  },
+  {
+   "text": "Hại người, hại mình",
+   "lexical": [
+    "harm",
+    "others",
+    "harm",
+    "oneself"
+   ],
+   "glossRaw": "Harm others, harm oneself",
+   "free": "To harm others is to harm yourself.",
+   "source": "en.wikipedia/Null-subject_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Null-subject_language"
+  },
+  {
+   "text": "các quả cam",
+   "lexical": [
+    null,
+    "classifier",
+    "orange"
+   ],
+   "glossRaw": "PL CLF orange",
+   "free": "(the) oranges",
+   "source": "en.wikipedia/Vietnamese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_grammar"
+  },
+  {
+   "text": "hai cuốn từ-điển",
+   "lexical": [
+    "two",
+    "classifier",
+    "dictionary"
+   ],
+   "glossRaw": "two CLF dictionary",
+   "free": "(the) two dictionaries",
+   "source": "en.wikipedia/Vietnamese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_grammar"
+  },
+  {
+   "text": "mấy con cá",
+   "lexical": [
+    "few",
+    "classifier",
+    "fish"
+   ],
+   "glossRaw": "few CLF fish",
+   "free": "(a) few fish",
+   "source": "en.wikipedia/Vietnamese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_grammar"
+  },
+  {
+   "text": "ba cân thịt",
+   "lexical": [
+    "three",
+    "kilogram",
+    "meat"
+   ],
+   "glossRaw": "three kilogram meat",
+   "free": "three kilograms of meat",
+   "source": "en.wikipedia/Vietnamese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_grammar"
+  },
+  {
+   "text": "một lạng thịt",
+   "lexical": [
+    "one",
+    "tael",
+    "meat"
+   ],
+   "glossRaw": "one tael meat",
+   "free": "one tael of meat",
+   "source": "en.wikipedia/Vietnamese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_grammar"
+  },
+  {
+   "text": "cái con chó này",
+   "lexical": [
+    "focus",
+    "classifier",
+    "dog",
+    null
+   ],
+   "glossRaw": "FOC CLF dog DEM.PROX",
+   "free": "this very dog",
+   "source": "en.wikipedia/Vietnamese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_grammar"
+  },
+  {
+   "text": "hai cái con chó đen này",
+   "lexical": [
+    "two",
+    "focus",
+    "classifier",
+    "dog",
+    "black",
+    null
+   ],
+   "glossRaw": "two.NUM FOC CLF dog black DEM.PROX",
+   "free": "these very two black dogs",
+   "source": "en.wikipedia/Vietnamese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_grammar"
+  },
+  {
+   "text": "mấy cái con mèo này",
+   "lexical": [
+    "the",
+    "focus",
+    "classifier",
+    "cat",
+    null
+   ],
+   "glossRaw": "PL.ART FOC CLF cat DEM.PROX",
+   "free": "these very cats",
+   "source": "en.wikipedia/Vietnamese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_grammar"
+  },
+  {
+   "text": "cái cuốn sách này",
+   "lexical": [
+    "focus",
+    "classifier",
+    "book",
+    null
+   ],
+   "glossRaw": "FOC CLF book DEM.PROX",
+   "free": "this very book",
+   "source": "en.wikipedia/Vietnamese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_grammar"
+  },
+  {
+   "text": "cái con mèo này",
+   "lexical": [
+    "focus",
+    "classifier",
+    "cat",
+    null
+   ],
+   "glossRaw": "FOC CLF cat DEM.PROX",
+   "free": "this very cat",
+   "source": "en.wikipedia/Vietnamese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_grammar"
+  },
+  {
+   "text": "cái người lính này",
+   "lexical": [
+    "focus",
+    "classifier",
+    "soldier",
+    null
+   ],
+   "glossRaw": "FOC CLF soldier DEM.PROX",
+   "free": "this very soldier",
+   "source": "en.wikipedia/Vietnamese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_grammar"
+  },
+  {
+   "text": "Bán cho tôi bốn con gà.",
+   "lexical": [
+    "sell",
+    "for",
+    "me",
+    "four",
+    "classifier",
+    "chicken"
+   ],
+   "glossRaw": "sell for me four CLF.ANIM chicken",
+   "free": "Sell me four chickens.",
+   "source": "en.wikipedia/Vietnamese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_grammar"
+  },
+  {
+   "text": "đây đi chợ, đấy có đi không?",
+   "lexical": [
+    "this",
+    "go",
+    "market",
+    "that",
+    null,
+    "go",
+    "not"
+   ],
+   "glossRaw": "this go market, that AFF go NEG",
+   "free": "I'm going to the market, what about you?",
+   "source": "en.wikipedia/Vietnamese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_grammar"
+  },
+  {
+   "text": "Tài đang nói.",
+   "lexical": [
+    "tài",
+    null,
+    "talk"
+   ],
+   "glossRaw": "Tài PRES.CONT talk",
+   "free": "Tài is talking.",
+   "source": "en.wikipedia/Vietnamese_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_language"
+  },
+  {
+   "text": "Giáp rất cao.",
+   "lexical": [
+    "giáp",
+    "question",
+    "tall"
+   ],
+   "glossRaw": "Giáp INT tall",
+   "free": "Giáp is very tall.",
+   "source": "en.wikipedia/Vietnamese_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Vietnamese_language"
+  }
+ ]
+}

@@ -16,6 +16,8 @@ export interface CardTranslationAlternative {
   romanization?: string;
   ipa?: string;
   furigana?: string;
+  /** Word-for-word gloss; see `CardTranslation.hyperliteral`. */
+  hyperliteral?: string;
   audioUrl?: string | null;
 }
 
@@ -32,6 +34,12 @@ export interface CardTranslation {
    * sentence text by ClickableWords, not as an annotation line under it.
    */
   furigana?: string;
+  /**
+   * Hyperliteral (word-for-word) gloss in the learner's base language, keeping
+   * the sentence's own order. Rendered as an annotation line under the text,
+   * like romanization.
+   */
+  hyperliteral?: string;
   /**
    * AI-feedback accepted alternatives for this card + language (max
    * WRITING_ALTERNATIVES_MAX). Writing mode diffs against the closest of

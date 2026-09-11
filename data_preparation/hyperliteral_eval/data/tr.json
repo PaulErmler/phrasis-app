@@ -1,0 +1,1712 @@
+{
+ "language": "tr",
+ "curatedAt": "2026-09-11",
+ "notes": "Wikipedia {{interlinear}} plus GlossLM. GlossLM rows had their morpheme hyphens closed up (`eleştir-di` -> `eleştirdi`); `transcriptionRaw` keeps the segmented original.",
+ "items": [
+  {
+   "text": "Gidebilirim de, gitmeyebilirim de.",
+   "lexical": [
+    "go",
+    "also",
+    "go",
+    "also"
+   ],
+   "glossRaw": "go-POT-AOR-1SG also, go-NEG-POT-AOR-1SG also.",
+   "free": "Maybe I'll go, maybe I won't.",
+   "source": "en.wikipedia/Clitic",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Clitic"
+  },
+  {
+   "text": "Gide de bilirim, gitmeye de bilirim.",
+   "lexical": [
+    "go",
+    "also",
+    "know",
+    "go",
+    "also",
+    "know"
+   ],
+   "glossRaw": "go-GER also know-AOR-1SG, go-NEG-GER also know-AOR-1SG.",
+   "free": "Maybe I'll go, maybe I won't.",
+   "source": "en.wikipedia/Clitic",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Clitic"
+  },
+  {
+   "text": "Ali bugün eve arabayla gidiyor.",
+   "lexical": [
+    "ali",
+    "today",
+    "to-house",
+    "by-car",
+    "is-going"
+   ],
+   "glossRaw": "Ali today to-house by-car is-going",
+   "free": "Today, Ali is going to the house by car.",
+   "source": "en.wikipedia/Turkish_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Turkish_grammar"
+  },
+  {
+   "text": "Ali eve arabayla bugün gidiyor.",
+   "lexical": [
+    "ali",
+    "to-house",
+    "by-car",
+    "today",
+    "is-going"
+   ],
+   "glossRaw": "Ali to-house by-car today is-going",
+   "free": "Today, Ali is going to the house by car.",
+   "source": "en.wikipedia/Turkish_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Turkish_grammar"
+  },
+  {
+   "text": "Ali arabayla bugün eve gidiyor.",
+   "lexical": [
+    "ali",
+    "by-car",
+    "today",
+    "to-house",
+    "is-going"
+   ],
+   "glossRaw": "Ali by-car today to-house is-going",
+   "free": "Today, Ali is going to the house by car.",
+   "source": "en.wikipedia/Turkish_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Turkish_grammar"
+  },
+  {
+   "text": "Birayı buzdolabına koy.",
+   "lexical": [
+    "the-beer",
+    "into-icebox",
+    "put"
+   ],
+   "glossRaw": "the-beer into-icebox put",
+   "free": "Put the beer in(to) the fridge.",
+   "source": "en.wikipedia/Turkish_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Turkish_grammar"
+  },
+  {
+   "text": "kumdan yapılmış kale",
+   "lexical": [
+    "of-sand",
+    "made",
+    "castle"
+   ],
+   "glossRaw": "of-sand made castle",
+   "free": "castle made of sand",
+   "source": "en.wikipedia/Turkish_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Turkish_grammar"
+  },
+  {
+   "text": "Sesini duymayı seviyorum.",
+   "lexical": [
+    "your-voice",
+    "hearing",
+    "i-love"
+   ],
+   "glossRaw": "your-voice-ACC hearing-ACC I-love",
+   "free": "I like to hear your voice.",
+   "source": "en.wikipedia/Turkish_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Turkish_grammar"
+  },
+  {
+   "text": "Kimi eğitime devam etmek, kimi de çalışmak istiyor.",
+   "lexical": [
+    "some-of-them",
+    "towards-education",
+    "continuation",
+    "make",
+    "some-of-them",
+    "also",
+    "work",
+    "want"
+   ],
+   "glossRaw": "some-of-them towards-education continuation make some-of-them also work want",
+   "free": "Some want to continue their education, and some want to work\"",
+   "source": "en.wikipedia/Turkish_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Turkish_grammar"
+  },
+  {
+   "text": "Gökte bir bulut yok.",
+   "lexical": [
+    "in-the-sky",
+    "a",
+    "cloud",
+    "not-existing"
+   ],
+   "glossRaw": "in-the-sky a cloud not-existing",
+   "free": "There is not a cloud in the sky.",
+   "source": "en.wikipedia/Turkish_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Turkish_grammar"
+  },
+  {
+   "text": "Balcının var bal tası, Oduncunun var baltası.",
+   "lexical": [
+    "honey-seller's",
+    "exists",
+    "honey",
+    "his",
+    "wood-cutter's",
+    "exists",
+    "his-axe"
+   ],
+   "glossRaw": "honey-seller's exists honey his-pot wood-cutter's exists his-axe",
+   "free": "The honey-seller has a honey-pot; the wood-cutter has an axe.",
+   "source": "en.wikipedia/Turkish_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Turkish_grammar"
+  },
+  {
+   "text": "Hiçbir adam ada değildir.",
+   "lexical": [
+    "no-one",
+    "man",
+    "island",
+    "is-not"
+   ],
+   "glossRaw": "no-one man island is-not",
+   "free": "No man is an island.",
+   "source": "en.wikipedia/Turkish_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Turkish_grammar"
+  },
+  {
+   "text": "en büyük yalancı",
+   "lexical": [
+    "most",
+    "big",
+    "liar"
+   ],
+   "glossRaw": "most big liar",
+   "free": "the biggest liar",
+   "source": "en.wikipedia/Turkish_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Turkish_grammar"
+  },
+  {
+   "text": "Can üç hırsız yakaladı.",
+   "lexical": [
+    "john",
+    "three",
+    "burglar",
+    "catch"
+   ],
+   "glossRaw": "John three burglar catch-PAST",
+   "free": "John caught three burglars.",
+   "transcriptionRaw": "Can üç hırsız yakala-dı .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Üç öğretmen Canı eleştirdi.",
+   "lexical": [
+    "three",
+    "teacher",
+    "john",
+    "criticize"
+   ],
+   "glossRaw": "three teacher John-ACC criticize-PAST",
+   "free": "Three teachers criticized John.",
+   "transcriptionRaw": "Üç öğretmen Can-ı eleştir-di .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ben dun aksam cok guzel bir biftek yedim.",
+   "lexical": [
+    "i",
+    "yesterday",
+    "evening",
+    "very",
+    "nice",
+    "a",
+    "steak",
+    "ate"
+   ],
+   "glossRaw": "I yesterday evening very nice a steak ate",
+   "free": "Yesterday evening, I ate a very nice steak.",
+   "transcriptionRaw": "Ben dun aksam cok guzel bir biftek yedim .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Işte sana bir dilim kek.",
+   "lexical": [
+    "particle",
+    "you",
+    "a",
+    "slice",
+    "cake"
+   ],
+   "glossRaw": "PART you.DAT a slice cake",
+   "free": "Here’s you a slice of cake.",
+   "transcriptionRaw": "Işte sana bir dilim kek .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ahmet mağazaya gidip ne aldı?",
+   "lexical": [
+    "ahmet",
+    "store",
+    "go",
+    "what",
+    "buy"
+   ],
+   "glossRaw": "Ahmet store-DAT go-SS.CVB what buy-PST.3",
+   "free": "What did Ahmet go to the store and buy?",
+   "transcriptionRaw": "Ahmet mağaza-ya gid-ip ne al-dı ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Arabanın motoru bozulup tekerlekleri durdu.",
+   "lexical": [
+    "car",
+    "engine",
+    "break",
+    "wheel",
+    "stop"
+   ],
+   "glossRaw": "car-GEN engine-3SG.POSS break-PASS-SS.CVB wheel-PL-TSG.POSS stop-PST.3",
+   "free": "The car’s engine broke and its wheels stopped.",
+   "transcriptionRaw": "Araba-nın motor-u boz-ul-up tekerlek-ler-i dur-du .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hasan bir kitap aldı.",
+   "lexical": [
+    "hasan",
+    "a",
+    "book",
+    "bought"
+   ],
+   "glossRaw": "Hasan a book bought",
+   "free": "Hasan bought a book",
+   "transcriptionRaw": "Hasan bir kitap aldı .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hasan bir kitabı aldı.",
+   "lexical": [
+    "hasan",
+    "one",
+    "book",
+    "bought"
+   ],
+   "glossRaw": "Hasan one book-ACC bought",
+   "free": "Hasan bought one book",
+   "transcriptionRaw": "Hasan bir kitab-ı aldı .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hasan kitabı tamamen okudu.",
+   "lexical": [
+    "hasan",
+    "book",
+    "completely",
+    "read"
+   ],
+   "glossRaw": "Hasan book-ACC completely read",
+   "free": "Hasan read the book completely.",
+   "transcriptionRaw": "Hasan kitab-ı tamamen okudu .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hasan tamamen kitap okudu.",
+   "lexical": [
+    "hasan",
+    "completely",
+    "book",
+    "read"
+   ],
+   "glossRaw": "Hasan completely book read",
+   "free": "Hasan read a book completely.",
+   "transcriptionRaw": "Hasan tamamen kitap okudu .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ali bir piyanoyu kiralamak istiyor.",
+   "lexical": [
+    "ali",
+    "one",
+    "piano",
+    "to-rent",
+    "wants"
+   ],
+   "glossRaw": "Ali one piano-ACC to-rent wants",
+   "free": "Ali wants to rent a certain piano.",
+   "transcriptionRaw": "Ali bir piyano-yu kiralamak istiyor .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ali bir piyano kiralamak istiyor.",
+   "lexical": [
+    "ali",
+    "one",
+    "piano",
+    "to-rent",
+    "wants"
+   ],
+   "glossRaw": "Ali one piano to-rent wants",
+   "free": "Ali wants to rent a (nonspecific) piano.",
+   "transcriptionRaw": "Ali bir piyano kiralamak istiyor .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ali uyku uyuyor.",
+   "lexical": [
+    "ali",
+    "sleep",
+    "sleep"
+   ],
+   "glossRaw": "Ali sleep sleep-IMPF",
+   "free": "Ali is sleeping (a sleep).",
+   "transcriptionRaw": "Ali uyku uyu-yor .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Neden kiminle iciyolar? Asil sorun ictikleri!",
+   "lexical": [
+    "why",
+    "with-who",
+    "they-drink",
+    "real",
+    "issue",
+    "that-they-drink"
+   ],
+   "glossRaw": "why with.who they.drink real issue that.they.drink",
+   "free": "Why who are they drinking with?! The real issue is that they’re drinking!",
+   "transcriptionRaw": "Neden kiminle iciyolar ? Asil sorun ictikleri !",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Şirket öğrencilerin yüzde yetmişini istihdam.etti",
+   "lexical": [
+    "company",
+    "student",
+    "hundred",
+    "seventy",
+    "hire"
+   ],
+   "glossRaw": "company student-PL-GEN hundred-LOC seventy-POSS.ACC hire-PST",
+   "free": "The company hired seventy percent of the students",
+   "transcriptionRaw": "Şirket öğrenci-ler-in yüz-de yetmiş-in-i istihdam .et-ti",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Şirket yüzde yetmiş öğrenci istihdam.etti",
+   "lexical": [
+    "company",
+    "hundred",
+    "seventy",
+    "student",
+    "hire"
+   ],
+   "glossRaw": "company hundred-LOC seventy student hire-PST",
+   "free": "Seventy percent of those hired by the company were students.",
+   "transcriptionRaw": "Şirket yüz-de yetmiş öğrenci istihdam .et-ti",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Şirket çoğunlukla/sadece öğrenci istihdam.etti",
+   "lexical": [
+    "company",
+    "mostly/only",
+    "student",
+    "hire"
+   ],
+   "glossRaw": "company mostly/only student hire-PST",
+   "free": "The company hired mostly/only students",
+   "transcriptionRaw": "Şirket çoğunlukla/sadece öğrenci istihdam .et-ti",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Şirket çoğunlukla/sadece öğrencileri istihdam.etti",
+   "lexical": [
+    "company",
+    "mostly/only",
+    "student",
+    "hire"
+   ],
+   "glossRaw": "company mostly/only student-PL-ACC hire-PST",
+   "free": "The company hired mostly/only the students",
+   "transcriptionRaw": "Şirket çoğunlukla/sadece öğrenci-ler-i istihdam .et-ti",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "yüzde yetmiş öğrenci",
+   "lexical": [
+    "hundred",
+    "seventy",
+    "student"
+   ],
+   "glossRaw": "hundred-LOC seventy student",
+   "free": "70% students",
+   "transcriptionRaw": "yüz-de yetmiş öğrenci",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "o öğrencilerin yüzde yetmişi",
+   "lexical": [
+    "that",
+    "student",
+    "hundred",
+    "seventy"
+   ],
+   "glossRaw": "that student-PL-GEN hundred-LOC seventy-POSS",
+   "free": "seventy percent of those students",
+   "transcriptionRaw": "o öğrenci-ler-in yüz-de yetmiş-i",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Öğrencilerin yüzde yetmişi suşiyi ÇATAL ile yedi.",
+   "lexical": [
+    "student",
+    "hundred",
+    "seventy",
+    "sushi",
+    "fork",
+    "with",
+    "eat"
+   ],
+   "glossRaw": "student-PL-GEN hundred-LOC seventy-POSS sushi-ACC fork with eat.PST",
+   "free": "70% of the students who ate sushi ate it with a fork.",
+   "transcriptionRaw": "Öğrenci-ler-in yüz-de yetmiş-i suşi-yi ÇATAL ile yedi .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "#Yüzde yetmiş kadın sufle yapmayı biliyor.",
+   "lexical": [
+    "hundred",
+    "seventy",
+    "woman",
+    "soufflé",
+    "make",
+    "know"
+   ],
+   "glossRaw": "hundred-LOC seventy woman soufflé make.NMZ know.IMPF",
+   "free": "Int. ‘Seventy percent of those who can make a soufflé are women.",
+   "transcriptionRaw": "#Yüz-de yetmiş kadın sufle yapmayı biliyor .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Adam kitabı çocuğa verdi.",
+   "lexical": [
+    "man",
+    "book",
+    "child",
+    "give"
+   ],
+   "glossRaw": "man book-ACC child-DAT give.PST",
+   "free": "The man gave the book to the child.",
+   "transcriptionRaw": "Adam kitabı çocuğa verdi .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "?Ayşe Mervenin işe.aldığı yüzde yetmiş kadını kovdu.",
+   "lexical": [
+    "ayşe",
+    "merve",
+    "hire",
+    "hundred",
+    "seventy",
+    "woman",
+    "fire"
+   ],
+   "glossRaw": "Ayşe Merve-GEN hire.REL hundred-LOC seventy woman-ACC fire.PST",
+   "free": "Ayşe fired the seventy percent women that Merve hired.’ # ‘Ayşe fired seventy percent of the women that Merve hired.",
+   "transcriptionRaw": "?Ayşe Merve-nin işe .aldığı yüz-de yetmiş kadın-ı kovdu .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ahmetler bize geldi.",
+   "lexical": [
+    "ahmet",
+    "we",
+    "come"
+   ],
+   "glossRaw": "Ahmet-PL we-DAT come-PAST",
+   "free": "(i) ‘Ahmet and his family/friends/associates came to us together (collective)’ (ii) *‘Ahmet and his family/friends/associates came to us at different times",
+   "transcriptionRaw": "Ahmet-ler biz-e gel-di .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Neue Film sehen yapiyor.",
+   "lexical": [
+    "new",
+    "film",
+    "see",
+    "do"
+   ],
+   "glossRaw": "new film see do",
+   "free": "Seeing a new film.",
+   "transcriptionRaw": "Neu-e Film sehen yapiyor .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hayır, önceki gün.",
+   "lexical": [
+    "no",
+    "before",
+    "day"
+   ],
+   "glossRaw": "no before day",
+   "free": "No, it is the day before.",
+   "transcriptionRaw": "Hayır , önceki gün .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Bi saniye bi saniye, birisinin Dilara’yı öptüğünden haberim yoktu.",
+   "lexical": [
+    "one",
+    "sec",
+    "one",
+    "sec",
+    "someone",
+    "dilara",
+    "kiss",
+    "news",
+    "not-exist"
+   ],
+   "glossRaw": "one sec one sec someone-GEN Dilara-ACC kiss-VN-3S.POSS-ABL news-1S.POSS not.exist.PST",
+   "free": "Wait a second, I had no idea that someone had kissed Dilara.",
+   "transcriptionRaw": "Bi saniye bi saniye , birisi-nin Dilara’yı öp-tüğ-ü-nden haber-im yok-tu .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Dindar amcam iskambil de/bile oynadı.",
+   "lexical": [
+    "religious",
+    "uncle-my",
+    "cards",
+    "even",
+    "play"
+   ],
+   "glossRaw": "religious uncle.my cards even play-PST",
+   "free": "My religious uncle also/even played cards yesterday.",
+   "transcriptionRaw": "Dindar amcam iskambil de/bile oyna-dı .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Bi çocuk her elmayı yedi.",
+   "lexical": [
+    "a",
+    "child",
+    "every",
+    "apple",
+    "eat"
+   ],
+   "glossRaw": "a child every apple-ACC eat-PST.3sg",
+   "free": "A child ate every apple.’ ✔ ∃ > ∀; *∀ > ∃",
+   "transcriptionRaw": "Bi çocuk her elma-yı ye-di .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Her elmayı bi çocuk yedi.",
+   "lexical": [
+    "every",
+    "apple",
+    "a",
+    "child",
+    "eat"
+   ],
+   "glossRaw": "every apple-ACC a child eat-PST.3sg",
+   "free": "Every apple was eaten by a different child.’ *∃ > ∀; ✔∀ > ∃",
+   "transcriptionRaw": "Her elma-yı bi çocuk ye-di .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Evet, bir de Ali öptü.",
+   "lexical": [
+    "yes",
+    "one",
+    null,
+    "ali",
+    "kiss"
+   ],
+   "glossRaw": "Yes, one ADD Ali kiss-PST",
+   "free": "Yes, and Ali kissed her too.",
+   "transcriptionRaw": "Evet , bir de Ali öp-tü .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "karasını / kızılını aldım",
+   "lexical": [
+    "black",
+    "_",
+    "red",
+    "i_bought"
+   ],
+   "glossRaw": "black-ATTR:ACC _ red-ATTR:ACC I_bought",
+   "free": "(Which pen did you buy?) ‘I bought a/the black / red one.",
+   "transcriptionRaw": "kara-sını / kızıl-ını aldım",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Adam kitabı okudu, çocuk da dergiyi.",
+   "lexical": [
+    "homme",
+    "livre",
+    "lire",
+    "enfant",
+    null,
+    "revue"
+   ],
+   "glossRaw": "homme livre-ACC lire.PST.3SG enfant CONJ revue-ACC",
+   "free": "L’homme a lu le livre et l’enfant la revue.",
+   "transcriptionRaw": "Adam kitab-ı okudu , çocuk da dergi-yi .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Adam kitabı okudu, dergiyi de çocuk.",
+   "lexical": [
+    "homme",
+    "livre",
+    "lire",
+    "revue",
+    null,
+    "enfant"
+   ],
+   "glossRaw": "homme livre-ACC lire.PST.3SG revue-ACC CONJ enfant",
+   "free": "L’homme a lu le livre et l’enfant la revue.",
+   "transcriptionRaw": "Adam kitab-ı okudu , dergi-yi de çocuk .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "liseye yeni başlayan ergen tavrı",
+   "lexical": [
+    "high-school",
+    "new",
+    "start",
+    "adolescent",
+    "attitude"
+   ],
+   "glossRaw": "high.school-DAT new start-SBJREL adolescent attitude-CM",
+   "free": "[adolescent who has just started high school] attitude",
+   "transcriptionRaw": "lise-ye yeni başla-yan ergen tavr-ı",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "polisin orantısız güç kullandığı haberi",
+   "lexical": [
+    "police",
+    "disproportionate",
+    "force",
+    "use",
+    "news"
+   ],
+   "glossRaw": "police-GEN.3SG disproportionate force use-FNOM-3SG news-CM",
+   "free": "the news that the police used disproportionate force",
+   "transcriptionRaw": "polis-in orantısız güç kullan-dığ-ı haber-i",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "“Bekle, görürüz” kafası/tutumu",
+   "lexical": [
+    "wait",
+    "see",
+    "head-cm/attitude"
+   ],
+   "glossRaw": "wait see-AOR-1PL head-CM/attitude-CM",
+   "free": "wait-and-(we shall) see-thinking/attitude",
+   "transcriptionRaw": "“Bekle , gör-ür-üz” kafa-sı/tutum-u",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "ana baba günü",
+   "lexical": [
+    "mother",
+    "father",
+    "day"
+   ],
+   "glossRaw": "mother father day-CM",
+   "free": "(a) crowded",
+   "transcriptionRaw": "ana baba gün-ü",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "babalar ve ogullar toplantisi",
+   "lexical": [
+    "father",
+    "and",
+    "son",
+    "meeting"
+   ],
+   "glossRaw": "father-PL and son-PL meeting-CM",
+   "free": "fathers-and-sons meeting",
+   "transcriptionRaw": "baba-lar ve ogul-lar toplanti-si",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "tabiata dönüs politikasi",
+   "lexical": [
+    "nature",
+    "return",
+    "policy"
+   ],
+   "glossRaw": "nature-DAT return-NOM policy-CM",
+   "free": "return-to-nature-policy",
+   "transcriptionRaw": "tabiat-a dön-üs politika-si",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Nermin okula gitmiş=mı?",
+   "lexical": [
+    null,
+    "school",
+    "go"
+   ],
+   "glossRaw": "PN school-DAT go-PFV.EV=Q",
+   "free": "Has Nermin gone to school?",
+   "transcriptionRaw": "Nermin okul-a git-miş=mı ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Nermin okula=mı gitmiş?",
+   "lexical": [
+    null,
+    "school",
+    "go"
+   ],
+   "glossRaw": "PN school-DAT=Q go-PFV.EV",
+   "free": "Has Nermin gone to school?",
+   "transcriptionRaw": "Nermin okul-a=mı git-miş ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Eve ne zaman gideceksin?",
+   "lexical": [
+    "home",
+    "what",
+    "time",
+    "go"
+   ],
+   "glossRaw": "home-DAT what time go-FUT-2SG",
+   "free": "When will you be going home?’",
+   "transcriptionRaw": "Ev-e ne zaman gid-ecek-sin ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Cemal bugün okula gitmedi, değil mi?",
+   "lexical": [
+    null,
+    "today",
+    "school",
+    "go",
+    "not",
+    "question"
+   ],
+   "glossRaw": "PN today school-DAT go-NEG-PFV NEG Q",
+   "free": "Cemal didn’t go to school today, did(n’t) he?",
+   "transcriptionRaw": "Cemal bugün okul-a git-me-di , değil mi ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Esra Handanın ablasıymış, öyle mi?",
+   "lexical": [
+    null,
+    null,
+    "elder-sister",
+    "so",
+    "question"
+   ],
+   "glossRaw": "PN PN-GEN elder.sister-3SG.POSS-EV.COP so Q",
+   "free": "So Esra is Handan’s elder sister, right?’",
+   "transcriptionRaw": "Esra Handan-ın abla-sı-ymış , öyle mi ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Dün “Suç ve Ceza” okudum – kitap harikaydı.",
+   "lexical": [
+    "yesteday",
+    "“crime",
+    "and",
+    "punishment",
+    "read",
+    "_",
+    "book",
+    "terrific"
+   ],
+   "glossRaw": "yesteday “Crime and Punishment read-PST _ book terrific-PST",
+   "free": "Yesterday I read Crime and Punishment. The book was terrific.",
+   "transcriptionRaw": "Dün “Suç ve Ceza” okudum – kitap harikaydı .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Daha iyi oldu.",
+   "lexical": [
+    "more",
+    "good",
+    "become"
+   ],
+   "glossRaw": "more good become-PRF.3SG",
+   "free": "It became better.",
+   "transcriptionRaw": "Daha iyi ol-du .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "kedi ve köpeklerime",
+   "lexical": [
+    "cat",
+    "and",
+    "dog"
+   ],
+   "glossRaw": "cat and dog-PL-1SG-DAT",
+   "free": "to my cat(s) and dogs",
+   "transcriptionRaw": "kedi ve köpek-ler-im-e",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mehmet kitabi okudu",
+   "lexical": [
+    "_",
+    "book",
+    "read"
+   ],
+   "glossRaw": "_ book-ACC read-PAST",
+   "free": "Mehmet read the book.",
+   "transcriptionRaw": "Mehmet kitab-i oku-du",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hasan Elifin geldiğini biliyor.",
+   "lexical": [
+    "hasan",
+    "elif",
+    "come",
+    "knows"
+   ],
+   "glossRaw": "Hasan Elif-GEN come-DIK-3POSS-ACC knows",
+   "free": "Hasan knows that Elif came/is coming/will come.",
+   "transcriptionRaw": "Hasan Elif-in gel-diğ-in-i biliyor .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Öğrencilerin yüzde yetmişi SUŞIYI çatal ile yedi.",
+   "lexical": [
+    "student",
+    "hundred",
+    "seventy",
+    "sushi",
+    "fork",
+    "with",
+    "eat"
+   ],
+   "glossRaw": "student-PL-GEN hundred-LOC seventy-POSS sushi-ACC fork with eat.PST",
+   "free": "70% of the students who ate something with a fork ate sushi with a fork.",
+   "transcriptionRaw": "Öğrencilerin yüzde yetmişi SUŞIYI çatal ile yedi .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Emine elmayi yedi.1",
+   "lexical": [
+    "emine",
+    "apple",
+    "eat"
+   ],
+   "glossRaw": "Emine apple-ACC eat-PAST.3sg",
+   "free": "Emine ate the apple.",
+   "transcriptionRaw": "Emine elmayi yedi.1",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ahmet hizli kouyordu",
+   "lexical": [
+    "ahmet",
+    "quickly",
+    "run"
+   ],
+   "glossRaw": "Ahmet quickly run-PROG-PAST.3sg",
+   "free": "Ahmet was running quickly.",
+   "transcriptionRaw": "Ahmet hizli kouyordu",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Acikcasi muhtemelen gelmeyeceim.",
+   "lexical": [
+    "frankly",
+    "probably",
+    "come"
+   ],
+   "glossRaw": "frankly probably come-NEG-FUT-1sg",
+   "free": "Frankly, I probably won't come.",
+   "transcriptionRaw": "Acikcasi muhtemelen gelmeyeceim.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Muhtemelen acikcasi gelmeyeceim.",
+   "lexical": [
+    "probably",
+    "frankly",
+    "come"
+   ],
+   "glossRaw": "probably frankly come-NEG-FUT-1sg",
+   "free": "Probably I frankly won't come.",
+   "transcriptionRaw": "Muhtemelen acikcasi gelmeyeceim.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ahmet imdi akillica teslim oldu.",
+   "lexical": [
+    "ahmet",
+    "now",
+    "wisely",
+    "surrender",
+    "be"
+   ],
+   "glossRaw": "Ahmet now wisely surrender be-PAST.3sg",
+   "free": "Ahmet has now wisely surrendered.",
+   "transcriptionRaw": "Ahmet imdi akillica teslim oldu.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ahmet akillica imdi teslim oldu.",
+   "lexical": [
+    "ahmet",
+    "wisely",
+    "now",
+    "surrender",
+    "be"
+   ],
+   "glossRaw": "Ahmet wisely now surrender be-PAST.3sg",
+   "free": "Ahmet has wisely now surrendered.",
+   "transcriptionRaw": "Ahmet akillica imdi teslim oldu.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ahmet dün okuyordu.",
+   "lexical": [
+    "ahmet",
+    "yesterday",
+    "read"
+   ],
+   "glossRaw": "Ahmet yesterday read-PROG-PAST.3sg",
+   "free": "Ahmet was reading yesterday.",
+   "transcriptionRaw": "Ahmet dün okuyordu.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Cüneyt yarin okuyor olacak.",
+   "lexical": [
+    "cüneyt",
+    "tomorrow",
+    "read",
+    "be"
+   ],
+   "glossRaw": "Cüneyt tomorrow read-PROG be-FUT.3sg",
+   "free": "Tomorrow Cüneyt will be reading.",
+   "transcriptionRaw": "Cüneyt yarin okuyor olacak.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ahmet dün okuduyor.",
+   "lexical": [
+    "ahmet",
+    "yesterday",
+    "read"
+   ],
+   "glossRaw": "Ahmet yesterday read-PAST-PROG.3sg",
+   "free": "Ahmet is having read yesterday.",
+   "transcriptionRaw": "Ahmet dün okuduyor.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Saat ikide Can genelde yiyecek olur.",
+   "lexical": [
+    "hour",
+    "two",
+    "can",
+    "usually",
+    "eat",
+    "be"
+   ],
+   "glossRaw": "hour two-LOC Can usually eat-FUT be-AOR.3sg",
+   "free": "At two o'clock, Can is usually about to eat.",
+   "transcriptionRaw": "Saat ikide Can genelde yiyecek olur.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "On sene sonra hala bu lokantaya gider olacak.",
+   "lexical": [
+    "ten",
+    "year",
+    "after",
+    "still",
+    "this",
+    "restaurant",
+    "go",
+    "be"
+   ],
+   "glossRaw": "ten year after still this restaurant-DAT go-AOR be-FUT.3sg",
+   "free": "In ten years, he will still be going to this restaurant.",
+   "transcriptionRaw": "On sene sonra hala bu lokantaya gider olacak.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ahmet gelmi olabilir.",
+   "lexical": [
+    "ahmet",
+    "come",
+    "be"
+   ],
+   "glossRaw": "Ahmet come-ANT be-POSS-AOR.3sg",
+   "free": "Ahmet might have come.",
+   "transcriptionRaw": "Ahmet gelmi olabilir.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ahmet gelmi olur.",
+   "lexical": [
+    "ahmet",
+    "come",
+    "be"
+   ],
+   "glossRaw": "Ahmet come-ANT be-AOR.3sg",
+   "free": "Ahmet has come.",
+   "transcriptionRaw": "Ahmet gelmi olur.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ablam arki söylüyor olabilirdi.",
+   "lexical": [
+    "sister",
+    "song",
+    "sing",
+    "be"
+   ],
+   "glossRaw": "sister-1sg song sing-PROG be-POSS-AOR-PAST.3sg",
+   "free": "My sister might have been singing songs.",
+   "transcriptionRaw": "Ablam arki söylüyor olabilirdi.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ablam arki söylüyordu olabilir.",
+   "lexical": [
+    "sister",
+    "song",
+    "sing",
+    "be"
+   ],
+   "glossRaw": "sister-1sg song sing-PROG-PAST be-POSS-AOR.3sg",
+   "free": "My sister might have been singing songs.",
+   "transcriptionRaw": "Ablam arki söylüyordu olabilir.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ahmet gelecek olabilir.",
+   "lexical": [
+    "ahmet",
+    "come",
+    "be"
+   ],
+   "glossRaw": "Ahmet come-FUT be-POSS-AOR.3sg",
+   "free": "Ahmet might come.",
+   "transcriptionRaw": "Ahmet gelecek olabilir.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ablam belki arki söylüyordu",
+   "lexical": [
+    "sister",
+    "maybe",
+    "song",
+    "sing"
+   ],
+   "glossRaw": "sister-1sg maybe song sing-PROG-PAST.3sg",
+   "free": "Maybe my sister was singing songs.",
+   "transcriptionRaw": "Ablam belki arki söylüyordu",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ahmet gelmeli olacak.",
+   "lexical": [
+    "ahmet",
+    "come",
+    "be"
+   ],
+   "glossRaw": "Ahmet come-OBLIG be-FUT.3sg",
+   "free": "Ahmet will have to come.",
+   "transcriptionRaw": "Ahmet gelmeli olacak.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ahmetin gelmesi gerekecek.",
+   "lexical": [
+    "ahmet",
+    "come",
+    "necessary"
+   ],
+   "glossRaw": "Ahmet-GEN come-NOM-3sg necessary-FUT.3sg",
+   "free": "Ahmet's coming will be necessary (i.e. Ahmet will have to come).",
+   "transcriptionRaw": "Ahmetin gelmesi gerekecek.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Disci Hasana mektubu müdür tarafindan göstertti",
+   "lexical": [
+    "dentist",
+    "hasan",
+    "letter",
+    "director",
+    "by",
+    "show"
+   ],
+   "glossRaw": "dentist Hasan-DAT letter-ACC director by show-CAUS-PAST",
+   "free": "The dentist made the director show the letter to Hasan",
+   "transcriptionRaw": "Disci Hasana mektubu müdür tarafindan göstertti",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hasana mektubu müdüre actirttim.",
+   "lexical": [
+    "hasan",
+    "letter",
+    "director",
+    "open"
+   ],
+   "glossRaw": "Hasan-DAT letter-ACC director-DAT open-CAUS-CAUS-PAST-1sg",
+   "free": "I made Hasan make the director open the letter",
+   "transcriptionRaw": "Hasana mektubu müdüre actirttim.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Müdüre mektubu actirttim.",
+   "lexical": [
+    "director",
+    "letter",
+    "open"
+   ],
+   "glossRaw": "director-DAT letter-ACC open-CAUS-CAUS-PAST-1sg",
+   "free": "I had someone make the director open the letter",
+   "transcriptionRaw": "Müdüre mektubu actirttim.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hasan sana benden fazla kitap verdi.",
+   "lexical": [
+    "hasan",
+    null,
+    null,
+    "more",
+    "book",
+    "give"
+   ],
+   "glossRaw": "Hasan 2sg-DAT 1sg-ABL more book give-PAST",
+   "free": "Hasan gave you more books than I",
+   "transcriptionRaw": "Hasan sana benden fazla kitap verdi.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Masa kap#n#n genis$lig\"inden daha enlidir.",
+   "lexical": [
+    "table",
+    "door",
+    "wide",
+    "more",
+    "broad"
+   ],
+   "glossRaw": "table door-GEN wide-NOML-3sg.POSS-ABL more broad-3sg",
+   "free": "The table is broader than the door's width",
+   "transcriptionRaw": "Masa kap#n#n genis$lig\"inden daha enlidir.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Masa kap#-n#n genis$-lig\"-inden daha enlidir.",
+   "lexical": [
+    "table",
+    "door",
+    "wide",
+    "more",
+    "broad"
+   ],
+   "glossRaw": "table door-GEN wide-NOML-3sg.POSS-ABL more broad-3sg",
+   "free": "The table is broader than the door's width",
+   "transcriptionRaw": "Masa kap#-n#n genis$-lig\"-in-den daha enli-dir.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ahmet gelebilir olacak.2",
+   "lexical": [
+    "ahmet",
+    "come",
+    "be"
+   ],
+   "glossRaw": "Ahmet come-POSS-AOR be-FUT.3sg",
+   "free": "Ahmet might come.",
+   "transcriptionRaw": "Ahmet gelebilir olacak.2",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ali bir piyanoyu kiralamak istiyor",
+   "lexical": [
+    "ali",
+    "one",
+    "piano",
+    "to-rent",
+    "wants"
+   ],
+   "glossRaw": "Ali one piano-ACC to-rent wants",
+   "free": "Ali wants to rent a certain piano.",
+   "transcriptionRaw": "Ali bir piyanoyu kiralamak istiyor",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ali bir piyano kiralamak istiyor",
+   "lexical": [
+    "ali",
+    "one",
+    "piano",
+    "to-rent",
+    "wants"
+   ],
+   "glossRaw": "Ali one piano to-rent wants",
+   "free": "Ali wants to rent a (non-specific) piano.",
+   "transcriptionRaw": "Ali bir piyano kiralamak istiyor",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "oraya ben de gittim",
+   "lexical": [
+    "there",
+    "i",
+    "focus",
+    "go"
+   ],
+   "glossRaw": "there I FOC go.PAST",
+   "free": "I too went there.",
+   "transcriptionRaw": "oraya ben de gittim",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "ben oraya da gittim",
+   "lexical": [
+    "i",
+    "there",
+    "focus",
+    "go"
+   ],
+   "glossRaw": "I there FOC go.PAST",
+   "free": "I went there too (as well as elsewhere).",
+   "transcriptionRaw": "ben oraya da gittim",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "ben oraya gittim de",
+   "lexical": [
+    "i",
+    "there",
+    "go",
+    "focus"
+   ],
+   "glossRaw": "I there go.PAST FOC",
+   "free": "I also went there.",
+   "transcriptionRaw": "ben oraya gittim de",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Odamda yatyor uyuyormusum.",
+   "lexical": [
+    "room",
+    "lie",
+    "sleep"
+   ],
+   "glossRaw": "room-LOC lie-PROG sleep-PROG-MIS-1sg",
+   "free": "(They say) I was lying in my room sleeping.",
+   "transcriptionRaw": "Odamda yatyor uyuyormusum.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "eve gelir sana yardimederiz",
+   "lexical": [
+    "home",
+    "come",
+    "you",
+    "help"
+   ],
+   "glossRaw": "home-dat come-aor you help-aor-1pl",
+   "free": "we will come home and help you",
+   "transcriptionRaw": "eve gelir sana yardimederiz",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "John Türkiyeye gidecekmi.",
+   "lexical": [
+    "john",
+    "turkey",
+    "go"
+   ],
+   "glossRaw": "John Turkey-DAT go-PRES-INEVID",
+   "free": "John will go to Turkey (I was told so or it is obvious from circumstantial evidence and I have no reason to doubt it).",
+   "transcriptionRaw": "John Türkiyeye gidecekmi.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "John imdi kütüphanede olacak.",
+   "lexical": [
+    "john",
+    "now",
+    "library",
+    "be"
+   ],
+   "glossRaw": "John now library-LOC be-PRES",
+   "free": "John will be at the library now.",
+   "transcriptionRaw": "John imdi kütüphanede olacak.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Babam ie otobüs ile gidiyor.",
+   "lexical": [
+    "father",
+    "work",
+    "bus",
+    "with",
+    "go"
+   ],
+   "glossRaw": "father-POSS.1.SG work-DAT bus with go-PROG",
+   "free": "My father is going to work by bus.",
+   "transcriptionRaw": "Babam ie otobüs ile gidiyor.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Babam ie otobüs ile gider.",
+   "lexical": [
+    "father",
+    "work",
+    "bus",
+    "with",
+    "go"
+   ],
+   "glossRaw": "father-POSS.1.SG work-DAT bus with go-AOR",
+   "free": "My father goes to work by bus (e.g. every morning).",
+   "transcriptionRaw": "Babam ie otobüs ile gider.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Sana borç para vereceim.",
+   "lexical": [
+    "you",
+    "loan",
+    "money",
+    "give"
+   ],
+   "glossRaw": "you-DAT loan money give-PRES-1.SG",
+   "free": "I'm going to give you money (e.g. as agreed/planned).",
+   "transcriptionRaw": "Sana borç para vereceim.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Sana borç para veririm.",
+   "lexical": [
+    "you",
+    "loan",
+    "money",
+    "give"
+   ],
+   "glossRaw": "you-DAT loan money give-AOR-1.SG",
+   "free": "I'll give you money (I'm willing to do so).",
+   "transcriptionRaw": "Sana borç para veririm.",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "bu elma degil",
+   "lexical": [
+    null,
+    "apple",
+    "not"
+   ],
+   "glossRaw": "DEM apple NEG",
+   "free": "this is not an apple",
+   "transcriptionRaw": "bu elma degil",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "adam köpegi dövdü",
+   "lexical": [
+    "man",
+    "dog",
+    "beat"
+   ],
+   "glossRaw": "man dog-ACC beat-PAST.3.SG",
+   "free": "the man beat the dog",
+   "transcriptionRaw": "adam köpegi dövdü",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "adam cocuga topu verdi",
+   "lexical": [
+    "man",
+    "child",
+    "ball",
+    "give"
+   ],
+   "glossRaw": "man child-DAT ball-ACC give-PAST.3.SG",
+   "free": "the man gave the child a/the ball",
+   "transcriptionRaw": "adam cocuga topu verdi",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "adam cocuga top verdi",
+   "lexical": [
+    "man",
+    "child",
+    "ball",
+    "give"
+   ],
+   "glossRaw": "man child-DAT ball give-PAST.3.SG",
+   "free": "the man gave the child a ball",
+   "transcriptionRaw": "adam cocuga top verdi",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "benim bütün bu güzel tahta bilyelerim",
+   "lexical": [
+    "my",
+    null,
+    null,
+    "nice",
+    "wooden",
+    "ball"
+   ],
+   "glossRaw": "my all DEM nice wooden ball-PL-POSS.1.SG",
+   "free": "all these nice wooden balls of mine",
+   "transcriptionRaw": "benim bütün bu güzel tahta bilyelerim",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "o hIzlI koSuyor",
+   "lexical": [
+    "he",
+    "fast",
+    "run"
+   ],
+   "glossRaw": "he fast run-IMPF.PRES.3.SG",
+   "free": "he is running fast",
+   "transcriptionRaw": "o hIzlI koSuyor",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "adam Alinin gülmesini istedi",
+   "lexical": [
+    "man",
+    "ali",
+    "laugh",
+    "want"
+   ],
+   "glossRaw": "man Ali-GEN laugh-NL-POSS.3.SG-LNK-ACC want-PAST.3.SG",
+   "free": "the man wanted Ali to laugh",
+   "transcriptionRaw": "adam Alinin gülmesini istedi",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "adam geldiktensonra Ali eve gitti",
+   "lexical": [
+    "man",
+    "come-after",
+    "ali",
+    "house",
+    "go"
+   ],
+   "glossRaw": "man come-GER-after Ali house-DAT go-PAST.3.SG",
+   "free": "after the man had come. Ali went home",
+   "transcriptionRaw": "adam geldiktensonra Ali eve gitti",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "bu elma olsa idi",
+   "lexical": [
+    null,
+    "apple",
+    "be",
+    "be"
+   ],
+   "glossRaw": "DEM apple be-COND COP.PAST.3.SG",
+   "free": "if this were an apple",
+   "transcriptionRaw": "bu elma olsa idi",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ali gülse idi",
+   "lexical": [
+    "ali",
+    "laugh",
+    "be"
+   ],
+   "glossRaw": "Ali laugh-COND COP-PAST.3.SG",
+   "free": "if Ali laughed",
+   "transcriptionRaw": "Ali gülse idi",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "bu elma ise",
+   "lexical": [
+    null,
+    "apple",
+    "be"
+   ],
+   "glossRaw": "DEM apple COP-COND",
+   "free": "if this is an apple",
+   "transcriptionRaw": "bu elma ise",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Su benim babam",
+   "lexical": [
+    null,
+    "my",
+    "father"
+   ],
+   "glossRaw": "DEM my father-1.SG",
+   "free": "this father of mine",
+   "transcriptionRaw": "Su benim babam",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "bu gülen adam",
+   "lexical": [
+    null,
+    "laugh",
+    "man"
+   ],
+   "glossRaw": "DEM laugh-PART man",
+   "free": "this laughing man",
+   "transcriptionRaw": "bu gülen adam",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "bu gülen adamlar",
+   "lexical": [
+    null,
+    "laugh",
+    "man"
+   ],
+   "glossRaw": "DEM laugh-PART man-PL",
+   "free": "these laughing men",
+   "transcriptionRaw": "bu gülen adamlar",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "erkek gibi olmak",
+   "lexical": [
+    "man",
+    "like",
+    "become"
+   ],
+   "glossRaw": "man like become",
+   "free": "to act like a man",
+   "transcriptionRaw": "erkek gibi olmak",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "gelmesi uzun sürdü",
+   "lexical": [
+    "come",
+    "long",
+    "last"
+   ],
+   "glossRaw": "come-GER-POSS.3.SG long last-PAST.3.SG",
+   "free": "his coming takes",
+   "transcriptionRaw": "gelmesi uzun sürdü",
+   "source": "glosslm/odin",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  }
+ ]
+}

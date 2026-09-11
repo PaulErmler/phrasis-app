@@ -1,5 +1,9 @@
 'use client';
 
+import {
+  ANNOTATION_FIELD,
+  AnnotationSettingsTabs,
+} from '@/components/app/settings/AnnotationSettingsTabs';
 import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -70,6 +74,7 @@ import {
   languageNeedsFurigana,
   languageNeedsIpa,
   languageNeedsRomanization,
+  glossLanguageFor,
 } from '@/lib/languages';
 
 import { reportError } from '@/lib/report-error';
@@ -87,6 +92,7 @@ interface LearningModeSettingsProps {
  * from the mutation (and therefore from `coursePatchableSettingsValidator`)
  * so `setField`/`setFields` reject unknown field names at compile time.
  */
+
 type CourseSettingsPatch = Omit<
   Parameters<ReturnType<typeof useUpdateCourseSettings>>[0],
   'courseId'
@@ -1726,67 +1732,53 @@ export function LearningModeSettings({
           {/* ================================================================
               LANGUAGE-SPECIFIC SETTINGS
               ================================================================
-              One row per script/pronunciation aid, rendered only when at
-              least one course language supports it; the supporting languages
-              are shown as chips on the row (each setting stays a single
-              course-wide switch — see SettingSwitchRowProps.languages).
-              Absent entirely when no course language has any.
+              One row per reading aid, each switchable for the whole course or
+              for a single language. The layout and the override semantics live
+              in AnnotationSettingsTabs; this is only the wiring.
 
-              Hide-don't-clear: a hidden row leaves the stored value
-              untouched. Course languages are editable from this same sheet,
-              so clearing would silently reset the preference every time a
-              language was removed and re-added. A stale `true` is inert
-              anyway — every consumer is gated on the translation actually
-              carrying the annotation, which the server only populates for
-              supported languages.
+              Hide-don't-clear: a hidden row leaves the stored value untouched,
+              and so does a stored override for a language no longer on the
+              course. Course languages are editable from this same sheet, so
+              clearing would silently reset the preference every time a
+              language was removed and re-added. A stale value is inert anyway
+              — every consumer is gated on the translation actually carrying
+              the annotation, which the server only populates for supported
+              languages.
 
-              IPA defaults OFF: it is a specialist aid and shouldn't appear
-              unasked. Romanization and furigana default ON — they are the
-              expected reading help for their scripts. */}
-          {romanizationLanguages.length > 0 ||
-          ipaLanguages.length > 0 ||
-          furiganaLanguages.length > 0 ? (
-            <>
-              <Separator />
-              <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-                {t('languageSettings')}
-              </p>
-              {romanizationLanguages.length > 0 && (
-                <SettingSwitchRow
-                  id="showRomanization"
-                  label={t('showRomanization')}
-                  description={t('showRomanizationDescription')}
-                  languages={toLanguageNames(romanizationLanguages)}
-                  checked={courseSettings.showRomanization ?? true}
-                  onCheckedChange={(checked) =>
-                    setField('showRomanization', checked)
-                  }
-                />
-              )}
-              {ipaLanguages.length > 0 && (
-                <SettingSwitchRow
-                  id="showIpa"
-                  label={t('showIpa')}
-                  description={t('showIpaDescription')}
-                  languages={toLanguageNames(ipaLanguages)}
-                  checked={courseSettings.showIpa ?? false}
-                  onCheckedChange={(checked) => setField('showIpa', checked)}
-                />
-              )}
-              {furiganaLanguages.length > 0 && (
-                <SettingSwitchRow
-                  id="showFurigana"
-                  label={t('showFurigana')}
-                  description={t('showFuriganaDescription')}
-                  languages={toLanguageNames(furiganaLanguages)}
-                  checked={resolveShowFurigana(courseSettings)}
-                  onCheckedChange={(checked) =>
-                    setField('showFurigana', checked)
-                  }
-                />
-              )}
-            </>
-          ) : null}
+              IPA and the word-for-word gloss default OFF for an existing
+              course; romanization and furigana default ON, being the expected
+              reading help for their scripts. A course created after the gloss
+              shipped carries an explicit `showHyperliteral: true`, stamped on
+              its settings row (NEW_COURSE_SETTINGS_DEFAULTS), so new learners
+              get it without it switching itself on for anyone else.
+
+              The separator and the section heading are rendered by the
+              component, not here: it returns null when no course language has
+              any aid, and a heading left behind out here would sit over an
+              empty section. */}
+          <AnnotationSettingsTabs
+            settings={courseSettings}
+            courseLanguages={courseLanguages}
+            gloss={{
+              language: glossLanguageFor({ baseLanguages: baseProp }),
+              // TARGET languages only. A base language never gets a gloss
+              // generated for it (`hyperliteralWantsFor`), so offering the
+              // learner a switch for one would be a switch that does nothing.
+              appliesTo: targetProp,
+            }}
+            languageName={(code) =>
+              getLocalizedLanguageNameByCode(code, locale)
+            }
+            onSetCourseWide={(kind, value, overrides) =>
+              void setFields({
+                [ANNOTATION_FIELD[kind]]: value,
+                annotationOverrides: overrides,
+              } as CourseSettingsPatch)
+            }
+            onSetOverrides={(overrides) =>
+              void setField('annotationOverrides', overrides)
+            }
+          />
         </div>
 
         {/* Rendered INSIDE SheetContent so its portal events bubble through

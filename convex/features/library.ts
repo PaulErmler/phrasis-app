@@ -1,3 +1,4 @@
+import { glossOptFor } from '../db/courseSettings';
 import { viewOfCard, renderingTextOf } from '../db/translationReads';
 import { v } from 'convex/values';
 import { query } from '../_generated/server';
@@ -349,11 +350,13 @@ export const getLibraryCards = query({
       })
       .filter((x): x is NonNullable<typeof x> => x !== null);
 
+    const glossOpt = await glossOptFor(ctx, course);
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
       inputs,
       course.baseLanguages,
       course.targetLanguages,
+      glossOpt,
     );
 
     const page = cards

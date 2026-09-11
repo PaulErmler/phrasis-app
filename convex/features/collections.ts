@@ -1,3 +1,10 @@
+import {
+  hyperliteralWantsFor,
+  type HyperliteralWants,
+} from '../../lib/annotationDisplay';
+import type { Id } from '../_generated/dataModel';
+import type { QueryCtx } from '../_generated/server';
+import { getCourseSettings, glossOptFor } from '../db/courseSettings';
 import { v, ConvexError } from 'convex/values';
 import {
   paginationOptsValidator,
@@ -269,12 +276,13 @@ export const browseCollectionTexts = query({
       // rendering a new card would get (canonical until the variant lands).
       view: row.card ? viewOfCard(row.card) : previewView(),
     }));
+    const glossOpt = await glossOptFor(ctx, course);
     const contentMap = await buildTextContentBatchForLanguages(
       ctx,
       inputs,
       course.baseLanguages,
       course.targetLanguages,
-      { markVersionStale: true },
+      { markVersionStale: true, ...glossOpt },
     );
 
     const page = rows.map((row, i) => {
@@ -439,10 +447,12 @@ export async function scheduleMissingTranslationsForText(
     llmPriority?: LlmPriority;
     requestedByUserId?: string;
     /**
-     * The course's politeness setting, when the caller is a browse surface
-     * that should render it. Absent, every language gets the sentence's
-     * primary rendering, which is what a preview with no setting shows.
+     * Which languages want a hyperliteral gloss, and in which language. A
+     * preview row shows the gloss line like any other card, so the browse
+     * surfaces pass this; without it a sentence read in the collection
+     * preview would show a gloss only after it became a card.
      */
+    hyperliteral?: HyperliteralWants;
   },
 ): Promise<number> {
   const { translationsScheduled } = await ensureTextContent(
@@ -455,6 +465,7 @@ export async function scheduleMissingTranslationsForText(
       skipTts: true,
       requestedByUserId: opts?.requestedByUserId,
       llmPriority: opts?.llmPriority,
+      hyperliteral: opts?.hyperliteral,
       // Warm work. If a landing primary translation still triggers TTS (a
       // card references the text, see storeTranslationAndScheduleTTS's
       // skipTts docs), that audio rides the background pool.
@@ -497,6 +508,10 @@ export const requestPreviewTranslations = mutation({
       course.baseLanguages,
       course.targetLanguages,
     );
+    const hyperliteral = hyperliteralWantsFor(
+      course,
+      await getCourseSettings(ctx, course._id),
+    );
 
     let translationsScheduled = 0;
     for (const textId of textIds) {
@@ -514,9 +529,15 @@ export const requestPreviewTranslations = mutation({
         ctx,
         text,
         languages,
-        // Explicit preview request: the viewing user caused this spend. The
-        // prewarm sibling below stays unattributed (speculative work).
-        { requestedByUserId: userId },
+        {
+          // Explicit preview request: the viewing user caused this spend. The
+          // prewarm sibling below stays unattributed (speculative work).
+          requestedByUserId: userId,
+          // The learner is reading these rows now, so they get the gloss line
+          // the card would show. Prewarm below deliberately does not: a gloss
+          // is a paid call per sentence and prewarm buys pages nobody opened.
+          ...(hyperliteral ? { hyperliteral } : {}),
+        },
       );
     }
 
@@ -562,6 +583,10 @@ export const prewarmPreviewTranslations = mutation({
       course.baseLanguages,
       course.targetLanguages,
     );
+    const hyperliteral = hyperliteralWantsFor(
+      course,
+      await getCourseSettings(ctx, course._id),
+    );
 
     let translationsScheduled = 0;
     for (const text of texts) {
@@ -576,7 +601,13 @@ export const prewarmPreviewTranslations = mutation({
         // `requestPreviewTranslations` above passes them, which is also the
         // mutation that attributes the cost to a user. Prewarm deliberately
         // does not attribute, because nobody asked for it.
-        {},
+        //
+        // The GLOSS is the exception, and it is deliberate (Paul,
+        // 2026-09-11): prewarm exists so the next page is ready before the
+        // learner scrolls to it, and a page that arrives with its glosses
+        // still generating is the thing prewarm was built to avoid. It rides
+        // the same speculative budget as the translation it annotates.
+        hyperliteral ? { hyperliteral } : {},
       );
     }
 

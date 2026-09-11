@@ -25,6 +25,7 @@ import { ttsPool, ttsWarmPool } from '../../lib/workpools';
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
+import { getHyperliteralSource } from '../../lib/hyperliterals';
 import { openrouterSttBody, isOpenrouterSttUrl } from '../lib/sttFixtures';
 import { sha256Hex } from '../../lib/sha256';
 import {
@@ -1762,13 +1763,25 @@ describe('features/decks', () => {
           schedulingPhase: 'preReview',
           preReviewCount: 0,
         });
-        await ctx.db.insert('translations', {
+        const esTranslationId = await ctx.db.insert('translations', {
           textId,
           targetLanguage: 'es',
           translatedText: 'Hola amigo',
           speakerGender: 'female',
           translationVersion: getCurrentTranslationVersion('es'),
           ipaText: 'ˈola aˈmiɣo',
+        });
+        // The word-for-word gloss is on by default for every target language,
+        // so a card without one is NOT complete and the steady-state probes
+        // below would dispatch for it.
+        await ctx.db.insert('hyperliterals', {
+          translationId: esTranslationId,
+          language: 'es',
+          glossLanguage: 'en',
+          forText: 'Hola amigo',
+          text: 'Hello friend',
+          source: getHyperliteralSource('es'),
+          requestedAt: Date.now(),
         });
         const timings = [{ word: 'x', start: 0, end: 0.4 }];
         const enBlob = await ctx.storage.store(new Blob([new Uint8Array([1])]));

@@ -1,0 +1,465 @@
+{
+ "language": "yue",
+ "curatedAt": "2026-09-11",
+ "notes": "Wikipedia {{interlinear}}.",
+ "items": [
+  {
+   "text": "佢哋 嚟 唔 嚟？",
+   "lexical": [
+    "they",
+    "come",
+    "not",
+    "come"
+   ],
+   "glossRaw": "they come not come",
+   "free": "Are they coming?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "他們 來 不 來？",
+   "lexical": [
+    "they",
+    "come",
+    "not",
+    "come"
+   ],
+   "glossRaw": "they come not come",
+   "free": "Are they coming?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "你 喜歡 音樂 不 喜歡 音樂？",
+   "lexical": [
+    "you",
+    "like",
+    "music",
+    "not",
+    "like",
+    "music"
+   ],
+   "glossRaw": "you like music not like music",
+   "free": "Do you like music?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "你 返 唔 返 屋企？",
+   "lexical": [
+    "you",
+    "return",
+    "not",
+    "return",
+    "home"
+   ],
+   "glossRaw": "you return not return home",
+   "free": "Are you going home?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "你 回 不 回 家？",
+   "lexical": [
+    "you",
+    "return",
+    "not",
+    "return",
+    "home"
+   ],
+   "glossRaw": "you return not return home",
+   "free": "Are you going home?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "你 喜歡不喜歡 音樂？",
+   "lexical": [
+    "you",
+    "like-not-like",
+    "music"
+   ],
+   "glossRaw": "you like-not-like music",
+   "free": "Do you like music?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "?你 返 屋企 唔 返？",
+   "lexical": [
+    "you",
+    "return",
+    "home",
+    "not",
+    "return"
+   ],
+   "glossRaw": "you return home not return",
+   "free": "Are you going home?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "你 回 家 不 回？",
+   "lexical": [
+    "you",
+    "return",
+    "home",
+    "not",
+    "return"
+   ],
+   "glossRaw": "you return home not return",
+   "free": "Are you going home?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "你 喜歡 她 不 喜歡？",
+   "lexical": [
+    "you",
+    "like",
+    "she",
+    "not",
+    "like"
+   ],
+   "glossRaw": "you like she not like",
+   "free": "Do you like her?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "我 喺 香港 住咗 一 年",
+   "lexical": [
+    "i",
+    "at/in",
+    "hong-kong",
+    "live",
+    "one",
+    "year"
+   ],
+   "glossRaw": "I at/in Hong-Kong live-PFV one year",
+   "free": "I have been living in Hong Kong for a year",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "我 喺 香港 住過 一 年",
+   "lexical": [
+    "i",
+    "at/in",
+    "hong-kong",
+    "live",
+    "one",
+    "year"
+   ],
+   "glossRaw": "I at/in Hong-Kong live-EXP one year",
+   "free": "I lived in Hong Kong for a year",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "我 著緊 衫",
+   "lexical": [
+    "i",
+    "wear",
+    "clothes"
+   ],
+   "glossRaw": "I wear-PROG clothes",
+   "free": "I am putting on clothes",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "我 著住 衫",
+   "lexical": [
+    "i",
+    "wear",
+    "clothes"
+   ],
+   "glossRaw": "I wear-DUR clothes",
+   "free": "I am wearing clothes",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "等 我 著吓",
+   "lexical": [
+    "let",
+    "me",
+    "wear"
+   ],
+   "glossRaw": "Let me wear-DEL",
+   "free": "Let me wear it for a while",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "我 做開 鐘點 嘅",
+   "lexical": [
+    "i",
+    "do",
+    "time",
+    null
+   ],
+   "glossRaw": "I do-HAB part-time SFP",
+   "free": "I normally work part-time",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "個 阿咇 突然之間 喊起上嚟",
+   "lexical": [
+    "classifier",
+    "baby",
+    "suddenly",
+    "cry"
+   ],
+   "glossRaw": "CL baby suddenly cry-INCH",
+   "free": "The baby suddenly began crying",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "你 唔 使 再 講落去 喇",
+   "lexical": [
+    "you",
+    "not",
+    "need",
+    "again",
+    "speak",
+    null
+   ],
+   "glossRaw": "you NEG need again speak-CONT SFP",
+   "free": "You don't have to go on speaking",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "畀 返 啲 錢 我",
+   "lexical": [
+    "give",
+    "back",
+    "those",
+    "money",
+    "me"
+   ],
+   "glossRaw": "Give back those money me",
+   "free": "Give me the money back",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "個 天 未 好 返",
+   "lexical": [
+    "the",
+    "sky",
+    "not-yet",
+    "good",
+    "back"
+   ],
+   "glossRaw": "the sky not-yet good back",
+   "free": "The weather is not yet well",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "畀 嗰 本 書 我",
+   "lexical": [
+    "give",
+    "that",
+    "classifier",
+    "book",
+    null
+   ],
+   "glossRaw": "give that CL book 1SG",
+   "free": "Give that book to me.",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "佢 本 書",
+   "lexical": [
+    null,
+    "classifier",
+    "book"
+   ],
+   "glossRaw": "3SG CL book",
+   "free": "his book",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "架 車 撻 唔 著",
+   "lexical": [
+    "classifier",
+    "car",
+    "start",
+    "not",
+    "burn"
+   ],
+   "glossRaw": "CL car start not burn",
+   "free": "The car won't start,\" and it cannot be interpreted as \"the cars\".",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "我 住 開 香港",
+   "lexical": [
+    null,
+    "live",
+    null,
+    "hong-kong"
+   ],
+   "glossRaw": "1SG live HAB Hong-Kong",
+   "free": "I've been living in Hong Kong.",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "筷-子 畀 人 用 咗",
+   "lexical": [
+    "chopsticks",
+    "by",
+    "person",
+    "use",
+    null
+   ],
+   "glossRaw": "chopsticks by person use PRF",
+   "free": "the chopsticks have been used\"",
+   "source": "en.wikipedia/Cantonese_grammar",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Cantonese_grammar"
+  },
+  {
+   "text": "王生 返 咗 屋企。",
+   "lexical": [
+    "mr-wong",
+    "return",
+    null,
+    "home"
+   ],
+   "glossRaw": "Mr.-Wong return PFV home",
+   "free": "Mr. Wong returned home.",
+   "source": "en.wikipedia/Dislocation_(syntax)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Dislocation_(syntax)"
+  },
+  {
+   "text": "返 咗 屋企 喇, 王生。",
+   "lexical": [
+    "return",
+    null,
+    "home",
+    null,
+    "mr-wong"
+   ],
+   "glossRaw": "return PFV home SFP, Mr.-Wong",
+   "free": "[He] returned home, Mr. Wong.",
+   "source": "en.wikipedia/Dislocation_(syntax)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Dislocation_(syntax)"
+  },
+  {
+   "text": "王生 已經 買 咗 奶。",
+   "lexical": [
+    "mr-wong",
+    "already",
+    "buy",
+    null,
+    "milk"
+   ],
+   "glossRaw": "Mr.-Wong already buy PFV milk",
+   "free": "Mr. Wong already bought the milk.",
+   "source": "en.wikipedia/Dislocation_(syntax)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Dislocation_(syntax)"
+  },
+  {
+   "text": "奶 王生 已經 買 咗。",
+   "lexical": [
+    "milk",
+    "mr-wong",
+    "already",
+    "buy",
+    null
+   ],
+   "glossRaw": "milk Mr.-Wong already buy PFV",
+   "free": "[As for] the milk, Mr. Wong already bought [it].",
+   "source": "en.wikipedia/Dislocation_(syntax)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Dislocation_(syntax)"
+  },
+  {
+   "text": "奶 已經 買 咗 喇, 王生。",
+   "lexical": [
+    "milk",
+    "already",
+    "buy",
+    null,
+    null,
+    "mr-wong"
+   ],
+   "glossRaw": "milk already buy PFV SFP, Mr.-Wong",
+   "free": "[As for] the milk, [he] already bought [it], Mr. Wong",
+   "source": "en.wikipedia/Dislocation_(syntax)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Dislocation_(syntax)"
+  },
+  {
+   "text": "呢 個 蘋果 畀 佢 食 咗 喇",
+   "lexical": [
+    "this",
+    "classifier",
+    "apple",
+    "by",
+    "he",
+    "eat",
+    null,
+    null
+   ],
+   "glossRaw": "this CL apple by he eat PFV SFP",
+   "free": "This apple was eaten by him.",
+   "source": "en.wikipedia/Object–subject–verb_word_order",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Object–subject–verb_word_order"
+  },
+  {
+   "text": "我 想 睇 晒 佢 先 還",
+   "lexical": [
+    "i",
+    "want",
+    "read",
+    null,
+    "it",
+    "first",
+    "return"
+   ],
+   "glossRaw": "I want read all it first return",
+   "free": "I want to finish reading it before I return it.",
+   "source": "en.wikipedia/Pronouns_in_Cantonese",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Pronouns_in_Cantonese"
+  },
+  {
+   "text": "我 自己 唔 會 咁 做",
+   "lexical": [
+    "i",
+    "myself",
+    "not",
+    "would",
+    "so",
+    "behave"
+   ],
+   "glossRaw": "I myself not would so behave",
+   "free": "I myself would not behave like that",
+   "source": "en.wikipedia/Pronouns_in_Cantonese",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Pronouns_in_Cantonese"
+  },
+  {
+   "text": "我 自己 買 餸 煮 飯",
+   "lexical": [
+    "i",
+    "myself",
+    "buy",
+    "groceries",
+    "cook",
+    "rice"
+   ],
+   "glossRaw": "I myself buy groceries cook rice",
+   "free": "I’ll buy the groceries and cook by myself",
+   "source": "en.wikipedia/Pronouns_in_Cantonese",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Pronouns_in_Cantonese"
+  }
+ ]
+}

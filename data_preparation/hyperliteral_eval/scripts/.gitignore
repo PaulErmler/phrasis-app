@@ -1,0 +1,4 @@
+# Network caches, not source data. Both are rebuilt on demand and the README
+# says so: deleting either just costs one re-fetch.
+wtbatch/
+glosslm_cache.json

@@ -99,6 +99,20 @@ export const OPENROUTER_MODELS = {
    *  tiers as indistinguishable (91% IPA, 98% romanization), not Vertex. */
   romanization: 'google/gemini-3.8-flash:floor',
 
+  /**
+   * Hyperliteral (word-for-word) gloss. The same model and routing as
+   * romanization, for the same reason plus one of its own: `pnpm
+   * eval:hyperliteral` picked it on 2026-09-11 over GPT-5.6 Luna, which the
+   * plan had proposed. Over 200 items in fi/hu/tr/ja/zh it scored 86% lexical
+   * coverage against Luna's 83%, produced the right number of gloss units on
+   * 100% of sentences against Luna's 90%, and led 7.7 to 6.9 on a Claude
+   * Sonnet judge chosen to be related to neither candidate. About 9x Luna's
+   * price per sentence ($0.000534 vs $0.000058), which is 9x a very small
+   * number, and it introduces no provider surface this app does not already
+   * depend on.
+   */
+  hyperliteral: 'google/gemini-3.8-flash:floor',
+
   /** Speech-to-text for languages MAI-Transcribe-2 does not cover
    *  (convex/lib/stt/gemini.ts): the clip goes in as `input_audio` on a
    *  chat completion. No word timestamps, so no karaoke; text only. Routed
@@ -176,6 +190,13 @@ export const SPEAKER_GENDER_CHECK_PROVIDER = {
  * constraint already recorded on `translationAutoFill` above.
  */
 export const ROMANIZATION_REASONING = 'minimal' as const;
+
+/**
+ * Same floor, same reason: Gemini 3.x rejects a disabled-reasoning request
+ * outright, so `minimal` is as far down as this can go. Glossing is a
+ * transcription-shaped task, not a reasoning one, and thinking is billed.
+ */
+export const HYPERLITERAL_REASONING = 'minimal' as const;
 
 /** Default OpenRouter provider options for the chat agent.
  *  Reasoning is streamed (exclude: false) so Gemini thought signatures

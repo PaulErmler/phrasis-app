@@ -1,3 +1,9 @@
+import { type HyperliteralWants } from '../../lib/annotationDisplay';
+import {
+  getHyperliteral,
+  hyperliteralNeedsWork,
+  hyperliteralTextOf,
+} from './hyperliterals';
 import { Doc, Id } from '../_generated/dataModel';
 import { MutationCtx, QueryCtx } from '../_generated/server';
 import {
@@ -67,6 +73,13 @@ export interface CardTranslationContent {
    * renders AS ruby over the sentence, not as a line under it.
    */
   furigana?: string;
+  /**
+   * Hyperliteral (word-for-word) gloss, in the course's base language. Same
+   * display semantics as romanization: a line under the sentence, absent
+   * rather than blank when the row failed. Only populated when the caller
+   * passes `hyperliteral`; nothing is read otherwise.
+   */
+  hyperliteral?: string;
   /**
    * True iff an LLM retranslation is currently in flight for this language
    * AND an existing `translatedText` is on file. Keyed off the LLM claim
@@ -217,6 +230,17 @@ export async function buildTextContentBatchForLanguages(
      * query does not treat legacy timing-less audio as a content gap.
      */
     ignoreMissingWordTimings?: boolean;
+    /**
+     * Which languages want a hyperliteral gloss, and in which language to read
+     * it. Absent (the default) skips the table entirely: no extra reads, no
+     * extra term, which is what a course with the gloss switched off should
+     * cost.
+     *
+     * The same value the content sweep generates from, so the gap this
+     * reports and the work that fills it can never disagree. Built by
+     * `hyperliteralWantsFor`; `glossOptFor` is the accessor.
+     */
+    hyperliteral?: HyperliteralWants;
   },
 ): Promise<Map<string, TextContentResult>> {
   const allLanguages = getCourseLanguages(baseLanguages, targetLanguages);
@@ -347,6 +371,8 @@ export async function buildTextContentBatchForLanguages(
   );
 
   type TranslationEntry = {
+    /** The `translations` row this entry resolved to, when one exists. */
+    rowId?: Id<'translations'>;
     text: string;
     romanization?: string;
     ipa?: string;
@@ -392,6 +418,10 @@ export async function buildTextContentBatchForLanguages(
     });
     translationMap.set(`${item.key}:${item.lang}`, {
       formLanguage,
+      // The served row's id, so a gloss (which lives in its own table, keyed
+      // by the row it describes) can be looked up without re-deriving which
+      // revision this slot resolved to.
+      rowId: row?._id,
       text: row?.translatedText ?? '',
       romanization: row?.romanizedText ?? undefined,
       ipa: row?.ipaText ?? undefined,
@@ -506,6 +536,67 @@ export async function buildTextContentBatchForLanguages(
     urlMap.set(item.key, urlByStorageId.get(item.payload.storageId) ?? null);
   }
 
+  // Hyperliteral glosses, one batched indexed read per served row. Skipped
+  // entirely when the caller wants none, so a course with the gloss off pays
+  // nothing for the feature. Keyed by the row the gloss hangs off, because a
+  // gloss belongs to a wording rather than to a language slot.
+  const glossByRow = new Map<string, Doc<'hyperliterals'> | null>();
+  const glossWants = opts?.hyperliteral;
+  /**
+   * Whether a gloss exists to be found for this language. The SAME list the
+   * sweep generates from, not a re-derivation: ask over a wider set and every
+   * card reports a gap nothing will ever fill (see `HyperliteralWants`).
+   * `languages` is already filtered by `hyperliteralApplies`, so there is no
+   * second check to make here.
+   */
+  const wantsGloss = (language: string): boolean =>
+    glossWants !== undefined && glossWants.languages.includes(language);
+  if (glossWants !== undefined) {
+    const glossLanguage = glossWants.glossLanguage;
+    const subjects: {
+      rowKey: string;
+      subject:
+        | { textId: Id<'texts'>; translationId?: undefined }
+        | { translationId: Id<'translations'>; textId?: undefined };
+    }[] = [];
+    const seen = new Set<string>();
+    for (const input of inputs) {
+      if (wantsGloss(input.sourceLanguage)) {
+        const rowKey = `text:${input.textId}`;
+        if (!seen.has(rowKey)) {
+          seen.add(rowKey);
+          subjects.push({ rowKey, subject: { textId: input.textId } });
+        }
+      }
+      for (const lang of allLanguages) {
+        const entry =
+          resolution(input, lang).accentEntry ??
+          translationMap.get(`${input.key}:${lang}`);
+        const rowId = entry?.rowId;
+        if (rowId === undefined) continue;
+        if (!wantsGloss(lang)) continue;
+        const rowKey = `translation:${rowId}`;
+        if (seen.has(rowKey)) continue;
+        seen.add(rowKey);
+        subjects.push({ rowKey, subject: { translationId: rowId } });
+      }
+    }
+    const rows = await Promise.all(
+      subjects.map((s) => getHyperliteral(ctx, s.subject, glossLanguage)),
+    );
+    subjects.forEach((s, i) => glossByRow.set(s.rowKey, rows[i]));
+  }
+
+  /** The gloss to render for one row, honouring the wording guard. */
+  const glossFor = (
+    rowKey: string,
+    language: string,
+    wording: string,
+  ): string | undefined =>
+    glossWants === undefined
+      ? undefined
+      : hyperliteralTextOf(glossByRow.get(rowKey), { language, wording });
+
   const result = new Map<string, TextContentResult>();
   for (const input of inputs) {
     const audioRecordings = allLanguages.map((lang) => {
@@ -555,6 +646,11 @@ export async function buildTextContentBatchForLanguages(
           furigana: langNeedsFurigana
             ? input.sourceAnnotations.furiganaText
             : undefined,
+          hyperliteral: glossFor(
+            `text:${input.textId}`,
+            lang,
+            input.sourceText,
+          ),
           retranslating: false,
           ...(voiceGender ? { voiceGender } : {}),
         };
@@ -571,6 +667,10 @@ export async function buildTextContentBatchForLanguages(
         romanization: langNeedsRomanization ? entry?.romanization : undefined,
         ipa: langNeedsIpa ? entry?.ipa : undefined,
         furigana: langNeedsFurigana ? entry?.furigana : undefined,
+        hyperliteral:
+          entry?.rowId === undefined
+            ? undefined
+            : glossFor(`translation:${entry.rowId}`, lang, translatedText),
         // Show the pill only when an LLM retranslation is in flight AND a
         // prior translatedText exists (i.e. this is a *re*translation, not
         // the first-time translation of a new card).
@@ -627,6 +727,32 @@ export async function buildTextContentBatchForLanguages(
       // is work to do" are one definition rather than two that drift.
       return missingAnnotationKinds(lang, stored).length > 0;
     });
+    // Glosses are a separate term because they live in a separate table. Same
+    // question as the sweep asks (`hyperliteralState`), so the trigger and the
+    // work it triggers cannot disagree, and absent entirely when the caller
+    // wants no glosses.
+    const hasMissingHyperliteral =
+      glossWants !== undefined &&
+      allLanguages.some((lang) => {
+        if (!wantsGloss(lang)) return false;
+        const isPlainSourceRow =
+          lang === input.sourceLanguage &&
+          resolution(input, lang).accentEntry === undefined;
+        if (isPlainSourceRow) {
+          return hyperliteralNeedsWork(glossByRow.get(`text:${input.textId}`), {
+            language: lang,
+            wording: input.sourceText,
+          });
+        }
+        const entry =
+          resolution(input, lang).accentEntry ??
+          translationMap.get(`${input.key}:${lang}`);
+        if (entry?.rowId === undefined) return false;
+        return hyperliteralNeedsWork(
+          glossByRow.get(`translation:${entry.rowId}`),
+          { language: lang, wording: entry.text },
+        );
+      });
     // Legacy audio (generated before Scribe integration) has a URL but no
     // wordTimings. Flag it as missing so useEnsureContent → ensureTextContent
     // triggers a backfill transcription, but only where a backfill can
@@ -665,11 +791,16 @@ export async function buildTextContentBatchForLanguages(
       translations,
       audioRecordings,
       missingTranslationLanguages,
-      hasMissingAnnotation,
+      // The gloss is folded in here, not kept separate: the collection
+      // preview's client asks "does this row need an annotation backfill?" to
+      // decide whether to request it, and a row whose ONLY gap was a gloss
+      // answered no and was never requested.
+      hasMissingAnnotation: hasMissingAnnotation || hasMissingHyperliteral,
       hasMissingContent:
         hasMissingTranslation ||
         hasMissingAudio ||
         hasMissingAnnotation ||
+        hasMissingHyperliteral ||
         hasUncheckedAudio ||
         (!opts?.ignoreMissingWordTimings && hasMissingWordTimings),
     });

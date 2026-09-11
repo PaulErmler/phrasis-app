@@ -1,5 +1,7 @@
 'use client';
 
+import { glossLanguageFor } from '@/lib/languages';
+import { annotationDisplayByLanguage } from '@/lib/annotationDisplay';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useMutation, useQuery } from 'convex/react';
@@ -549,6 +551,19 @@ export function LearningMode({
     showRomanization: state.courseSettings.showRomanization ?? true,
     showIpa: state.courseSettings.showIpa ?? false,
     showFurigana: resolveShowFurigana(state.courseSettings),
+    // Per-language overrides of those three plus the word-for-word gloss.
+    // Resolved once per render for every course language; the card surfaces
+    // index it by the line's own language.
+    annotationDisplay: annotationDisplayByLanguage(
+      state.courseSettings,
+      [...state.baseLanguages, ...state.targetLanguages],
+      {
+        language: glossLanguageFor({ baseLanguages: state.baseLanguages }),
+        // Target languages only, the same set the sweep generates for. A base
+        // line resolving to "show a gloss" would wait on one nobody makes.
+        appliesTo: state.targetLanguages,
+      },
+    ),
     onMaster: state.handleMaster,
     onHide: state.handleHide,
     onFavorite: state.handleFavorite,

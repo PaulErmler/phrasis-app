@@ -1,5 +1,10 @@
 'use client';
 
+import {
+  annotationLineProps,
+  showFuriganaFor,
+  type AnnotationDisplay,
+} from '@/lib/annotationDisplay';
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { AudioButton } from './AudioButton';
 import { CardShell } from './CardShell';
@@ -63,6 +68,7 @@ export function LearningCardContent({
     onAudioPlay,
     showRomanization = true,
     showIpa = false,
+    annotationDisplay,
     showFurigana = true,
     mergedPlayback,
     audioSpeedOverrides,
@@ -203,78 +209,106 @@ export function LearningCardContent({
                   DEFAULT_PLAYBACK_SPEED);
               const effectiveSpeed = override ?? generalSpeed;
               return (
+                // The annotation lines sit BELOW this row, not inside the
+                // text column, so the word-mapping control on their right
+                // reaches the card's edge instead of stopping where the
+                // audio controls begin. Same shape as CardShell's base rows.
                 <div
                   key={translation.language}
-                  className="flex items-start gap-2"
                   {...(index === 0
                     ? { 'data-tutorial': TUTORIAL_ANCHORS.targetTextAudio }
                     : {})}
                 >
+                  <div className="flex items-start gap-2">
+                    <div
+                      className="flex-1"
+                      onClick={
+                        isBlurred
+                          ? () => handleReveal(translation.language)
+                          : undefined
+                      }
+                    >
+                      <ClickableWords
+                        text={translation.text || '...'}
+                        language={translation.language}
+                        wordTimings={audio?.wordTimings ?? null}
+                        localTime={activeClip?.localTime ?? 0}
+                        clockBinding={isActive ? clockBinding : undefined}
+                        isActive={!!isActive}
+                        enabled={highlightEnabled}
+                        furigana={
+                          showFuriganaFor(
+                            annotationDisplay,
+                            translation.language,
+                            showFurigana,
+                          )
+                            ? translation.furigana
+                            : undefined
+                        }
+                        interactive={!isBlurred}
+                        className={`${compact ? 'text-base leading-relaxed' : 'body-large'} ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
+                        // Onboarding's word-tap tutorial targets the longest
+                        // target-language word via this data attribute.
+                        coachmarkAnchorForLongestWord={
+                          index === 0 ? COACHMARK_ANCHORS.wordTap : undefined
+                        }
+                      />
+                    </div>
+                    <div className="flex items-center">
+                      <AudioButton
+                        url={audio?.url ?? null}
+                        language={translation.language}
+                        onPlay={onAudioPlay}
+                        onTimeUpdate={buttonPlayback.onTimeUpdate}
+                        onStop={buttonPlayback.onStop}
+                        speed={effectiveSpeed}
+                        playSignal={ipaPlay.signalFor(
+                          translation.language,
+                          index === 0 ? replayTargetSignal : undefined,
+                        )}
+                      />
+                      {onSpeedCycle && (
+                        <CardSpeedBadge
+                          override={override ?? null}
+                          generalSpeed={generalSpeed}
+                          onCycle={(next) =>
+                            onSpeedCycle(translation.language, next)
+                          }
+                          variant={speedBadgeVariant}
+                        />
+                      )}
+                    </div>
+                  </div>
+                  {/* Keeps the tap-to-reveal target the annotations had while
+                      they lived inside the text column above. */}
                   <div
-                    className="flex-1"
                     onClick={
                       isBlurred
                         ? () => handleReveal(translation.language)
                         : undefined
                     }
                   >
-                    <ClickableWords
-                      text={translation.text || '...'}
-                      language={translation.language}
-                      wordTimings={audio?.wordTimings ?? null}
-                      localTime={activeClip?.localTime ?? 0}
-                      clockBinding={isActive ? clockBinding : undefined}
-                      isActive={!!isActive}
-                      enabled={highlightEnabled}
-                      furigana={showFurigana ? translation.furigana : undefined}
-                      interactive={!isBlurred}
-                      className={`${compact ? 'text-base leading-relaxed' : 'body-large'} ${isBlurred ? 'blur-sm select-none cursor-pointer' : 'transition-[filter] duration-300'}`}
-                      // Onboarding's word-tap tutorial targets the longest
-                      // target-language word via this data attribute.
-                      coachmarkAnchorForLongestWord={
-                        index === 0 ? COACHMARK_ANCHORS.wordTap : undefined
-                      }
-                    />
                     <AnnotationLines
+                      text={translation.text}
+                      language={translation.language}
                       romanization={translation.romanization}
+                      hyperliteral={translation.hyperliteral}
                       ipa={translation.ipa}
-                      showRomanization={showRomanization}
-                      showIpa={showIpa}
+                      {...annotationLineProps(
+                        annotationDisplay,
+                        translation.language,
+                        {
+                          showRomanization,
+                          showIpa,
+                        },
+                      )}
                       className={
                         isBlurred
                           ? 'blur-sm select-none cursor-pointer'
                           : 'transition-[filter] duration-300'
                       }
-                      onIpaClick={
-                        isBlurred
-                          ? undefined
-                          : () => ipaPlay.bump(translation.language)
-                      }
+                      interactive={!isBlurred}
                     />
-                  </div>
-                  <div className="flex items-center">
-                    <AudioButton
-                      url={audio?.url ?? null}
-                      language={translation.language}
-                      onPlay={onAudioPlay}
-                      onTimeUpdate={buttonPlayback.onTimeUpdate}
-                      onStop={buttonPlayback.onStop}
-                      speed={effectiveSpeed}
-                      playSignal={ipaPlay.signalFor(
-                        translation.language,
-                        index === 0 ? replayTargetSignal : undefined,
-                      )}
-                    />
-                    {onSpeedCycle && (
-                      <CardSpeedBadge
-                        override={override ?? null}
-                        generalSpeed={generalSpeed}
-                        onCycle={(next) =>
-                          onSpeedCycle(translation.language, next)
-                        }
-                        variant={speedBadgeVariant}
-                      />
-                    )}
                   </div>
                 </div>
               );

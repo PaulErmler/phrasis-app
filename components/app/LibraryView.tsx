@@ -1,5 +1,6 @@
 'use client';
 
+import { annotationDisplayFromSettings } from '@/lib/annotationDisplay';
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useTranslations } from 'next-intl';
 import { useQuery, useMutation, usePreloadedQuery } from 'convex/react';
@@ -498,6 +499,12 @@ export function LibraryView({
                     flaggedInSession: cardActions.flaggedCardIds.has(card._id),
                     showIpa: courseSettings?.showIpa === true,
                     showFurigana: resolveShowFurigana(courseSettings),
+                    // Built from the card's own languages: the library has
+                    // course settings but not the course's language lists.
+                    annotationDisplay: annotationDisplayFromSettings(
+                      courseSettings,
+                      card.translations.map((tr) => tr.language),
+                    ),
                     onMaster: () => handleMaster(card, isMastered),
                     onHide: () => handleHide(card, isHidden),
                     onFavorite: () => handleFavorite(card._id),

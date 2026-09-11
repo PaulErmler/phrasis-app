@@ -1,0 +1,1827 @@
+{
+ "language": "hu",
+ "curatedAt": "2026-09-11",
+ "notes": "GlossLM only, same reason and same de-segmentation as Finnish.",
+ "items": [
+  {
+   "text": "A fiú eszik.",
+   "lexical": [
+    "the",
+    "boy",
+    "eats"
+   ],
+   "glossRaw": "The boy eats.",
+   "free": "The boy eats.",
+   "source": "en.wikipedia/Accusative_case",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Accusative_case"
+  },
+  {
+   "text": "A fiú eszik egy almát.",
+   "lexical": [
+    "the",
+    "boy",
+    "eats",
+    null,
+    "apple"
+   ],
+   "glossRaw": "The boy eats an apple.ACC.",
+   "free": "The boy eats an apple.",
+   "source": "en.wikipedia/Accusative_case",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Accusative_case"
+  },
+  {
+   "text": "olvasok egy könyvet",
+   "lexical": [
+    "read",
+    "a",
+    "book"
+   ],
+   "glossRaw": "read-1SG.PRES.INDEF a book-ACC.SG",
+   "free": "I read a book",
+   "source": "en.wikipedia/Definiteness",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Definiteness"
+  },
+  {
+   "text": "olvasom a könyvet",
+   "lexical": [
+    "read",
+    "the",
+    "book"
+   ],
+   "glossRaw": "read-1SG.PRES.DEF the book-ACC.SG",
+   "free": "I read the book",
+   "source": "en.wikipedia/Definiteness",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Definiteness"
+  },
+  {
+   "text": "a ház magas",
+   "lexical": [
+    "the",
+    "house",
+    "high"
+   ],
+   "glossRaw": "the house high",
+   "free": "the house is high",
+   "source": "en.wikipedia/Nominal_sentence",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Nominal_sentence"
+  },
+  {
+   "text": "ház -a -i -tok -ban",
+   "lexical": [
+    "house",
+    "of",
+    null,
+    "your",
+    "in"
+   ],
+   "glossRaw": "house POSS PL your.PL in",
+   "free": "In your houses",
+   "source": "en.wikipedia/Synthetic_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Synthetic_language"
+  },
+  {
+   "text": "A labda a fa mögött van",
+   "lexical": [
+    "the",
+    "ball",
+    "the",
+    "tree",
+    "behind",
+    "be"
+   ],
+   "glossRaw": "DEF ball DEF tree behind be.PRS.3SG",
+   "free": "The ball is behind the tree",
+   "transcriptionRaw": "A labda a fa mögött van",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "A kutya megharapta a fiút és elfutott",
+   "lexical": [
+    "the",
+    "dog",
+    "bite",
+    "the",
+    "boy",
+    "and",
+    "run"
+   ],
+   "glossRaw": "DEF dog PRV-bite-PST.OC DEF boy-ACC and PRV-run-PST.3SG",
+   "free": "The dog bit the boy and run away",
+   "transcriptionRaw": "A kutya meg-harap-ta a fiú-t és el-fut-ott",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Holnap elmegyek a boltba",
+   "lexical": [
+    "tomorrow",
+    "go",
+    "the",
+    "shop"
+   ],
+   "glossRaw": "tomorrow PRV-go-PRS.1SG DEF shop-ILL",
+   "free": "Tomorrow I will go to the shop",
+   "transcriptionRaw": "Holnap el-megy-ek a bolt-ba",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Elmennék a boltba, ha nem esne az eső",
+   "lexical": [
+    "go",
+    "the",
+    "shop",
+    "if",
+    "not",
+    "fall",
+    "the",
+    "rain"
+   ],
+   "glossRaw": "PRV-go-COND-1SG DEF shop-ILL if NEG fall-COND.3SG DEF rain",
+   "free": "I would go to the shop, if it did not rain",
+   "transcriptionRaw": "El-men-né-k a bolt-ba , ha nem es-ne az eső",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ha reggeliztem volna, nem lennék most éhes",
+   "lexical": [
+    "if",
+    "eat-breakfast",
+    "be",
+    "not",
+    "be",
+    "now",
+    "hungry"
+   ],
+   "glossRaw": "If eat.breakfast-PST-1SG be.PST-COND NEG be.PRS-COND-1SG now hungry",
+   "free": "If I would have eaten breakfast, I would not be hungry now",
+   "transcriptionRaw": "Ha reggeliz-te-m vol-na , nem len-né-k most éhes",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Azt mondta, hogy menjek el",
+   "lexical": [
+    "that",
+    "say",
+    "that",
+    "go",
+    null
+   ],
+   "glossRaw": "that-ACC say-PST.3SG.OC that go-IMP-1SG PRV",
+   "free": "S/he said to me to go away",
+   "transcriptionRaw": "Az-t mond-ta , hogy men-j-ek el",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Azt akarja, hogy énekeljek",
+   "lexical": [
+    "that",
+    "want",
+    "that",
+    "sing"
+   ],
+   "glossRaw": "that-ACC want-PRS.3SG.OC that sing-IMP-1SG",
+   "free": "S/he wants me to sing",
+   "transcriptionRaw": "Az-t akar-ja , hogy énekel-j-ek",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Itt beszélnek magyarul",
+   "lexical": [
+    "here",
+    "speak",
+    "hungarian"
+   ],
+   "glossRaw": "here speak-PRS.3PL Hungarian-ESS",
+   "free": "Hungarian is spoken here / One can speak Hungarian here",
+   "transcriptionRaw": "Itt beszél-nek magyar-ul",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Itt nem sátorozhatsz",
+   "lexical": [
+    "here",
+    "not",
+    "tent"
+   ],
+   "glossRaw": "here NEG tent-VBZ-POT-PRS.2SG",
+   "free": "You may not camp here / One may not camp here",
+   "transcriptionRaw": "Itt nem sátor-oz-hat-sz",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Magyarországra megyek magyarul tanulni",
+   "lexical": [
+    "hungary",
+    "go",
+    "hungarian",
+    "study"
+   ],
+   "glossRaw": "Hungary-SUBL go-PRS.1SG Hungarian-ESS study-INF",
+   "free": "I'm going to Hungary to learn Hungarian",
+   "transcriptionRaw": "Magyarország-ra megy-ek magyar-ul tanul-ni",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Nincs otthon kenyér",
+   "lexical": [
+    "not",
+    "home",
+    "bread"
+   ],
+   "glossRaw": "NEG home.LOC bread",
+   "free": "There is no bread at home",
+   "transcriptionRaw": "Nincs otthon kenyér",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Az Anna említette könyv",
+   "lexical": [
+    "the",
+    "anna",
+    "mention",
+    "book"
+   ],
+   "glossRaw": "DEF Anna mention-PTCP-POSS.3SG book",
+   "free": "The book mentioned by Anna",
+   "transcriptionRaw": "Az Anna említ-ett-e könyv",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Kiviszem a tányért",
+   "lexical": [
+    "out-take",
+    "the",
+    "plate"
+   ],
+   "glossRaw": "out-take-PRS.1SG DEF plate-ACC",
+   "free": "I take the plate",
+   "transcriptionRaw": "Ki-viszem a tányért",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "A kutyák okosak",
+   "lexical": [
+    "the",
+    "dog",
+    "smart"
+   ],
+   "glossRaw": "DEF dog-PL smart-PL",
+   "free": "Dogs are smart",
+   "transcriptionRaw": "A kutyák okosak",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Táskátlanul/ruhátlanul mentem az iskolába",
+   "lexical": [
+    "bag-ess/clothes",
+    "go",
+    "the",
+    "school"
+   ],
+   "glossRaw": "bag-PRIV-ESS/clothes-PRIV-ESS go-PST.1SG DEF school-ILL",
+   "free": "I went to school without a bag/without clothes",
+   "transcriptionRaw": "Táskátlanul/ruhátlanul mentem az iskolába",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mosd meg a kezedet",
+   "lexical": [
+    "wash",
+    null,
+    "the",
+    "hand"
+   ],
+   "glossRaw": "wash PRV DEF hand-POSS.2SG-ACC",
+   "free": "Wash your hands",
+   "transcriptionRaw": "Mosd meg a kez-ed-et",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Az ember barátja",
+   "lexical": [
+    "the",
+    "human",
+    "friend"
+   ],
+   "glossRaw": "DEF human friend-POSS.3SG",
+   "free": "friend of man",
+   "transcriptionRaw": "Az ember barát-ja",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mit keres ez itt?",
+   "lexical": [
+    "what",
+    "look-for",
+    "this",
+    "here"
+   ],
+   "glossRaw": "what-ACC look.for.PRS.3SG this here",
+   "free": "What does s/he look for here?",
+   "transcriptionRaw": "Mit keres ez itt ?",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "a Magyar Köztársaság",
+   "lexical": [
+    "the",
+    "hungary",
+    "republic"
+   ],
+   "glossRaw": "DEF.ART Hungary Republic",
+   "free": "the Republic of Hungary",
+   "transcriptionRaw": "a Magyar Köztársaság",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "ez a szoba",
+   "lexical": [
+    "this",
+    "the",
+    "room"
+   ],
+   "glossRaw": "this DEF.ART room.NOM",
+   "free": "this room",
+   "transcriptionRaw": "ez a szoba",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "a gyerekek nem figyeltek a tanárra",
+   "lexical": [
+    "the",
+    "child",
+    "not",
+    "pay-attention",
+    "the",
+    "teacher"
+   ],
+   "glossRaw": "DEF.ART child-PL not pay.attention-PST-3PL.INDF DEF.ART teacher-SUBL",
+   "free": "the children didn’t pay attention to the teacher",
+   "transcriptionRaw": "a gyerek-ek nem figyel-t-ek a tanár-ra",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "a virágok elhervadtak",
+   "lexical": [
+    "the",
+    "flower",
+    "wilt"
+   ],
+   "glossRaw": "DEF.ART flower-PL PFX-wilt-PST-3PL.INDF",
+   "free": "the flowers wilted",
+   "transcriptionRaw": "a virág-ok el-hervad-t-ak",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "a fiúknak van pénze",
+   "lexical": [
+    "the",
+    "boy",
+    "be",
+    "money"
+   ],
+   "glossRaw": "DEF.ART boy-PL-DAT be.3SG money-POSS.3SG",
+   "free": "the boys have money",
+   "transcriptionRaw": "a fiú-k-nak van pénz-e",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "egy autó megállt a házunk előtt",
+   "lexical": [
+    "a",
+    "car",
+    "stop",
+    "the",
+    "house",
+    "front"
+   ],
+   "glossRaw": "INDF.ART car stop-PST.INDF DEF.ART house-POSS.1PL front",
+   "free": "one of the cars has stopped in front of our house",
+   "transcriptionRaw": "egy autó megáll-t a ház-unk előtt",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "János Marit keresi",
+   "lexical": [
+    "john",
+    "mary",
+    "seek"
+   ],
+   "glossRaw": "John Mary-ACC seek-OC",
+   "free": "as for John, it is Mary that he seeks",
+   "transcriptionRaw": "János Mari-t keres-i",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "a fiú, aki beteg volt, nem dolgozik",
+   "lexical": [
+    "the",
+    "boy",
+    "who",
+    "sick",
+    "be",
+    "not",
+    "work"
+   ],
+   "glossRaw": "DEF.ART boy who sick be.PST.3SG not work.3SG",
+   "free": "the boy who was sick is not working",
+   "transcriptionRaw": "a fiú , aki beteg volt , nem dolgozik",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "ez a kalap: ezek a kalapok",
+   "lexical": [
+    "this",
+    "the",
+    "hat",
+    "this",
+    "the",
+    "hat"
+   ],
+   "glossRaw": "this DEF.ART hat: this-PL DEF.ART hat-PL",
+   "free": "this hat: these hats",
+   "transcriptionRaw": "ez a kalap: ez-ek a kalap-ok",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "az idős és sikeres író",
+   "lexical": [
+    "the",
+    "old",
+    "and",
+    "successful",
+    "writer"
+   ],
+   "glossRaw": "DEF.ART old and successful writer",
+   "free": "the old and successful writer",
+   "transcriptionRaw": "az idős és sikeres író",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Péter nem volte betég?",
+   "lexical": [
+    "peter",
+    "not",
+    "be",
+    "sick"
+   ],
+   "glossRaw": "Peter not be.PST.3SG-Q sick",
+   "free": "wasn’t Peter sick?",
+   "transcriptionRaw": "Péter nem volt-e betég ?",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "János magasabb, mint én",
+   "lexical": [
+    "john",
+    "tall",
+    "than",
+    null
+   ],
+   "glossRaw": "John tall-CMPR than 1SG",
+   "free": "John is taller than I",
+   "transcriptionRaw": "János magas-abb , mint én",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Anna nem olvassa a könyvet",
+   "lexical": [
+    "anna",
+    "not",
+    "read",
+    "the",
+    "book"
+   ],
+   "glossRaw": "Anna not read.3SG.OC DEF.ART book-ACC",
+   "free": "Anna is not reading the book",
+   "transcriptionRaw": "Anna nem olvassa a könyv-et",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "egy autó meg volt véve",
+   "lexical": [
+    "a",
+    "car",
+    null,
+    "be",
+    "buy"
+   ],
+   "glossRaw": "INDF.ART car PFX be-PST.3SG buy-CVB",
+   "free": "a car was bought",
+   "transcriptionRaw": "egy autó meg vol-t vé-ve",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "a bankot kirabolták",
+   "lexical": [
+    "the",
+    "bank",
+    "rob"
+   ],
+   "glossRaw": "DEF.ART bank-ACC PFX-rob-PST-3PL.OC",
+   "free": "the bank was robbed",
+   "transcriptionRaw": "a bank-ot ki-rabol-t-ák",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "a fiúk látják magukat",
+   "lexical": [
+    "the",
+    "boy",
+    "see",
+    "self"
+   ],
+   "glossRaw": "DEF.ART boy-PL see-3PL.OC self.POSS.3PL-ACC",
+   "free": "the boys see themselves",
+   "transcriptionRaw": "a fiú-k lát-ják mag-uk-at",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "az a kávé az enyém",
+   "lexical": [
+    "that",
+    "the",
+    "coffee",
+    "the",
+    "mine"
+   ],
+   "glossRaw": "that DEF.ART coffee DEF.ART mine",
+   "free": "that coffee is mine",
+   "transcriptionRaw": "az a kávé az enyém",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "hány könyvet veszel?",
+   "lexical": [
+    "how-many",
+    "book",
+    "buy"
+   ],
+   "glossRaw": "how.many book-ACC buy-2SG",
+   "free": "how many books are you buying?",
+   "transcriptionRaw": "hány könyv-et vesz-el ?",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "az a lány, aki a könyvet olvassa, beteg volt",
+   "lexical": [
+    "that",
+    "the",
+    "girl",
+    "who",
+    "the",
+    "book",
+    "read",
+    "sick",
+    "be"
+   ],
+   "glossRaw": "that DEF.ART girl who DEF.ART book-ACC read.3SG.OC sick be.PST.3SG",
+   "free": "that girl, who’s reading the book, was sick",
+   "transcriptionRaw": "az a lány , aki a könyv-et olvassa , beteg volt",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "milyen könyveket olvasó fiúkkal találkoztál?",
+   "lexical": [
+    "what",
+    "book",
+    "read",
+    "boy",
+    "meet"
+   ],
+   "glossRaw": "what book-PL-ACC read-ACT.PTCP boy-PL.INS meet-PST-2SG",
+   "free": "boys reading what books did you meet?",
+   "transcriptionRaw": "milyen könyv-ek-et olvas-ó fiú-kkal találkoz-t-ál ?",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "a könyvet olvasó lány beteg volt",
+   "lexical": [
+    "the",
+    "book",
+    "read",
+    "girl",
+    "sick",
+    "be"
+   ],
+   "glossRaw": "DEF.ART book-ACC read-ACT.PTCP girl sick be.PST.3SG",
+   "free": "the girl reading a/the book was sick",
+   "transcriptionRaw": "a könyv-et olvas-ó lány beteg volt",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "az a lány beteg volt, aki a könyvet olvassa",
+   "lexical": [
+    "that",
+    "the",
+    "girl",
+    "sick",
+    "be",
+    "who",
+    "the",
+    "book",
+    "read"
+   ],
+   "glossRaw": "that DEF.ART girl sick be.PST.3SG who DEF.ART book-ACC read.3SG.OC",
+   "free": "the girl was sick who’s reading the book",
+   "transcriptionRaw": "az a lány beteg volt , aki a könyv-et olvassa",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Anna tudta azt, hogy Péter beteg",
+   "lexical": [
+    "anna",
+    "know",
+    "it",
+    "that",
+    "peter",
+    "sick"
+   ],
+   "glossRaw": "Anna know-PST-3SG.OC it-ACC that Peter sick",
+   "free": "Anna knew that Peter was sick",
+   "transcriptionRaw": "Anna tud-t-a az-t , hogy Péter beteg",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Péternek a kalapja",
+   "lexical": [
+    "peter",
+    "the",
+    "hat"
+   ],
+   "glossRaw": "Peter.DAT DEF.ART hat-POSS.3SG",
+   "free": "Peter’s hat",
+   "transcriptionRaw": "Péter-nek a kalap-ja",
+   "source": "glosslm/uratyp",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Nekem van könyvem.",
+   "lexical": [
+    "i",
+    "be",
+    "book"
+   ],
+   "glossRaw": "I.DAT be.3SUBJ book.1POSS.NOM",
+   "free": "I have a book.",
+   "transcriptionRaw": "Nekem van könyvem .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Kit gondolsz hogy látta Jánost?",
+   "lexical": [
+    "who",
+    "think",
+    "that",
+    "saw",
+    "john"
+   ],
+   "glossRaw": "who.ACC think.2SG.INDF that saw.3SG.DEF John.ACC",
+   "free": "Who do you think saw John?",
+   "transcriptionRaw": "Kit gondolsz hogy látta Jánost ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "A gyerekek a könyvet ANNÁNAK adták.",
+   "lexical": [
+    "the",
+    "children",
+    "the",
+    "book",
+    "anna",
+    "give"
+   ],
+   "glossRaw": "the children.NOM the book.ACC Anna.DAT give.PAS.3PL",
+   "free": "As for the children, they gave the book to ANNA.",
+   "transcriptionRaw": "A gyerekek a könyvet ANNÁNAK adták .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Jövő héten, érmet nyerhet.",
+   "lexical": [
+    "next",
+    "week",
+    "medal",
+    "win"
+   ],
+   "glossRaw": "next week.SUP medal.ACC win.POSS.3S",
+   "free": "Next week she can win a medal.",
+   "transcriptionRaw": "Jövő héten , érmet nyerhet .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ursát VALINAK muttatuk be.",
+   "lexical": [
+    "ursa",
+    "vali",
+    "introduce-pas",
+    "particle"
+   ],
+   "glossRaw": "Ursa-acc Vali-dat introduce-pas-1pl part",
+   "free": "We introduced Ursa to VALI.",
+   "transcriptionRaw": "Ursát VALINAK muttatuk be .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "√Péter Lundba jár egyetemre.",
+   "lexical": [
+    "peter",
+    "lund",
+    "go",
+    "university"
+   ],
+   "glossRaw": "Peter.NOM Lund.ILLAT go.3S university.SUBL",
+   "free": "(As for) Peter, he goes to university in Lund.",
+   "transcriptionRaw": "√Péter Lundba jár egyetemre .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "ZORÁVAL beszéltem, nem Adával.",
+   "lexical": [
+    "zora",
+    "speak",
+    "not",
+    "ada"
+   ],
+   "glossRaw": "Zora.INSTR speak.PAS.1S NEG Ada.INSTR",
+   "free": "I spoke with ZORA, not with Ada.",
+   "transcriptionRaw": "ZORÁVAL beszéltem , nem Adával .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Hol jártál a nyáron?",
+   "lexical": [
+    "where",
+    "went",
+    "the",
+    "summer-in"
+   ],
+   "glossRaw": "where went.2SG the summer.in",
+   "free": "Where did you go in the summer?",
+   "transcriptionRaw": "Hol jártál a nyáron ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "János újságot olvas.",
+   "lexical": [
+    "john",
+    "newspaper",
+    "reads"
+   ],
+   "glossRaw": "John newspaper-ACC reads",
+   "free": "John is engaged in newspaper-reading.",
+   "transcriptionRaw": "János újságo-t olvas .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Énekelni, énekelt Mari.",
+   "lexical": [
+    "to-sing",
+    "sang",
+    "mari"
+   ],
+   "glossRaw": "to.sing sang.3SG Mari",
+   "free": "As far as singing is concerned, Mari did sing yesterday.",
+   "transcriptionRaw": "Énekelni , énekelt Mari .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Olvasni azt hiszem hogy olvasott.",
+   "lexical": [
+    "to-read",
+    "that",
+    "think",
+    "that",
+    "read"
+   ],
+   "glossRaw": "to.read that.ACC think.1SG that read.PST.2SG",
+   "free": "As for reading, I think he read.",
+   "transcriptionRaw": "Olvasni azt hiszem hogy olvasott .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Olvasni tudom, hogy olvasott.",
+   "lexical": [
+    "to-read",
+    "know",
+    "that",
+    "read"
+   ],
+   "glossRaw": "to.read know.1SG that read.PST.2SG",
+   "free": "As for reading, I know he read.",
+   "transcriptionRaw": "Olvasni tudom , hogy olvasott .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "a szomszéd kertje",
+   "lexical": [
+    null,
+    "neighbour",
+    "garden"
+   ],
+   "glossRaw": "DEFF neighbour garden-3SG.POSS",
+   "free": "the neighbour’s garden",
+   "transcriptionRaw": "a szomszéd kert-je",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Twétaaga akakadde kamú okumála énnyúmba.",
+   "lexical": [
+    "need",
+    "million",
+    "one",
+    "finish",
+    "house"
+   ],
+   "glossRaw": "1PL.SM-need 12A-12PX-million 12-one 15A-15PX-finish 9A-9.house",
+   "free": "We need (at least) one million to finish the house.",
+   "transcriptionRaw": "Tw-étaaga a-ka-kadde ka-mú o-ku-mála é-nnyúmba .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Twétaaga kakadde kamú okumála énnyúmba.",
+   "lexical": [
+    "need",
+    "million",
+    "one",
+    "finish",
+    "house"
+   ],
+   "glossRaw": "1PL.SM-need 12PX-million 12-one 15A-15PX-finish 9A-9.house",
+   "free": "We need (exactly) one million to finish the house.’",
+   "transcriptionRaw": "Tw-é-taaga ka-kadde ka-mú o-ku-mála é-nnyúmba .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb Zsuzsánál.",
+   "lexical": [
+    "mary",
+    "taller",
+    "susan"
+   ],
+   "glossRaw": "Mary taller Susan.ADE",
+   "free": "Mary is taller than Susan.",
+   "transcriptionRaw": "Mari magasabb Zsuzsánál .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb, mint amilyen magas Péter.",
+   "lexical": [
+    "mary",
+    "taller",
+    "than",
+    "how",
+    "tall",
+    "peter"
+   ],
+   "glossRaw": "Mary taller than how tall Peter",
+   "free": "Mary is taller than Peter.",
+   "transcriptionRaw": "Mari magasabb , mint amilyen magas Péter .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Marinak több macskája van, mint ahány macskája Péternek van.",
+   "lexical": [
+    "mary",
+    "more",
+    "cat",
+    "is",
+    "than",
+    "how-many",
+    "cat",
+    "peter",
+    "is"
+   ],
+   "glossRaw": "Mary.DAT more cat.POSS.3SG is than how.many cat.POSS.3SG Peter.DAT is",
+   "free": "Mary has more cats than Peter has.",
+   "transcriptionRaw": "Marinak több macskája van , mint ahány macskája Péternek van .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Marinak nagyobb macskája van, mint amilyen nagy macskája Péternek van.",
+   "lexical": [
+    "mary",
+    "bigger",
+    "cat",
+    "is",
+    "than",
+    "how",
+    "big",
+    "cat",
+    "peter",
+    "is"
+   ],
+   "glossRaw": "Mary.DAT bigger cat.POSS.3SG is than how big cat.POSS.3SG Peter.DAT is",
+   "free": "Mary has a bigger cat than Peter has.",
+   "transcriptionRaw": "Marinak nagyobb macskája van , mint amilyen nagy macskája Péternek van .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb, mint amilyen Péter magas.",
+   "lexical": [
+    "mary",
+    "taller",
+    "than",
+    "how",
+    "peter",
+    "tall"
+   ],
+   "glossRaw": "Mary taller than how Peter tall",
+   "free": "Mary is taller than Peter.",
+   "transcriptionRaw": "Mari magasabb , mint amilyen Péter magas .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb, mint amennyire magas Péter.",
+   "lexical": [
+    "mary",
+    "taller",
+    "than",
+    "how-much",
+    "tall",
+    "peter"
+   ],
+   "glossRaw": "Mary taller than how.much tall Peter",
+   "free": "Mary is taller than Peter.",
+   "transcriptionRaw": "Mari magasabb , mint amennyire magas Péter .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb, mint amennyire Péter magas.",
+   "lexical": [
+    "mary",
+    "taller",
+    "than",
+    "how-much",
+    "peter",
+    "tall"
+   ],
+   "glossRaw": "Mary taller than how.much Peter tall",
+   "free": "Mary is taller than Peter.",
+   "transcriptionRaw": "Mari magasabb , mint amennyire Péter magas .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Rudolf nagyobb macskát vett, mint amilyen széles macskaajtót Miklós vett.",
+   "lexical": [
+    "rudolph",
+    "bigger",
+    "cat",
+    "bought",
+    "than",
+    "how",
+    "wide",
+    "cat-flap",
+    "mike",
+    "bought"
+   ],
+   "glossRaw": "Rudolph bigger cat.ACC bought.3SG than how wide cat.flap.ACC Mike bought.3SG",
+   "free": "Rudolph bought a bigger cat then Mike did a cat flap.",
+   "transcriptionRaw": "Rudolf nagyobb macskát vett , mint amilyen széles macskaajtót Miklós vett .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb volt, mint amilyen magas Péter volt.",
+   "lexical": [
+    "mary",
+    "taller",
+    "was",
+    "than",
+    "how",
+    "tall",
+    "peter",
+    "was"
+   ],
+   "glossRaw": "Mary taller was.3SG than how tall Peter was.3SG",
+   "free": "Mary was taller than Peter.",
+   "transcriptionRaw": "Mari magasabb volt , mint amilyen magas Péter volt .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb volt, mint Péter.",
+   "lexical": [
+    "mary",
+    "taller",
+    "was",
+    "than",
+    "peter"
+   ],
+   "glossRaw": "Mary taller was.3SG than Peter",
+   "free": "Mary was taller than Peter.",
+   "transcriptionRaw": "Mari magasabb volt , mint Péter .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari több macskát vett, mint ahány macskát Péter vett.",
+   "lexical": [
+    "mary",
+    "more",
+    "cat",
+    "bought",
+    "than",
+    "how-many",
+    "cat",
+    "peter",
+    "bought"
+   ],
+   "glossRaw": "Mary more cat.ACC bought.3SG than how.many cat.ACC Peter bought.3SG",
+   "free": "Mary bought more cats than Peter did.",
+   "transcriptionRaw": "Mari több macskát vett , mint ahány macskát Péter vett .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari több macskát vett, mint Péter.",
+   "lexical": [
+    "mary",
+    "more",
+    "cat",
+    "bought",
+    "than",
+    "peter"
+   ],
+   "glossRaw": "Mary more cat.ACC bought.3SG than Peter",
+   "free": "Mary bought more cats than Peter did.",
+   "transcriptionRaw": "Mari több macskát vett , mint Péter .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ez az elmélet a jó.",
+   "lexical": [
+    "this",
+    "the",
+    "theory",
+    "the",
+    "good"
+   ],
+   "glossRaw": "this the theory the good",
+   "free": "This theory is the good one.",
+   "transcriptionRaw": "Ez az elmélet a jó .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ez az elmélet a jobb.",
+   "lexical": [
+    "this",
+    "the",
+    "theory",
+    "the",
+    "better"
+   ],
+   "glossRaw": "this the theory the better",
+   "free": "This theory is the better one.",
+   "transcriptionRaw": "Ez az elmélet a jobb .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ez az elmélet a legjobb.",
+   "lexical": [
+    "this",
+    "the",
+    "theory",
+    "the",
+    "best"
+   ],
+   "glossRaw": "this the theory the best",
+   "free": "This theory is the best one.",
+   "transcriptionRaw": "Ez az elmélet a legjobb .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ez az elmélet jó.",
+   "lexical": [
+    "this",
+    "the",
+    "theory",
+    "good"
+   ],
+   "glossRaw": "this the theory good",
+   "free": "This theory is good.",
+   "transcriptionRaw": "Ez az elmélet jó .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ez az elmélet jobb.",
+   "lexical": [
+    "this",
+    "the",
+    "theory",
+    "better"
+   ],
+   "glossRaw": "this the theory better",
+   "free": "This theory is better.",
+   "transcriptionRaw": "Ez az elmélet jobb .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ez az elmélet legjobb.",
+   "lexical": [
+    "this",
+    "the",
+    "theory",
+    "best"
+   ],
+   "glossRaw": "this the theory best",
+   "free": "This theory is the best.",
+   "transcriptionRaw": "Ez az elmélet legjobb .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "a mögötti létra",
+   "lexical": [
+    "the",
+    "behind",
+    "ladder"
+   ],
+   "glossRaw": "the behind-AFF ladder",
+   "free": "the ladder behind",
+   "transcriptionRaw": "a mögött-i létra",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Az asztal hosszabb, mint amilyen széles az iroda.",
+   "lexical": [
+    "the",
+    "table",
+    "longer",
+    "than",
+    "how",
+    "wide",
+    "the",
+    "office"
+   ],
+   "glossRaw": "the table longer than how wide the office",
+   "free": "The table is longer than the office is wide.",
+   "transcriptionRaw": "Az asztal hosszabb , mint amilyen széles az iroda .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb, mint amilyen magas Péter volt.",
+   "lexical": [
+    "mary",
+    "taller",
+    "than",
+    "how",
+    "tall",
+    "peter",
+    "was"
+   ],
+   "glossRaw": "Mary taller than how tall Peter was.3SG",
+   "free": "Mary is taller than Peter was.",
+   "transcriptionRaw": "Mari magasabb , mint amilyen magas Péter volt .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb, mint amilyen Péter volt magas.",
+   "lexical": [
+    "mary",
+    "taller",
+    "than",
+    "how",
+    "peter",
+    "was",
+    "tall"
+   ],
+   "glossRaw": "Mary taller than how Peter was.3SG tall",
+   "free": "Mary is taller than Peter was.",
+   "transcriptionRaw": "Mari magasabb , mint amilyen Péter volt magas .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb, mint amennyire magas Péter volt.",
+   "lexical": [
+    "mary",
+    "taller",
+    "than",
+    "how-much",
+    "tall",
+    "peter",
+    "was"
+   ],
+   "glossRaw": "Mary taller than how.much tall Peter was.3SG",
+   "free": "Mary is taller than Peter was.",
+   "transcriptionRaw": "Mari magasabb , mint amennyire magas Péter volt .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb, mint amennyire Péter volt magas.",
+   "lexical": [
+    "mary",
+    "taller",
+    "than",
+    "how-much",
+    "peter",
+    "was",
+    "tall"
+   ],
+   "glossRaw": "Mary taller than how.much Peter was.3SG tall",
+   "free": "Mary is taller than Peter was.",
+   "transcriptionRaw": "Mari magasabb , mint amennyire Péter volt magas .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb, mint magas Péter volt.",
+   "lexical": [
+    "mary",
+    "taller",
+    "than",
+    "tall",
+    "peter",
+    "was"
+   ],
+   "glossRaw": "Mary taller than tall Peter was.3SG",
+   "free": "Mary is taller than Peter was.",
+   "transcriptionRaw": "Mari magasabb , mint magas Péter volt .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb, mint Péter volt magas.",
+   "lexical": [
+    "mary",
+    "taller",
+    "than",
+    "peter",
+    "was",
+    "tall"
+   ],
+   "glossRaw": "Mary taller than Peter was.3SG tall",
+   "free": "Mary is taller than Peter was.",
+   "transcriptionRaw": "Mari magasabb , mint Péter volt magas .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Az asztal hosszabb, mint amilyen az iroda széles.",
+   "lexical": [
+    "the",
+    "desk",
+    "longer",
+    "than",
+    "how",
+    "the",
+    "office",
+    "wide"
+   ],
+   "glossRaw": "the desk longer than how the office wide",
+   "free": "The desk is longer than the office is wide.",
+   "transcriptionRaw": "Az asztal hosszabb , mint amilyen az iroda széles .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Milyen magas volt Péter?",
+   "lexical": [
+    "how",
+    "tall",
+    "was",
+    "peter"
+   ],
+   "glossRaw": "how tall was.3SG Peter",
+   "free": "How tall was Peter?",
+   "transcriptionRaw": "Milyen magas volt Péter ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Milyen volt Péter magas?",
+   "lexical": [
+    "how",
+    "was",
+    "peter",
+    "tall"
+   ],
+   "glossRaw": "how was.3SG Peter tall",
+   "free": "How tall was Peter?",
+   "transcriptionRaw": "Milyen volt Péter magas ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mennyire magas volt Péter?",
+   "lexical": [
+    "how-much",
+    "tall",
+    "was",
+    "peter"
+   ],
+   "glossRaw": "how.much tall was.3SG Peter",
+   "free": "How tall was Peter?",
+   "transcriptionRaw": "Mennyire magas volt Péter ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mennyire volt Péter magas?",
+   "lexical": [
+    "how-much",
+    "was",
+    "peter",
+    "tall"
+   ],
+   "glossRaw": "how.much was.3SG Peter tall",
+   "free": "How tall was Peter?",
+   "transcriptionRaw": "Mennyire volt Péter magas ?",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb, mint amennyire Péter magas volt.",
+   "lexical": [
+    "mary",
+    "taller",
+    "than",
+    "how-much",
+    "peter",
+    "tall",
+    "was"
+   ],
+   "glossRaw": "Mary taller than how.much Peter tall was.3SG",
+   "free": "Mary is taller than Peter was.",
+   "transcriptionRaw": "Mari magasabb , mint amennyire Péter magas volt .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "A macska kövérebb, mint amennyire széles a macskaajtó volt.",
+   "lexical": [
+    "the",
+    "cat",
+    "fatter",
+    "than",
+    "how-much",
+    "wide",
+    "the",
+    "cat-flap",
+    "was"
+   ],
+   "glossRaw": "the cat fatter than how.much wide the cat.flap was.3SG",
+   "free": "The cat is fatter than the cat flap was wide.",
+   "transcriptionRaw": "A macska kövérebb , mint amennyire széles a macskaajtó volt .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari magasabb, mint amilyen magas Gyuri volt.",
+   "lexical": [
+    "mary",
+    "taller",
+    "than",
+    "how",
+    "tall",
+    "george",
+    "was"
+   ],
+   "glossRaw": "Mary taller than how tall George was.3SG",
+   "free": "Mary is taller than George was.",
+   "transcriptionRaw": "Mari magasabb , mint amilyen magas Gyuri volt .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari nagyobb macskákat vett, mint amilyen nagy macskákat Gyuri látott.",
+   "lexical": [
+    "mary",
+    "bigger",
+    "cats",
+    "bought",
+    "than",
+    "how",
+    "big",
+    "cats",
+    "george",
+    "saw"
+   ],
+   "glossRaw": "Mary bigger cats.ACC bought.3SG than how big cats.ACC George saw.3SG",
+   "free": "Mary bought bigger cats than George saw.",
+   "transcriptionRaw": "Mari nagyobb macskákat vett , mint amilyen nagy macskákat Gyuri látott .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Leégett a gyár, amely esemény megmozgatta a várost.",
+   "lexical": [
+    "down-burned",
+    "the",
+    "factory",
+    "which",
+    "event",
+    "moved",
+    "the",
+    "city"
+   ],
+   "glossRaw": "down.burned.3SG the factory which event PRT.moved.3SG the city.ACC",
+   "free": "The factory burned down, which moved the city.",
+   "transcriptionRaw": "Leégett a gyár , amely esemény megmozgatta a várost .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Mari Judith Hermann könyvét olvasta, amelyet egyébként még én küldtem neki Berlinből.",
+   "lexical": [
+    "mary",
+    "judith",
+    "hermann",
+    "book",
+    "read",
+    "which",
+    "incidentally",
+    "still",
+    "i",
+    "sent",
+    "she",
+    "berlin"
+   ],
+   "glossRaw": "Mary Judith Hermann book.POSS.ACC read.PST.3SG which.ACC incidentally still I sent.1SG she.DAT Berlin.ELA",
+   "free": "Mary was reading Judith Hermann's book, which actually I had sent her from Berlin.",
+   "transcriptionRaw": "Mari Judith Hermann könyvét olvasta , amelyet egyébként még én küldtem neki Berlinből .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Leégett a gyár, ami megmozgatta a várost.",
+   "lexical": [
+    "down-burned",
+    "the",
+    "factory",
+    "what",
+    "moved",
+    "the",
+    "city"
+   ],
+   "glossRaw": "down.burned.3SG the factory what PRT.moved.3SG the city.ACC",
+   "free": "The factory burned down, which moved the city.",
+   "transcriptionRaw": "Leégett a gyár , ami megmozgatta a várost .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Leégett a gyár, ez az esemény megmozgatta a várost.",
+   "lexical": [
+    "down-burned",
+    "the",
+    "factory",
+    "this",
+    "the",
+    "event",
+    "moved",
+    "the",
+    "city"
+   ],
+   "glossRaw": "down.burned.3SG the factory this the event PRT.moved.3SG the city.ACC",
+   "free": "The factory burned down; this event moved the city.",
+   "transcriptionRaw": "Leégett a gyár , ez az esemény megmozgatta a várost .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ugyanazt a könyvet olvasom, mint amit Péter olvas.",
+   "lexical": [
+    "that-same",
+    "the",
+    "book",
+    "read",
+    "as",
+    "what",
+    "peter",
+    "reads"
+   ],
+   "glossRaw": "that.same.ACC the book.ACC read.1SG as what.ACC Peter reads",
+   "free": "I am reading the same book that Peter is reading.",
+   "transcriptionRaw": "Ugyanazt a könyvet olvasom , mint amit Péter olvas .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ugyanazt a könyvet olvasom, mint amit Péter.",
+   "lexical": [
+    "that-same",
+    "the",
+    "book",
+    "read",
+    "as",
+    "what",
+    "peter"
+   ],
+   "glossRaw": "that.same.ACC the book.ACC read.1SG as what.ACC Peter",
+   "free": "I am reading the same book that Peter is reading.",
+   "transcriptionRaw": "Ugyanazt a könyvet olvasom , mint amit Péter .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ugyanazt a könyvet olvasom, mint Péter olvas.",
+   "lexical": [
+    "that-same",
+    "the",
+    "book",
+    "read",
+    "as",
+    "peter",
+    "reads"
+   ],
+   "glossRaw": "that.same.ACC the book.ACC read.1SG as Peter reads",
+   "free": "I am reading the same book that Peter is reading.",
+   "transcriptionRaw": "Ugyanazt a könyvet olvasom , mint Péter olvas .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Ugyanazt a könyvet olvasom, mint Péter.",
+   "lexical": [
+    "that-same",
+    "the",
+    "book",
+    "read",
+    "as",
+    "peter"
+   ],
+   "glossRaw": "that.same.ACC the book.ACC read.1SG as Peter",
+   "free": "I am reading the same book that Peter is reading.",
+   "transcriptionRaw": "Ugyanazt a könyvet olvasom , mint Péter .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Nagyobb macskát vettem ma, mint amekkorát láttam tegnap.",
+   "lexical": [
+    "bigger",
+    "cat",
+    "bought",
+    "today",
+    "than",
+    "how-big",
+    "saw",
+    "yesterday"
+   ],
+   "glossRaw": "bigger cat.ACC bought.1SG today than how.big.ACC saw.1SG yesterday",
+   "free": "I bought a bigger cat today than the one I saw yesterday.",
+   "transcriptionRaw": "Nagyobb macskát vettem ma , mint amekkorát láttam tegnap .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Nagyobb macskát vettem ma, mint amekkorát vettem tegnap.",
+   "lexical": [
+    "bigger",
+    "cat",
+    "bought",
+    "today",
+    "than",
+    "how-big",
+    "bought",
+    "yesterday"
+   ],
+   "glossRaw": "bigger cat.ACC bought.1SG today than how.big.ACC bought.1SG yesterday",
+   "free": "I bought a bigger cat today than yesterday.",
+   "transcriptionRaw": "Nagyobb macskát vettem ma , mint amekkorát vettem tegnap .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "az összes diák",
+   "lexical": [
+    "the",
+    null,
+    "student"
+   ],
+   "glossRaw": "the all student",
+   "free": "all the students",
+   "transcriptionRaw": "az összes diák",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "utálsz be jönni",
+   "lexical": [
+    "hate",
+    "in",
+    "come"
+   ],
+   "glossRaw": "hate-2SG in come-INF",
+   "free": "you hate to come in",
+   "transcriptionRaw": "utál-sz be jön-ni",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "be fog kelleni tudni jönni",
+   "lexical": [
+    "in",
+    "will",
+    "must",
+    "be-able",
+    "come"
+   ],
+   "glossRaw": "in will must-INF be.able-INF come-INF",
+   "free": "it will be necessary to be able to come in",
+   "transcriptionRaw": "be fog kell-eni tud-ni jön-ni",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "be fog tudni kelleni jönni",
+   "lexical": [
+    "in",
+    "will",
+    "be-able",
+    "must",
+    "come"
+   ],
+   "glossRaw": "in will be.able-INF must-INF come-INF",
+   "free": "intended: ‘(someone) will be able to have to come in",
+   "transcriptionRaw": "be fog tud-ni kell-eni jön-ni",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "be fog/szokott találni jönni",
+   "lexical": [
+    "in",
+    "will/usually",
+    "happen",
+    "come"
+   ],
+   "glossRaw": "in will/usually happen-INF come-INF",
+   "free": "intended: ‘(s/he) will/usually happen/s to come in",
+   "transcriptionRaw": "be fog/szokott talál-ni jön-ni",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "a ti véleményetek",
+   "lexical": [
+    "the",
+    "you",
+    "opinion"
+   ],
+   "glossRaw": "the you opinion-POSS-2PL",
+   "free": "your opinion",
+   "transcriptionRaw": "a ti vélemény-e-tek",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "nektek a véleményetek",
+   "lexical": [
+    "you",
+    "the",
+    "opinion"
+   ],
+   "glossRaw": "you.DAT the opinion-POSS-2PL",
+   "free": "your opinion",
+   "transcriptionRaw": "nektek a vélemény-e-tek",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "a gyerekek véleménye",
+   "lexical": [
+    "the",
+    "children",
+    "opinion"
+   ],
+   "glossRaw": "the children opinion-POSS",
+   "free": "the children's opinion",
+   "transcriptionRaw": "a gyerekek vélemény-e",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "a gyerekeknek a véleménye",
+   "lexical": [
+    "the",
+    "children",
+    "the",
+    "opinion"
+   ],
+   "glossRaw": "the children.DAT the opinion-POSS",
+   "free": "the children's opinion",
+   "transcriptionRaw": "a gyerekeknek a vélemény-e",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Anna azért haragszik, mert Péter elaludt.",
+   "lexical": [
+    "anna",
+    "that-for",
+    "is-angry",
+    "because",
+    "peter",
+    "slept"
+   ],
+   "glossRaw": "Anna that-for is.angry because Peter slept",
+   "free": "Anna is angry because Peter has fallen asleep.",
+   "transcriptionRaw": "Anna az-ért haragszik , mert Péter elaludt .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "Egy diák bekopogott az igazgatóhoz.",
+   "lexical": [
+    "a",
+    "student",
+    "vprt-knocked",
+    "the",
+    "director"
+   ],
+   "glossRaw": "a student vprt-knocked the director-all",
+   "free": "A (particular) student knocked at the director's office.",
+   "transcriptionRaw": "Egy diák be-kopogott az igazgató-hoz .",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  },
+  {
+   "text": "három darab újság",
+   "lexical": [
+    "three",
+    null,
+    "newspaper"
+   ],
+   "glossRaw": "three CLGENERAL newspaper",
+   "free": "three newspapers",
+   "transcriptionRaw": "három darab újság",
+   "source": "glosslm/imtvault",
+   "sourceUrl": "https://huggingface.co/datasets/lecslab/glosslm-corpus"
+  }
+ ]
+}

@@ -1,0 +1,657 @@
+{
+ "language": "zh",
+ "curatedAt": "2026-09-11",
+ "notes": "Wikipedia {{interlinear}}. Source keeps the template's word segmentation. Mixed Traditional and Simplified, as the sources are.",
+ "items": [
+  {
+   "text": "你 認得 這 個 人 不 認得 這 個 人？",
+   "lexical": [
+    "you",
+    "know",
+    "this",
+    "classifier",
+    "man",
+    "not",
+    "know",
+    "this",
+    "classifier",
+    "man"
+   ],
+   "glossRaw": "you know this CL man not know this CL man",
+   "free": "Do you know this man?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "你 認得 不 認得 這 個 人？",
+   "lexical": [
+    "you",
+    "know",
+    "not",
+    "know",
+    "this",
+    "classifier",
+    "man"
+   ],
+   "glossRaw": "you know not know this CL man",
+   "free": "Do you know this man?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "你 認得 這 個 人 不 認得?",
+   "lexical": [
+    "you",
+    "know",
+    "this",
+    "classifier",
+    "man",
+    "not",
+    "know"
+   ],
+   "glossRaw": "you know this CL man not know",
+   "free": "Do you know this man?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "你 看 不 看 电影？",
+   "lexical": [
+    "you",
+    "watch",
+    "not",
+    "watch",
+    "movie"
+   ],
+   "glossRaw": "you watch not watch movie",
+   "free": "Will you watch the movie?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "你 看 电影 不？",
+   "lexical": [
+    "you",
+    "watch",
+    "movie",
+    "not"
+   ],
+   "glossRaw": "you watch movie not",
+   "free": "Will you watch the movie?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "你 看 电影 不 看？",
+   "lexical": [
+    "you",
+    "watch",
+    "movie",
+    "not",
+    "watch"
+   ],
+   "glossRaw": "you watch movie not watch",
+   "free": "Will you watch the movie?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "这 本 书 好 不 好？",
+   "lexical": [
+    "this",
+    "classifier",
+    "book",
+    "good",
+    "not",
+    "good"
+   ],
+   "glossRaw": "this CL book good not good",
+   "free": "Is this book good?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "这 本 书 好 不？",
+   "lexical": [
+    "this",
+    "classifier",
+    "book",
+    "good",
+    "not"
+   ],
+   "glossRaw": "this CL book good not",
+   "free": "Is this book good?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "你 敢 不 敢 杀 鸡?",
+   "lexical": [
+    "you",
+    "dare",
+    "not",
+    "dare",
+    "kill",
+    "chicken"
+   ],
+   "glossRaw": "you dare not dare kill chicken",
+   "free": "Do you dare kill chicken?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "张三 讨厌 李斯 不 讨厌",
+   "lexical": [
+    "zhangsan",
+    "hate",
+    "lisi",
+    "not",
+    "hate"
+   ],
+   "glossRaw": "Zhangsan hate Lisi not hate",
+   "free": "Does Zhangsan hate Lisi or not?",
+   "source": "en.wikipedia/A-not-A_question",
+   "sourceUrl": "https://en.wikipedia.org/wiki/A-not-A_question"
+  },
+  {
+   "text": "我 的 车",
+   "lexical": [
+    "me",
+    "of",
+    "car"
+   ],
+   "glossRaw": "me POSS car",
+   "free": "my car",
+   "source": "en.wikipedia/Chinese_classifier",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Chinese_classifier"
+  },
+  {
+   "text": "天空 一 云",
+   "lexical": [
+    "sky",
+    "one",
+    "cloud"
+   ],
+   "glossRaw": "sky one cloud",
+   "free": "the sky was full of clouds",
+   "source": "en.wikipedia/Chinese_classifier",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Chinese_classifier"
+  },
+  {
+   "text": "他 踢 了 我 一",
+   "lexical": [
+    "he",
+    "kick",
+    null,
+    "me",
+    "one"
+   ],
+   "glossRaw": "he kick PAST me one",
+   "free": "he kicked me",
+   "source": "en.wikipedia/Chinese_classifier",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Chinese_classifier"
+  },
+  {
+   "text": "多少 条 河",
+   "lexical": [
+    "how-many",
+    "classifier",
+    "river"
+   ],
+   "glossRaw": "how-many CL river",
+   "free": "How many rivers?",
+   "source": "en.wikipedia/Classifier_(linguistics)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Classifier_(linguistics)"
+  },
+  {
+   "text": "我 著 緊 衫。",
+   "lexical": [
+    "i",
+    "wear",
+    null,
+    "clothes"
+   ],
+   "glossRaw": "I wear PROG clothes",
+   "free": "I am putting on clothes.",
+   "source": "en.wikipedia/Continuous_and_progressive_aspects",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Continuous_and_progressive_aspects"
+  },
+  {
+   "text": "我 著 住 衫。",
+   "lexical": [
+    "i",
+    "wear",
+    null,
+    "clothes"
+   ],
+   "glossRaw": "I wear CONT clothes",
+   "free": "I am wearing clothes.",
+   "source": "en.wikipedia/Continuous_and_progressive_aspects",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Continuous_and_progressive_aspects"
+  },
+  {
+   "text": "我 在 穿 衣服。",
+   "lexical": [
+    "i",
+    null,
+    "wear",
+    "clothes"
+   ],
+   "glossRaw": "I PROG wear clothes",
+   "free": "I am putting on clothes.",
+   "source": "en.wikipedia/Continuous_and_progressive_aspects",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Continuous_and_progressive_aspects"
+  },
+  {
+   "text": "我 穿 著 衣服。",
+   "lexical": [
+    "i",
+    "wear",
+    null,
+    "clothes"
+   ],
+   "glossRaw": "I wear CONT clothes",
+   "free": "I am wearing clothes.",
+   "source": "en.wikipedia/Continuous_and_progressive_aspects",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Continuous_and_progressive_aspects"
+  },
+  {
+   "text": "事实 是 他 不 好看。",
+   "lexical": [
+    "truth",
+    "be",
+    "he",
+    "not",
+    "good-looking"
+   ],
+   "glossRaw": "Truth COP he-NOM NEG good-looking.",
+   "free": "The truth is that he is not good-looking.",
+   "source": "en.wikipedia/Equative_sentence",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Equative_sentence"
+  },
+  {
+   "text": "他 不 好看。",
+   "lexical": [
+    "he",
+    "not",
+    "good-looking"
+   ],
+   "glossRaw": "He-NOM NEG good-looking.",
+   "free": "He is not good-looking.",
+   "source": "en.wikipedia/Equative_sentence",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Equative_sentence"
+  },
+  {
+   "text": "妈妈: 不 要 忘 了 丢 垃圾。",
+   "lexical": [
+    "mother",
+    "not",
+    "want",
+    "forget",
+    null,
+    "throw",
+    "rubbish"
+   ],
+   "glossRaw": "mother: Not want forget PERF throw rubbish.",
+   "free": "Mother: \"Do not (you) forget to take out the rubbish.",
+   "source": "en.wikipedia/Null-subject_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Null-subject_language"
+  },
+  {
+   "text": "这 块 蛋糕 很 好吃。 谁 烤 的?",
+   "lexical": [
+    "this",
+    "piece",
+    "cake",
+    null,
+    "tasty",
+    "who",
+    "bake",
+    null
+   ],
+   "glossRaw": "This piece cake DEGREE tasty. Who bake MODIFY",
+   "free": "This cake is tasty. Who baked (it)?",
+   "source": "en.wikipedia/Pro-drop_language",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Pro-drop_language"
+  },
+  {
+   "text": "种 水果 的 农人",
+   "lexical": [
+    "grow",
+    "fruit",
+    null,
+    "farmer"
+   ],
+   "glossRaw": "grow fruit PTCL farmer",
+   "free": "the fruit-growing farmer\" or \"the farmer who grows fruit",
+   "source": "en.wikipedia/Relative_clause",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Relative_clause"
+  },
+  {
+   "text": "他们 种 的 水果",
+   "lexical": [
+    "they",
+    "grow",
+    null,
+    "fruit"
+   ],
+   "glossRaw": "they grow PTCL fruit",
+   "free": "the by-them-grown fruit\" or \"the fruit that they grow",
+   "source": "en.wikipedia/Relative_clause",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Relative_clause"
+  },
+  {
+   "text": "昨天 批评 的 人 都 不 在 这里",
+   "lexical": [
+    "yesterday",
+    "criticize",
+    null,
+    "person",
+    null,
+    "not",
+    "at",
+    "here"
+   ],
+   "glossRaw": "yesterday criticize PTCL person all not at here",
+   "free": "the people who criticized [others] yesterday are all not here\" or \"the people whom [others] criticized yesterday are all not here",
+   "source": "en.wikipedia/Relative_clause",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Relative_clause"
+  },
+  {
+   "text": "昨天 被 批评 的 人 都 不 在 这里",
+   "lexical": [
+    "yesterday",
+    null,
+    "criticize",
+    null,
+    "person",
+    null,
+    "not",
+    "at",
+    "here"
+   ],
+   "glossRaw": "yesterday PASS criticize PTCL person all not at here",
+   "free": "the people who were criticized yesterday are all not here",
+   "source": "en.wikipedia/Relative_clause",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Relative_clause"
+  },
+  {
+   "text": "我 写 信 的 毛笔",
+   "lexical": [
+    "i",
+    "write",
+    "letter",
+    null,
+    "brushpen"
+   ],
+   "glossRaw": "I write letter PTCL brushpen",
+   "free": "the brushpen that I write letters with",
+   "source": "en.wikipedia/Relative_clause",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Relative_clause"
+  },
+  {
+   "text": "我 替 他 画 画 的 人",
+   "lexical": [
+    "i",
+    "for",
+    "her/him",
+    "draw",
+    "picture",
+    null,
+    "person"
+   ],
+   "glossRaw": "I for her/him draw picture PTCL person",
+   "free": "the person for whom I drew the picture",
+   "source": "en.wikipedia/Relative_clause",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Relative_clause"
+  },
+  {
+   "text": "张三 擦干净了 桌子。",
+   "lexical": [
+    "zhangsan",
+    "wipe-clean",
+    "table"
+   ],
+   "glossRaw": "Zhangsan wipe-clean-PFV table",
+   "free": "Zhangsan wiped the table clean.",
+   "source": "en.wikipedia/Resultative",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Resultative"
+  },
+  {
+   "text": "背 到 婆婆 那",
+   "lexical": [
+    "carry",
+    "arrive",
+    "grandma",
+    "there"
+   ],
+   "glossRaw": "Carry arrive grandma there",
+   "free": "Carry (it to) grandma",
+   "source": "en.wikipedia/Syntactic_bootstrapping",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Syntactic_bootstrapping"
+  },
+  {
+   "text": "走 去 婆婆 那",
+   "lexical": [
+    "walk",
+    "go",
+    "grandma",
+    "there"
+   ],
+   "glossRaw": "Walk go grandma there",
+   "free": "Walk (over to) grandma there",
+   "source": "en.wikipedia/Syntactic_bootstrapping",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Syntactic_bootstrapping"
+  },
+  {
+   "text": "你 快 给 爸爸 看 看",
+   "lexical": [
+    "you",
+    "quickly",
+    "give",
+    "daddy",
+    "look",
+    "look"
+   ],
+   "glossRaw": "you quickly give daddy look look",
+   "free": "you (let) daddy (take a quick) look",
+   "source": "en.wikipedia/Syntactic_bootstrapping",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Syntactic_bootstrapping"
+  },
+  {
+   "text": "你 这 就 吃 完 饭",
+   "lexical": [
+    "you",
+    "this",
+    "then",
+    "eat",
+    "finish",
+    "rice"
+   ],
+   "glossRaw": "you this then eat finish rice",
+   "free": "you already finished eating your rice",
+   "source": "en.wikipedia/Syntactic_bootstrapping",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Syntactic_bootstrapping"
+  },
+  {
+   "text": "张三 被 李四 打 了。",
+   "lexical": [
+    "zhangsan",
+    null,
+    "lisi",
+    "hit",
+    null
+   ],
+   "glossRaw": "Zhangsan PASS Lisi hit PRF",
+   "free": "Zhangsan was hit by Lisi.",
+   "source": "en.wikipedia/Voice_(grammar)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Voice_(grammar)"
+  },
+  {
+   "text": "张三 被 打 了。",
+   "lexical": [
+    "zhangsan",
+    null,
+    "hit",
+    null
+   ],
+   "glossRaw": "Zhangsan PASS hit PRF",
+   "free": "Zhangsan was hit ∅.",
+   "source": "en.wikipedia/Voice_(grammar)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Voice_(grammar)"
+  },
+  {
+   "text": "问题 解决 了。",
+   "lexical": [
+    "problem",
+    "solve",
+    null
+   ],
+   "glossRaw": "Problem solve PRF.",
+   "free": "Problem (has)been solved.",
+   "source": "en.wikipedia/Voice_(grammar)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Voice_(grammar)"
+  },
+  {
+   "text": "问题 还 没 解决。",
+   "lexical": [
+    "problem",
+    "still",
+    "not",
+    "solve"
+   ],
+   "glossRaw": "Problem still not solve.",
+   "free": "Problem (has)not(yet) been solved.",
+   "source": "en.wikipedia/Voice_(grammar)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Voice_(grammar)"
+  },
+  {
+   "text": "问题 终 被 解决。",
+   "lexical": [
+    "problem",
+    "finally",
+    null,
+    "solve"
+   ],
+   "glossRaw": "Problem finally PASS solve.",
+   "free": "Problem was finally solved.",
+   "source": "en.wikipedia/Voice_(grammar)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Voice_(grammar)"
+  },
+  {
+   "text": "那个 警察 被 打伤了。",
+   "lexical": [
+    "that",
+    "policeman",
+    null,
+    "hit-wounded"
+   ],
+   "glossRaw": "That policeman PASS hit-wounded-PRF",
+   "free": "That policeman was wounded.",
+   "source": "en.wikipedia/Voice_(grammar)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Voice_(grammar)"
+  },
+  {
+   "text": "那个 警察 被 人 打伤了。",
+   "lexical": [
+    "that",
+    "policeman",
+    null,
+    "somebody",
+    "hit-wounded"
+   ],
+   "glossRaw": "That policeman PASS somebody hit-wounded-PRF",
+   "free": "That policeman was wounded (by-somebody).",
+   "source": "en.wikipedia/Voice_(grammar)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Voice_(grammar)"
+  },
+  {
+   "text": "那个 警察 被 流氓 打伤了。",
+   "lexical": [
+    "that",
+    "policeman",
+    null,
+    "hooligan",
+    "hit-wounded"
+   ],
+   "glossRaw": "That policeman PASS hooligan hit-wounded-PRF",
+   "free": "That policeman was wounded (by-hooligans).",
+   "source": "en.wikipedia/Voice_(grammar)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Voice_(grammar)"
+  },
+  {
+   "text": "问题 得到 了 解决。",
+   "lexical": [
+    "problem",
+    "receive",
+    null,
+    "solution"
+   ],
+   "glossRaw": "Problem receive PRF solution.",
+   "free": "Solution (was)found for problem.",
+   "source": "en.wikipedia/Voice_(grammar)",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Voice_(grammar)"
+  },
+  {
+   "text": "你 想 知道 瑪麗 為什麼 買了 什麼",
+   "lexical": [
+    "you",
+    "want",
+    "know",
+    "mary",
+    "why",
+    "buy",
+    "what"
+   ],
+   "glossRaw": "You want know Mary why buy-PAST what",
+   "free": "What do you wonder why Mary bought it?",
+   "source": "en.wikipedia/Wh-movement",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Wh-movement"
+  },
+  {
+   "text": "你 想 知道 誰 買了 什麼",
+   "lexical": [
+    "you",
+    "want",
+    "know",
+    "who",
+    "buy",
+    "what"
+   ],
+   "glossRaw": "You want know who buy-PAST what",
+   "free": "What is the thing x such that you wonder who bought x?' 'Who is the person x such that you wonder what x bought?",
+   "source": "en.wikipedia/Wh-movement",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Wh-movement"
+  },
+  {
+   "text": "你 想 知道 瑪麗 在 哪裡 買了 什麼",
+   "lexical": [
+    "you",
+    "want",
+    "know",
+    "mary",
+    "at",
+    "where",
+    "buy",
+    "what"
+   ],
+   "glossRaw": "You want know Mary at where buy-PAST what",
+   "free": "What is the thing x such that you wonder where Mary bought x?' 'Where is the place x such that you wonder what Mary bought at x?",
+   "source": "en.wikipedia/Wh-movement",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Wh-movement"
+  },
+  {
+   "text": "你 在 做 什麼？",
+   "lexical": [
+    "you",
+    null,
+    "do",
+    "what"
+   ],
+   "glossRaw": "you PROG do what",
+   "free": "What are you doing?",
+   "source": "en.wikipedia/Wh-movement",
+   "sourceUrl": "https://en.wikipedia.org/wiki/Wh-movement"
+  }
+ ]
+}

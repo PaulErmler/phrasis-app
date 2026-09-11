@@ -195,6 +195,33 @@ export const courseSettingsFields = {
   showRomanization: v.optional(v.boolean()), // show Latin transliteration below non-Latin script text
   showIpa: v.optional(v.boolean()), // show IPA transcription below sentence text (default OFF, unlike showRomanization)
   showFurigana: v.optional(v.boolean()), // furigana ruby over kanji for Japanese (default ON; language-specific section in settings)
+  // Hyperliteral (word-for-word) gloss under the sentence. Unset reads as OFF,
+  // so no existing course gains the line silently; a course created after the
+  // feature shipped carries an explicit `true`, stamped by
+  // NEW_COURSE_SETTINGS_DEFAULTS in convex/db/courseSettings.ts.
+  showHyperliteral: v.optional(v.boolean()),
+  // Per-language exceptions to the four reading-aid switches above, keyed by
+  // language code. Holds ONLY the exceptions: a language absent from the
+  // record, or a kind absent from its entry, follows the course-wide switch.
+  // Resolution lives in lib/annotationDisplay.ts and is shared by the client
+  // and the content sweep, so "what the card shows" and "what gets generated"
+  // are one rule rather than two that drift.
+  //
+  // Hide-don't-clear applies here too: an override for a language no longer on
+  // the course stays stored and inert, because course languages are editable
+  // from the same sheet and clearing would silently reset the preference every
+  // time a language was removed and re-added.
+  annotationOverrides: v.optional(
+    v.record(
+      v.string(),
+      v.object({
+        romanization: v.optional(v.boolean()),
+        ipa: v.optional(v.boolean()),
+        furigana: v.optional(v.boolean()),
+        hyperliteral: v.optional(v.boolean()),
+      }),
+    ),
+  ),
   // Language order overrides
   baseLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for base languages
   targetLanguageOrder: v.optional(v.array(v.string())), // ordered ISO codes for target languages
@@ -710,6 +737,52 @@ export default defineSchema({
     // convex/db/translationReads.ts, same invariant test.
     .index('by_textId_supersededAt', ['textId', 'supersededAt']),
 
+  // Hyperliteral (word-for-word) glosses. Its own table rather than columns on
+  // `texts` / `translations`, because a sentence carries ONE gloss per gloss
+  // language and those rows are shared between users: an English learner and a
+  // German learner of Russian read the same translation row and need different
+  // glosses. Columns would force a record field that every write rewrites, and
+  // would grow a row that is read on every review.
+  //
+  // Exactly one of `textId` / `translationId` is set — the source sentence, or
+  // one of its translations. One row per (sentence row, gloss language); the
+  // claiming mutation reads the index before inserting, so a double request
+  // cannot make two.
+  hyperliterals: defineTable({
+    textId: v.optional(v.id('texts')),
+    translationId: v.optional(v.id('translations')),
+    // The sentence's own language, so a reader can gate on
+    // `hyperliteralApplies` without loading the parent row.
+    language: v.string(),
+    // The language the gloss is WRITTEN IN (the course's base language).
+    glossLanguage: v.string(),
+    // The exact wording this gloss was made for. A translation row is patched
+    // in place when a user edits it, so a gloss can outlive the sentence it
+    // describes; readers treat a mismatch as missing and the edit pipeline
+    // deletes the rows as well. Belt and braces on purpose: a stale gloss
+    // shown under an edited sentence is worse than a missing one.
+    forText: v.string(),
+    // undefined = requested and still in flight, '' = attempted and failed,
+    // non-empty = done. The same tri-state as `texts.romanizedText`; see the
+    // note there. Test with `=== undefined`, never `!x`. The row's existence
+    // IS the request claim, so there is no separate requestedAt marker on the
+    // parent.
+    text: v.optional(v.string()),
+    // Engine + prompt version that produced (or failed to produce) `text`.
+    // A row tagged with a retired engine is stale and regenerates on the next
+    // view. The gloss language is NOT part of this tag: it is its own column,
+    // so revising the German conventions cannot invalidate the English rows.
+    source: v.string(),
+    // When the claim was made. A claim older than
+    // ANNOTATION_REQUEST_COOLDOWN_MS with no text yet is retried, so a
+    // provider outage costs one attempt per window rather than one per view.
+    requestedAt: v.number(),
+  })
+    .index('by_translationId_and_glossLanguage', [
+      'translationId',
+      'glossLanguage',
+    ])
+    .index('by_textId_and_glossLanguage', ['textId', 'glossLanguage']),
   // Content-addressed audio store. One row per unique
   // (language, voiceGender, regionVariant, spoken string) AND TTS setup
   // (`ttsProvider` + `ttsVersion`; the setup is not indexed, the lookup

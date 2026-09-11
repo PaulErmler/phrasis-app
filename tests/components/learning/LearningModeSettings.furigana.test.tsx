@@ -66,11 +66,26 @@ describe('LearningModeSettings: language-specific section', () => {
     expect(screen.queryByLabelText('showFurigana')).toBeNull();
   });
 
-  it('hides the whole section when no course language has any aid', () => {
+  it('shows only the gloss row for a language with no script aids', () => {
     // fil: Latin script (no romanization), no espeak voice (no IPA), and no
-    // furigana — the only way all three rows are absent.
+    // furigana. Before the word-for-word gloss existed this was the one way to
+    // empty the section; the gloss applies to every language that is not the
+    // gloss language, so the section now has exactly one row.
     renderSettings(['fil'], ['fil']);
-    expect(screen.queryByText('languageSettings')).toBeNull();
+    expect(screen.getByText('languageSettings')).toBeInTheDocument();
+    expect(screen.getByLabelText('showHyperliteral')).toBeInTheDocument();
+    expect(screen.queryByLabelText('showRomanization')).toBeNull();
+    expect(screen.queryByLabelText('showIpa')).toBeNull();
+    expect(screen.queryByLabelText('showFurigana')).toBeNull();
+  });
+
+  it('hides the whole section for an English-only course', () => {
+    // The gloss is written in English, so an English sentence has nothing to
+    // gloss into; English needs no romanization and no furigana. The IPA row
+    // is what keeps the section alive for most courses, so this asserts the
+    // empty-section branch with a language that has no espeak voice either.
+    renderSettings(['en'], ['en']);
+    expect(screen.queryByLabelText('showHyperliteral')).toBeNull();
   });
 
   it('defaults furigana to ON', () => {

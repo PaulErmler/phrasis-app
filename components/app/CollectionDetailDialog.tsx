@@ -1,5 +1,10 @@
 'use client';
 
+import {
+  annotationLinePropsFromSettings,
+  showFuriganaFromSettings,
+  type AnnotationSettings,
+} from '@/lib/annotationDisplay';
 import { useCallback, useLayoutEffect, useRef } from 'react';
 import {
   Dialog,
@@ -110,7 +115,6 @@ export function CollectionDetailDialog({
   const { preloadedCourseSettings } = useAppData();
   const courseSettings = usePreloadedQuery(preloadedCourseSettings);
   const highlightEnabled = courseSettings?.highlightWords === true;
-  const showIpa = courseSettings?.showIpa === true;
   const showFurigana = resolveShowFurigana(courseSettings);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -433,7 +437,7 @@ export function CollectionDetailDialog({
                   )}
                   {visibleEarlierRows.map((row) => (
                     <PreviewTextRow
-                      showIpa={showIpa}
+                      courseSettings={courseSettings}
                       showFurigana={showFurigana}
                       key={row._id}
                       row={row}
@@ -456,7 +460,7 @@ export function CollectionDetailDialog({
                 <div className="space-y-4">
                   {visibleRows.map((row) => (
                     <PreviewTextRow
-                      showIpa={showIpa}
+                      courseSettings={courseSettings}
                       showFurigana={showFurigana}
                       key={row._id}
                       row={row}
@@ -501,14 +505,15 @@ export function CollectionDetailDialog({
 function PreviewTextRow({
   row,
   highlightEnabled,
-  showIpa,
+  courseSettings,
   showFurigana,
   browse,
   sentencesRemaining,
 }: {
   row: BrowseTextRow;
   highlightEnabled: boolean;
-  showIpa: boolean;
+  /** Read per line, so a per-language override reaches the preview too. */
+  courseSettings: AnnotationSettings | null | undefined;
   showFurigana: boolean;
   browse: CollectionBrowse;
   sentencesRemaining?: number | null;
@@ -548,13 +553,23 @@ function PreviewTextRow({
             localTime={buttonPlayback.active?.localTime ?? 0}
             isActive={isActiveLine}
             enabled={highlightEnabled}
-            furigana={showFurigana ? translation.furigana : undefined}
+            furigana={
+              showFuriganaFromSettings(courseSettings, translation.language)
+                ? translation.furigana
+                : undefined
+            }
             className={cn('text-sm leading-relaxed', isBase && 'font-medium')}
           />
           <AnnotationLines
+            text={translation.text}
+            language={translation.language}
             romanization={translation.romanization}
+            hyperliteral={translation.hyperliteral}
             ipa={translation.ipa}
-            showIpa={showIpa}
+            {...annotationLinePropsFromSettings(
+              courseSettings,
+              translation.language,
+            )}
           />
         </div>
         <AudioButton
