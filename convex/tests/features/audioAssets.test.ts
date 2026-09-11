@@ -7,7 +7,7 @@ import { internal } from '../../_generated/api';
 import type { Id } from '../../_generated/dataModel';
 import { scheduleAudioForLanguage } from '../../features/decks';
 import { deleteAudioRowsForTextLanguage } from '../../lib/audio';
-import { findAudioAssetByKey } from '../../lib/audioAssets';
+import { findAudioAssetByKey, upsertAudioPointer } from '../../lib/audioAssets';
 import { ensureTextContent } from '../../lib/contentScheduling';
 import { audioPointer } from '../../db/translationReads';
 import {
@@ -632,6 +632,42 @@ describe('audioAssets content-addressed cache', () => {
       expect(female?.storageId).toBe(femaleBlob);
       expect((await getRow(t, textB))?.assetId).toBe(female?._id);
       expect(await blobExists(t, femaleBlob)).toBe(true);
+    });
+  });
+});
+
+describe('upsertAudioPointer and the rendering key', () => {
+  it('an unkeyed upsert re-points the row and leaves its key alone', async () => {
+    const t = convexTest(schema, modules);
+    const textId = await seedText(t, 'Hola');
+    await storeFinal(t, {
+      textId,
+      spokenText: 'Hola',
+      storageId: await storeBlob(t, 1),
+    });
+    const first = (await getRow(t, textId))!;
+    await t.run((ctx) =>
+      upsertAudioPointer(ctx, textId, 'es', first.assetId, 'female'),
+    );
+    expect((await getRow(t, textId))?.variantKey).toBe('female');
+
+    // Same asset, no key (a job enqueued before the keys existed): a
+    // no-op, not a demotion to a legacy pointer.
+    await t.run((ctx) => upsertAudioPointer(ctx, textId, 'es', first.assetId));
+    expect((await getRow(t, textId))?.variantKey).toBe('female');
+
+    // Another asset, no key: re-pointed, key kept.
+    const other = await seedText(t, 'Adiós');
+    await storeFinal(t, {
+      textId: other,
+      spokenText: 'Adiós',
+      storageId: await storeBlob(t, 2),
+    });
+    const otherAsset = (await getRow(t, other))!.assetId;
+    await t.run((ctx) => upsertAudioPointer(ctx, textId, 'es', otherAsset));
+    expect(await getRow(t, textId)).toMatchObject({
+      assetId: otherAsset,
+      variantKey: 'female',
     });
   });
 });

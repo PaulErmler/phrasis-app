@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from 'vitest';
 import schema from '../../schema';
 import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
 import { getCurrentTranslationVersion } from '../../../lib/languages';
-import { api } from '../../_generated/api';
+import { api, internal } from '../../_generated/api';
 import { MARK_READ_LIMIT } from '../../db/collectionTextMarks';
 import type { Doc, Id } from '../../_generated/dataModel';
 import type { MutationCtx } from '../../_generated/server';
@@ -12,7 +12,7 @@ import type { WithoutSystemFields } from 'convex/server';
 import { getMixedAccentTextLanguage } from '../../../lib/languages';
 // Mocked globally in tests/convexTestSetup.ts. Imported here to assert on
 // the enqueue boundary (the pools never run jobs under convex-test).
-import { llmPool, ttsPool } from '../../lib/workpools';
+import { llmPool, ttsPool, ttsWarmPool } from '../../lib/workpools';
 import { USER_PROVIDED_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
 
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
@@ -1269,5 +1269,34 @@ describe('features/collections', () => {
       expect(res.scheduled).toBe(false);
       expect(await t.run(async (ctx) => ctx.db.get(rowId))).not.toBeNull();
     });
+  });
+});
+
+describe('ensureFirstSentencesForCollection (the signup warm-up)', () => {
+  it('translates the first five sentences but voices only the first', async () => {
+    const t = convexTest(schema, modules);
+    const { collId, textIds } = await seedCourseWithTexts(t, 6);
+    vi.mocked(llmPool.enqueueAction).mockClear();
+    vi.mocked(ttsPool.enqueueAction).mockClear();
+    vi.mocked(ttsWarmPool.enqueueAction).mockClear();
+
+    await t.mutation(
+      internal.features.collections.ensureFirstSentencesForCollection,
+      { collectionId: collId, baseLanguages: ['en'], targetLanguages: ['es'] },
+    );
+
+    // Five rows go to the model (the sixth text is past the preview).
+    const translated = vi
+      .mocked(llmPool.enqueueAction)
+      .mock.calls.map((c) => (c[2] as { textId: Id<'texts'> }).textId);
+    expect(translated.sort()).toEqual(textIds.slice(0, 5).sort());
+    // One clip, on the warm pool (background priority): the first
+    // sentence's own-language audio. The rest wait for a tap on the
+    // preview's audio icon or for the card to be added.
+    const voiced = vi
+      .mocked(ttsWarmPool.enqueueAction)
+      .mock.calls.map((c) => (c[2] as { textId: Id<'texts'> }).textId);
+    expect(voiced).toEqual([textIds[0]]);
+    expect(vi.mocked(ttsPool.enqueueAction)).not.toHaveBeenCalled();
   });
 });

@@ -1,4 +1,8 @@
 import { v } from 'convex/values';
+import {
+  SPEAKER_GENDER_SCAN_SOURCE,
+  speakerGenderPatch,
+} from '../../lib/speakerGenderPrompt';
 import { internalMutation } from '../_generated/server';
 import { Id } from '../_generated/dataModel';
 import { adjustCollectionTextCount } from '../db/seed';
@@ -122,6 +126,16 @@ export const batchUpsertDatasetTexts = internalMutation({
         // the field. Sentences sharing a (collectionId, arcId) get pulled
         // into each other's translation prompts as a sliding context window.
         arcId: v.union(v.string(), v.null()),
+        // The speaker gender the offline scan fixed for the sentence
+        // ('male' | 'female' | 'neutral'; scripts/classify-speaker-gender.mts,
+        // lib/speakerGenderPrompt.ts) and the scan's source tag. Absent or
+        // `null` when the upload carries no verdict for the row: the fields
+        // are then left as they are, never cleared, so a partial scan cannot
+        // erase evidence. A male/female verdict also becomes the voice
+        // (`audioSpeakerGender`); a neutral one keeps whatever flip the
+        // text already has, or leaves a new text for the sweep to flip.
+        speakerGender: v.optional(v.union(v.string(), v.null())),
+        metadataSource: v.optional(v.union(v.string(), v.null())),
       }),
     ),
   },
@@ -173,6 +187,10 @@ export const batchUpsertDatasetTexts = internalMutation({
           ? undefined
           : t.referentGender;
       const arcId = t.arcId === null || t.arcId === '' ? undefined : t.arcId;
+      const speaker = speakerGenderPatch(
+        t.speakerGender,
+        t.metadataSource ?? SPEAKER_GENDER_SCAN_SOURCE,
+      );
       const existing = existingByExternalId.get(t.externalId);
       if (existing) {
         await ctx.db.patch(existing._id, {
@@ -185,6 +203,7 @@ export const batchUpsertDatasetTexts = internalMutation({
           addresseeGender,
           referentGender,
           arcId,
+          ...speaker,
         });
         updated++;
       } else {
@@ -202,6 +221,7 @@ export const batchUpsertDatasetTexts = internalMutation({
           addresseeGender,
           referentGender,
           arcId,
+          ...speaker,
         });
         inserted++;
         textCountDelta++;

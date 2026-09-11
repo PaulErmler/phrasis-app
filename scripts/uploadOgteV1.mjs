@@ -33,6 +33,18 @@ const LEVELS_DIR = path.join(
   __dirname,
   '../data_preparation/ogte-dataset/data/output/levels_curated',
 );
+/**
+ * The offline speaker-gender scan (`pnpm classify:speaker`), keyed by the
+ * same `id` column. Optional: without it every row uploads with no verdict
+ * and the fields on `texts` stay untouched.
+ */
+const SPEAKER_GENDER_CSV = path.join(
+  __dirname,
+  '../data_preparation/ogte-dataset/data/output/speaker_gender.csv',
+);
+// Mirrors SPEAKER_GENDER_SCAN_SOURCE in lib/speakerGenderPrompt.ts (this
+// script runs under plain node, so it cannot import the TypeScript module).
+const SPEAKER_GENDER_SCAN_SOURCE = 'speaker-scan-v1';
 
 /**
  * Per-level metadata. The displayName is the human label corresponding to the
@@ -276,6 +288,30 @@ function mapGenderField(value) {
   return undefined;
 }
 
+/** id → 'male' | 'female' | 'neutral' from the scan, or an empty map. */
+function readSpeakerGenderVerdicts() {
+  const verdicts = new Map();
+  if (!fs.existsSync(SPEAKER_GENDER_CSV)) {
+    console.warn(
+      `No speaker-gender scan at ${SPEAKER_GENDER_CSV}; uploading without verdicts.`,
+    );
+    return verdicts;
+  }
+  const rows = parse(fs.readFileSync(SPEAKER_GENDER_CSV, 'utf-8'), {
+    columns: true,
+    skip_empty_lines: true,
+    trim: true,
+  });
+  for (const row of rows) {
+    const verdict = (row.speakerGender ?? '').trim();
+    if (verdict === 'male' || verdict === 'female' || verdict === 'neutral') {
+      verdicts.set((row.id ?? '').trim(), verdict);
+    }
+  }
+  console.log(`Speaker-gender verdicts: ${verdicts.size}`);
+  return verdicts;
+}
+
 async function main() {
   const args = parseArgs();
   console.log(
@@ -286,6 +322,8 @@ async function main() {
     console.error(`ERROR: levels_curated directory not found at ${LEVELS_DIR}`);
     process.exit(1);
   }
+
+  const speakerVerdicts = readSpeakerGenderVerdicts();
 
   // Step 1 — create-or-get the dataset row.
   const datasetId = runConvexMutation(
@@ -362,6 +400,12 @@ async function main() {
         // OGTE arc grouping from the curation manifest. Empty string → null
         // so the mutation clears the field for rows without an arc.
         arcId: arcIdRaw === '' ? null : arcIdRaw,
+        // The scan's verdict, or null: the mutation then leaves the
+        // speaker fields alone rather than clearing them.
+        speakerGender: speakerVerdicts.get(externalId) ?? null,
+        metadataSource: speakerVerdicts.has(externalId)
+          ? SPEAKER_GENDER_SCAN_SOURCE
+          : null,
       });
     }
     console.log(`  parsed ${validTexts.length} rows (skipped ${skippedCount})`);

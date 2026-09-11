@@ -39,6 +39,14 @@ export const OPENROUTER_MODELS = {
    *  3.7 Flash and Luna against the gold corpora and a judged wild sample.
    *  Re-run it before switching. */
   renderingClassifier: 'google/gemini-3.1-flash-lite',
+  /** The speaker-gender check a "wrong speaker" flag runs on the English
+   *  sentence (convex/features/sentenceMetadata.ts `checkSpeakerGender`),
+   *  the same prompt and model as the offline corpus scan
+   *  (scripts/classify-speaker-gender.mts). One word back, so the lite
+   *  tier on its cheapest endpoint; thinking off (2.5 honours it, 3.x does
+   *  not) and the output price capped just above the flex tier
+   *  (SPEAKER_GENDER_CHECK_PROVIDER). Paul, 2026-09-11. */
+  speakerGenderCheck: 'google/gemini-2.5-flash-lite:floor',
   /** Short thread title from first user message. Left on 3.1 Flash Lite.
    *  A 4-word title in the user's own language is the one job here where
    *  the newer model buys nothing. */
@@ -150,6 +158,15 @@ export const OPENROUTER_CHAT_EXTRA_BODY = {
  */
 export const OPENROUTER_USAGE_ACCOUNTING = {
   usage: { include: true },
+} as const;
+
+/**
+ * Routing for the speaker-gender check: USD per million output tokens,
+ * just above the flex tier's $0.20 so a busy flex falls through to
+ * standard and nothing dearer.
+ */
+export const SPEAKER_GENDER_CHECK_PROVIDER = {
+  max_price: { completion: 0.22 },
 } as const;
 
 /**

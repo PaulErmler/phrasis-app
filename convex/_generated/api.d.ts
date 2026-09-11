@@ -143,6 +143,7 @@ import type * as lib_sentenceMetadataPrompt from "../lib/sentenceMetadataPrompt.
 import type * as lib_sentenceMetadataShape from "../lib/sentenceMetadataShape.js";
 import type * as lib_serbianTranslit from "../lib/serbianTranslit.js";
 import type * as lib_sha256 from "../lib/sha256.js";
+import type * as lib_speakerGenderVerdicts from "../lib/speakerGenderVerdicts.js";
 import type * as lib_stt_audioContainer from "../lib/stt/audioContainer.js";
 import type * as lib_stt_cost from "../lib/stt/cost.js";
 import type * as lib_stt_gemini from "../lib/stt/gemini.js";
@@ -330,6 +331,7 @@ declare const fullApi: ApiFromModules<{
   "lib/sentenceMetadataShape": typeof lib_sentenceMetadataShape;
   "lib/serbianTranslit": typeof lib_serbianTranslit;
   "lib/sha256": typeof lib_sha256;
+  "lib/speakerGenderVerdicts": typeof lib_speakerGenderVerdicts;
   "lib/stt/audioContainer": typeof lib_stt_audioContainer;
   "lib/stt/cost": typeof lib_stt_cost;
   "lib/stt/gemini": typeof lib_stt_gemini;

@@ -43,6 +43,7 @@ import {
   isPremadeLevelCollection,
 } from '../lib/collections';
 import { resolveCardSpeakerGenders } from '../../lib/languages';
+import { renderingKey } from '../../lib/preferenceResolution';
 import { annotationFieldsOf } from '../lib/textAnnotations';
 import { deleteAudioRow } from '../lib/audio';
 import { resolveAudioPayload } from '../lib/audioAssets';
@@ -712,14 +713,21 @@ export const requestPreviewAudio = mutation({
       audioLanguage,
       audioSpeakerGender,
       translation,
-      { requestedByUserId: userId },
+      {
+        requestedByUserId: userId,
+        // The pointer is stamped like the sweep's: an unkeyed upsert here
+        // would otherwise demote a keyed pointer to a legacy one.
+        variantKey: renderingKey(audioSpeakerGender),
+      },
     );
     return { scheduled };
   },
 });
 
 /**
- * Ensure translations and audio exist for the FIRST 5 sentences of every
+ * Ensure translations for the FIRST 5 sentences of every premade level
+ * collection, and audio for the first of them, exist for the given
+ * language pair. In detail: the first 5 sentences of every
  * premade level collection in the active dataset (or legacy CEFR set) for
  * the given language pair. Scheduled from course creation
  * (`createCourse` / `completeOnboarding`) so that drilling into any level
@@ -795,16 +803,24 @@ export const ensureFirstSentencesForCollection = internalMutation({
       .take(COLLECTION_PREVIEW_SIZE);
 
     await Promise.all(
-      texts.map((text) =>
+      texts.map((text, index) =>
         ensureTextContent(
           ctx,
           text._id,
           text,
           args.baseLanguages,
           args.targetLanguages,
-          // Signup-time warm of ~20 collections × 5 texts: background, so
-          // this burst can't queue ahead of the user's own cards.
-          { priority: 'background' },
+          {
+            // Signup-time warm of ~20 collections × 5 texts: background, so
+            // this burst can't queue ahead of the user's own cards.
+            priority: 'background',
+            // Audio for the first sentence only (Paul, 2026-09-11). The
+            // other four get their wording, so the level preview renders at
+            // once; their clips are synthesized when the learner taps play
+            // (`requestPreviewAudio`) or adds the card. Most levels are
+            // browsed, never listened to.
+            skipTts: index > 0,
+          },
         ),
       ),
     );

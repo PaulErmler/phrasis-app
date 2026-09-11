@@ -3416,7 +3416,7 @@ describe('features/scheduling', () => {
       ).rejects.toThrow();
     });
 
-    it('wrong_gender moves the sentence voice, asks the classifier and retranslates', async () => {
+    it('wrong_gender moves the sentence voice, checks the sentence and retranslates', async () => {
       const t = convexTest(schema, modules);
       const { cardId, textId } = await seedFlaggableCard(t);
       const asUser = t.withIdentity({ subject: 'user_A' });
@@ -3433,19 +3433,15 @@ describe('features/scheduling', () => {
       // card on it: there is one translation, written for one speaker.
       const text = await t.run((ctx) => ctx.db.get(textId));
       expect(text?.audioSpeakerGender).toBe('female');
-      // The classifier is asked from the source sentence; its verdict
+      // The sentence is checked from its own wording; a definitive verdict
       // outranks the pick when it lands.
-      const classify = await pendingJobs(t, 'classifyCurriculumText');
-      expect(classify).toHaveLength(1);
-      expect(classify[0].args[0]).toMatchObject({
-        textId,
-        translations: [{ language: 'es', text: 'Hola mundo' }],
-      });
-      expect(text?.metadataRequestedAt).toBeDefined();
+      const check = await pendingJobs(t, 'checkSpeakerGender');
+      expect(check).toHaveLength(1);
+      expect(check[0].args[0]).toMatchObject({ textId, userId: 'user_A' });
       expect(llmEnqueues()).toHaveLength(1);
     });
 
-    it('wrong_gender on a text the current classifier already judged is not re-asked', async () => {
+    it('wrong_gender on a text a classifier already judged is checked again (every flag leads to a check)', async () => {
       const t = convexTest(schema, modules);
       const { cardId, textId } = await seedFlaggableCard(t);
       await t.run((ctx) =>
@@ -3459,6 +3455,7 @@ describe('features/scheduling', () => {
         cardId,
         reasons: ['wrong_gender'],
       });
+      expect(await pendingJobs(t, 'checkSpeakerGender')).toHaveLength(1);
       expect(await pendingJobs(t, 'fetchSentenceMetadata')).toHaveLength(0);
     });
 
@@ -3501,7 +3498,7 @@ describe('features/scheduling', () => {
       const reward = await t.run(async (ctx) =>
         ctx.db
           .query('flagRewards')
-          .withIndex('by_user_and_period', (q) =>
+          .withIndex('by_userId_and_period', (q) =>
             q.eq('userId', 'user_A').eq('period', period),
           )
           .first(),

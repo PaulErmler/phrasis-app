@@ -313,7 +313,7 @@ const USER_TABLE_DRAINS: Record<UserTable, UserTableDrain> = {
     ids(
       await ctx.db
         .query('flagRewards')
-        .withIndex('by_user_and_period', (q) => q.eq('userId', u))
+        .withIndex('by_userId_and_period', (q) => q.eq('userId', u))
         .take(ROW_BATCH),
     ),
 };

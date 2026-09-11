@@ -12,6 +12,7 @@
  * `getLanguageByCode` from languages.ts to read each language's active
  * provider when filtering voices.
  */
+import { definitiveSpeakerGender } from './sentenceMetadataSource';
 import {
   fnv1a,
   getLanguageByCode,
@@ -425,7 +426,10 @@ export interface SpeakerGenderInput {
   audioSpeakerGender?: string;
   /** Whether the text is user-created (custom/chat) vs premade dataset. */
   userCreated: boolean;
-  /** See `texts.metadataSource`. Not read here; carried for the resolver. */
+  /**
+   * See `texts.metadataSource`: what makes a curriculum text's
+   * `speakerGender` evidence rather than the old sweep's flip.
+   */
   metadataSource?: string;
 }
 
@@ -435,14 +439,17 @@ export interface SpeakerGenderInput {
  * once and kept.
  *
  * Two cases (`seed` is the text id, used for a deterministic coin-flip):
- *   1. Definitive `speakerGender` ('male'/'female'): the source of truth; mirror
- *      it into `audioSpeakerGender`, never overwrite `speakerGender`.
+ *   1. Definitive `speakerGender` (`definitiveSpeakerGender` in
+ *      lib/sentenceMetadataSource.ts: 'male'/'female', and on a curriculum
+ *      text stamped by a classifier): the source of truth; mirror it into
+ *      `audioSpeakerGender`, never overwrite `speakerGender`.
  *   2. Otherwise: keep a prior `audioSpeakerGender`, else flip once. The
  *      flip is written into `audioSpeakerGender` ONLY. `speakerGender` is the
  *      classifier's verdict (or empty) and is never written here, so a
  *      reader can tell evidence from a flip without a third field. Rows from
- *      before 2026-09-10 may still hold a flip in `speakerGender`; that is
- *      what `metadataSource` (lib/sentenceMetadataSource.ts) guards.
+ *      before 2026-09-10 may still hold a flip in `speakerGender`; unstamped,
+ *      it is ignored, so a learner's speaker correction on such a text is
+ *      not reverted by the next sweep.
  * Prior `audioSpeakerGender` is preserved when present so two runs don't re-roll.
  */
 export function resolveCardSpeakerGenders(
@@ -452,9 +459,10 @@ export function resolveCardSpeakerGenders(
   audioSpeakerGender: 'male' | 'female';
   genderPatch: { audioSpeakerGender?: 'male' | 'female' };
 } {
+  const evidence = definitiveSpeakerGender(text);
   const audioSpeakerGender: 'male' | 'female' =
-    text.speakerGender === 'male' || text.speakerGender === 'female'
-      ? text.speakerGender
+    evidence !== null
+      ? evidence
       : text.audioSpeakerGender === 'male' ||
           text.audioSpeakerGender === 'female'
         ? text.audioSpeakerGender

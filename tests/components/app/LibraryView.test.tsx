@@ -29,8 +29,6 @@ const editCardFn = makeMutationMock();
 const regenerateCardAudioFn = makeMutationMock();
 const flagTranslationFn = makeMutationMock();
 const updatePinnedActionsFn = makeMutationMock();
-// The library asks for the rendering its cards' settings want (text only).
-const requestLibraryRenderingsFn = makeMutationMock();
 
 const useQueryMock = vi.fn();
 
@@ -68,8 +66,6 @@ vi.mock('convex/react', () => ({
         return flagTranslationFn;
       case 'updatePinnedCardActions':
         return updatePinnedActionsFn;
-      case 'requestLibraryRenderings':
-        return requestLibraryRenderingsFn;
       default:
         return vi.fn();
     }
@@ -86,7 +82,6 @@ vi.mock('@/convex/_generated/api', () => ({
     features: {
       library: {
         getLibraryCards: { __mockKey: 'getLibraryCards' },
-        requestLibraryRenderings: { __mockKey: 'requestLibraryRenderings' },
       },
       scheduling: {
         masterCard: { __mockKey: 'masterCard' },
@@ -323,7 +318,6 @@ beforeEach(() => {
   regenerateCardAudioFn.mockClear();
   flagTranslationFn.mockClear();
   updatePinnedActionsFn.mockClear();
-  requestLibraryRenderingsFn.mockClear();
   userSettingsValue = null;
   useQueryMock.mockReset();
 });

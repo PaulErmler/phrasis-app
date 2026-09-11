@@ -9,11 +9,14 @@ import {
   scheduleAudioForLanguage,
   ensureTextContent,
 } from '../../features/decks';
-import { liveTranslation } from '../../db/translationReads';
+import { liveTranslation, audioPointer } from '../../db/translationReads';
 import { findAudioAssetInAnyAccent } from '../../lib/audioAssets';
 import { SOURCE_VERBATIM_TRANSLATION_SOURCE } from '../../../lib/translationProvenance';
 import { getVoiceLocale, pickAccentForText } from '../../../lib/voices';
-import { getCurrentTtsVersion } from '../../../lib/languages';
+import {
+  getCurrentTranslationVersion,
+  getCurrentTtsVersion,
+} from '../../../lib/languages';
 import { llmPool, ttsPool } from '../../lib/workpools';
 import { drainSchedulerAfterEach } from '../lib/drainScheduler';
 import { insertAudioFixture } from '../lib/audioFixtures';
@@ -642,5 +645,81 @@ describe('English accent variants', () => {
       expect(gb?.flagCount).toBeUndefined();
       expect(es?.flagCount).toBe(1);
     });
+  });
+});
+
+describe('an accent variant\'s ttsVersion bump reaches live pointers', () => {
+  async function storeClip(
+    t: TestConvex<typeof schema>,
+    textId: Id<'texts'>,
+    language: string,
+    voiceName: string,
+    spokenText: string,
+  ) {
+    const storageId = await t.run((ctx) =>
+      ctx.storage.store(new Blob([new Uint8Array([1])])),
+    );
+    await t.mutation(internal.features.decks.storeAudioRecording, {
+      textId,
+      language,
+      voiceName,
+      storageId,
+      ttsQuality: 'validated',
+      ttsProvider: 'gemini',
+      voiceGender: 'female',
+      speed: 1,
+      spokenText,
+      variantKey: KEY,
+    });
+  }
+
+  function insertRow(
+    t: TestConvex<typeof schema>,
+    textId: Id<'texts'>,
+    targetLanguage: string,
+    translatedText: string,
+  ) {
+    return t.run((ctx) =>
+      ctx.db.insert('translations', {
+        textId,
+        targetLanguage,
+        translatedText,
+        translationSource: SOURCE_VERBATIM_TRANSLATION_SOURCE,
+        // Current, so the wording is not what the sweep regenerates: a
+        // version-stale row would hold its clip for the archive instead.
+        translationVersion: getCurrentTranslationVersion(targetLanguage),
+        speakerGender: 'female',
+        variantKey: KEY,
+      }),
+    );
+  }
+
+  it('an Australian clip from before the General-accent prompt is detached by the sweep; a British one stays', async () => {
+    const t = convexTest(schema, modules);
+    const au = await seedEnglishText(t, 'Hello world');
+    await storeClip(t, au, 'en_au', 'Leda@en-AU', 'Hello world');
+    await insertRow(t, au, 'en_au', 'Hello world');
+    const gb = await seedEnglishText(t, 'Hello there');
+    await storeClip(t, gb, 'en_gb', 'Leda@en-GB', 'Hello there');
+    await insertRow(t, gb, 'en_gb', 'Hello there');
+    // Age both to the stamp every clip carried before the bump.
+    await t.run(async (ctx) => {
+      for (const asset of await ctx.db.query('audioAssets').collect()) {
+        await ctx.db.patch(asset._id, { ttsVersion: 1 });
+      }
+    });
+
+    // The sweep reads the version through the asset's own accent, so the
+    // en_au bump marks the live Australian pointer stale.
+    await sweep(t, au, ['en_au'], []);
+    expect(await t.run((ctx) => audioPointer(ctx, au, 'en_au'))).toBe(null);
+    expect(ttsEnqueues().map((e) => e.language)).toContain('en_au');
+
+    vi.mocked(ttsPool.enqueueAction).mockClear();
+    await sweep(t, gb, ['en_gb'], []);
+    expect(await t.run((ctx) => audioPointer(ctx, gb, 'en_gb'))).not.toBe(
+      null,
+    );
+    expect(ttsEnqueues().map((e) => e.language)).not.toContain('en_gb');
   });
 });

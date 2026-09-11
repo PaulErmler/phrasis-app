@@ -100,7 +100,6 @@ import { FEATURE_IDS } from './featureIds';
 import {
   ensureTextContent,
   regenerateSupersededRevisionAudio,
-  requestSentenceMetadataIfNeeded,
 } from '../lib/contentScheduling';
 import { fetchTrackDueCards, fetchTrackEarliestDue } from '../lib/dueQueue';
 import { claimLlmTranslationIfAvailable } from './llmTranslationQueue';
@@ -1820,7 +1819,7 @@ async function payFlagReward(
   const period = new Date(now).toISOString().slice(0, 7);
   const row = await ctx.db
     .query('flagRewards')
-    .withIndex('by_user_and_period', (q) =>
+    .withIndex('by_userId_and_period', (q) =>
       q.eq('userId', userId).eq('period', period),
     )
     .first();
@@ -1843,22 +1842,14 @@ async function payFlagReward(
  *
  *  - wrong_translation, other: the retranslation this mutation always did
  *    (`retranslation_high`, under the per-row cap, one quota unit).
- *  - wrong_gender: the per-card override when a gender was picked, and a
- *    sentence-metadata classification of the shared text when the current
- *    classifier has not judged it yet. NO immediate retranslation: it would
- *    run under the coin flip the flag is complaining about, and the sweep
- *    regenerates the rows the verdict proves wrong once it lands
- *    (`sweepStaleTranslations`). With wrong_translation ticked as well the
- *    retranslation happens anyway.
- *  - wrong_politeness: the per-card override when a level was picked (the
- *    variant path renders it); otherwise a retranslation, which on ja, ko,
- *    th and fil requests the language's default level.
+ *  - wrong_gender: the learner's pick becomes the sentence's voice, the
+ *    English wording is checked (`checkSpeakerGender`: a definitive verdict
+ *    outranks the pick), and the shared row is retranslated for the
+ *    corrected voice like any other flag.
  *
- * The view is the card's own, settings included, so the pinned check and
- * the audit's `before` describe the wording the learner saw, and the
- * retranslation targets exactly the row the card reads: its keyed row, or
- * its legacy row (docs/architecture/rendering-keys.md). Rows versioned
- * from a replaced primary are re-derived by the next sweep.
+ * The view is the card's own, so the pinned check and the audit's `before`
+ * describe the wording the learner saw, and the retranslation targets the
+ * row the card reads (docs/architecture/rendering-keys.md).
  */
 export const flagTranslation = mutation({
   args: {
@@ -2082,10 +2073,10 @@ export const flagTranslation = mutation({
     // A sentence has one voice and one translation written for it, so a
     // speaker correction moves the SENTENCE, not one card: the learner's
     // pick becomes the text's voice and every row of it is re-rendered
-    // below. The classifier is asked in the same breath, from the source
-    // sentence alone; its verdict outranks the pick when it lands
-    // (`applyTextMetadata`). A text already judged by the current
-    // classifier is not re-asked: same prompt, same answer.
+    // below. The sentence is checked in the same breath (Paul, 2026-09-11:
+    // every speaker flag leads to a check): a male/female verdict from the
+    // English wording outranks the pick and re-keys the text, a neutral
+    // one leaves the pick as the voice (`applySpeakerGenderVerdict`).
     if (reasons.includes('wrong_gender')) {
       if (
         args.requestedGender &&
@@ -2096,12 +2087,15 @@ export const flagTranslation = mutation({
         });
         text = { ...text, audioSpeakerGender: args.requestedGender };
       }
-      await requestSentenceMetadataIfNeeded(
-        ctx,
-        text,
-        course.baseLanguages,
-        course.targetLanguages,
-        { requestedByUserId: userId },
+      await ctx.scheduler.runAfter(
+        0,
+        internal.features.sentenceMetadata.checkSpeakerGender,
+        {
+          textId: text._id,
+          baseLanguages: course.baseLanguages,
+          targetLanguages: course.targetLanguages,
+          userId,
+        },
       );
     }
 

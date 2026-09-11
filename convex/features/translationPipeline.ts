@@ -439,6 +439,7 @@ async function replaceTranslationRow(
     translationSource: string | undefined;
     regionVariant: string | undefined;
     speakerGender: 'male' | 'female';
+    variantKey: string;
     translationVersion: number;
     renderingVerified: boolean | undefined;
   }> = {
@@ -475,6 +476,13 @@ async function replaceTranslationRow(
   // stale gender, so the new row's gender should reflect the current card.
   if (args.speakerGender) {
     patch.speakerGender = args.speakerGender;
+  }
+  // The key the wording was rendered for (rendering-keys.md, invariant 4).
+  // A regeneration for the other voice moves the row onto that voice; left
+  // unstamped, `sweepStaleTranslations` finds the row voice-stale on every
+  // pass and buys the same rendering again.
+  if (args.variantKey) {
+    patch.variantKey = args.variantKey;
   }
   await ctx.db.patch(existing._id, patch);
   return {
@@ -585,6 +593,11 @@ async function replaceForVersionBump(
       ...(args.renderingVerified !== undefined
         ? { renderingVerified: args.renderingVerified }
         : {}),
+      // An identical wording rendered for the other voice still moves the
+      // row onto that voice (key and stamp), or the next sweep regenerates
+      // it again.
+      ...(args.variantKey ? { variantKey: args.variantKey } : {}),
+      ...(args.speakerGender ? { speakerGender: args.speakerGender } : {}),
     });
     return {
       rowId: existing._id,

@@ -178,12 +178,28 @@ describe('resolveCardSpeakerGenders', () => {
         speakerGender: 'female',
         audioSpeakerGender: undefined,
         userCreated: false,
+        metadataSource: 'speaker-scan-v1',
       },
       'seed1',
     );
     expect(r.audioSpeakerGender).toBe('female');
     // Mirrors into audioSpeakerGender; never patches speakerGender.
     expect(r.genderPatch).toEqual({ audioSpeakerGender: 'female' });
+  });
+
+  it('an unstamped male/female on a premade text is the old sweep\'s flip, not evidence', () => {
+    // Production holds this shape on every curriculum text the pre-2026-09-10
+    // sweep reached. A learner's correction (audioSpeakerGender) must win.
+    const r = resolveCardSpeakerGenders(
+      {
+        speakerGender: 'male',
+        audioSpeakerGender: 'female',
+        userCreated: false,
+      },
+      'seed-flip',
+    );
+    expect(r.audioSpeakerGender).toBe('female');
+    expect(r.genderPatch).toEqual({});
   });
 
   it('definitive + already-matching audio writes no patch', () => {

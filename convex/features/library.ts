@@ -1,10 +1,6 @@
-import {
-  viewOfCard,
-  renderingCardOf,
-  renderingTextOf,
-} from '../db/translationReads';
+import { viewOfCard, renderingTextOf } from '../db/translationReads';
 import { v } from 'convex/values';
-import { mutation, query } from '../_generated/server';
+import { query } from '../_generated/server';
 import { Doc } from '../_generated/dataModel';
 import { getAuthUserId } from '../db/users';
 import { getActiveCourseForUser } from '../db/courses';
@@ -22,7 +18,6 @@ import {
   fsrsStateValidator,
   schedulingPhaseValidator,
 } from '../types';
-import { ensureTextContent } from '../lib/contentScheduling';
 
 // ============================================================================
 // QUERY
@@ -79,14 +74,6 @@ const libraryCardValidator = v.object({
  *   'favorites'→ only favorited non-hidden cards
  */
 const LIBRARY_LIMIT = 100;
-
-/**
- * How many library cards one request may sweep. `getLibraryCards` is
- * unpaginated and returns up to `LIBRARY_LIMIT` in one shot, and the client
- * renders all of them, so a smaller cap strands the tail of the page on an
- * "updating" chip that never clears. It was 60 against a 100-card page.
- */
-const MAX_LIBRARY_RENDERING_CARDS = LIBRARY_LIMIT;
 
 // Convex full-text search accepts at most 16 terms per query.
 export const MAX_SEARCH_TERMS = 16;
@@ -404,58 +391,5 @@ export const getLibraryCards = query({
       .filter((c): c is NonNullable<typeof c> => c !== null);
 
     return page;
-  },
-});
-
-/**
- * Ask for the rendering variants of the cards the library is showing.
- *
- * The library is a query, and a query cannot schedule work, so the wording a
- * course's politeness setting asks for used to appear only once the review
- * ensure path happened to reach the card. A learner who set a level and
- * opened the library saw the canonical sentence with nothing to say it was
- * about to change (2026-09-08 review). The client calls this for the page it
- * has rendered, the same shape the collection preview already uses.
- *
- * TEXT ONLY (`skipTts`): a browse surface may buy a translation, never a
- * clip. Claim-deduped per variant, so repeated calls while a job is in
- * flight are no-ops and two learners on the same course share one job. Not
- * quota-gated, for the same reason `requestPreviewTranslations` is not:
- * translations are the cheap half and audio is the spend that matters.
- */
-export const requestLibraryRenderings = mutation({
-  args: { cardIds: v.array(v.id('cards')) },
-  returns: v.object({ translationsScheduled: v.number() }),
-  handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return { translationsScheduled: 0 };
-    const active = await getActiveCourseForUser(ctx, userId);
-    if (!active) return { translationsScheduled: 0 };
-    const { course } = active;
-    const deck = await getDeckByCourseId(ctx, course._id);
-    if (!deck) return { translationsScheduled: 0 };
-
-    let translationsScheduled = 0;
-    for (const cardId of args.cardIds.slice(0, MAX_LIBRARY_RENDERING_CARDS)) {
-      const card = await ctx.db.get(cardId);
-      // Ownership: the card must belong to this user's active deck.
-      if (!card || card.deckId !== deck._id) continue;
-      const text = await ctx.db.get(card.textId);
-      if (!text) continue;
-      const scheduled = await ensureTextContent(
-        ctx,
-        card.textId,
-        text,
-        course.baseLanguages,
-        course.targetLanguages,
-        {
-          skipTts: true,
-          card: renderingCardOf(card),
-          requestedByUserId: userId,
-        },
-      );
-      translationsScheduled += scheduled.translationsScheduled;
-    }
-    return { translationsScheduled };
   },
 });

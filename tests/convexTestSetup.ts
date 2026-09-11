@@ -187,9 +187,9 @@ vi.mock('lindera-wasm-nodejs-ipadic', () => {
  * The setup above fakes `OPENROUTER_API_KEY` on the assumption, true until
  * 2026-09, that every suite reaching an LLM declares its own mock. Two
  * scheduled actions broke it:
- * `sentenceMetadata.classifyCurriculumText` (the sweep's metadata gate)
- * and `sentenceMetadata.fetchSentenceMetadata` (the custom-card paths) are
- * scheduled by `ensureTextContent` and by the translation write choke
+ * `sentenceMetadata.checkSpeakerGender` (the flag's speaker check) and
+ * `sentenceMetadata.fetchSentenceMetadata` (the custom-card paths) are
+ * scheduled by the flag mutation and by the translation write choke
  * point, so any suite that lands a translation now fires them. Unmocked they made a real
  * HTTP call, which outlives `drainSchedulerAfterEach`'s macrotask drain and
  * resumes inside the NEXT test, where convex-test's scheduled-function

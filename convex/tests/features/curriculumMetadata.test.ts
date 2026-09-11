@@ -16,11 +16,7 @@ import schema from '../../schema';
 import { internal } from '../../_generated/api';
 import type { Id } from '../../_generated/dataModel';
 import { llmPool, ttsPool } from '@/convex/lib/workpools';
-import {
-  ensureTextContent,
-  MAX_METADATA_ATTEMPTS,
-  metadataState,
-} from '../../lib/contentScheduling';
+import { ensureTextContent } from '../../lib/contentScheduling';
 import { audioPointer } from '../../db/translationReads';
 import { getTtsProviderForLanguage } from '../../../lib/languages';
 import { CURRENT_SENTENCE_METADATA_SOURCE } from '../../../lib/sentenceMetadataSource';
@@ -33,12 +29,11 @@ const modules = import.meta.glob('/convex/**/*.ts');
 drainSchedulerAfterEach();
 
 /**
- * Curriculum sentence metadata as the precondition of a rendering key
- * (docs/architecture/rendering-keys.md): the sweep asks the classifier for
- * a curriculum text it has not judged, from the source alone and under a
- * claim, and waits for the verdict before it computes any key; a verdict
- * stamps the source; a text the classifier keeps failing on renders from
- * defaults after `MAX_METADATA_ATTEMPTS`.
+ * Curriculum sentence metadata and the rendering key
+ * (docs/architecture/rendering-keys.md): no sweep classifies a curriculum
+ * text; a verdict (the offline scan through the upload, the flag's speaker
+ * check, or the full classifier on a user text) stamps the source and moves
+ * the voice, and the rows follow it.
  */
 
 // An English base also asks for the text's accent row (en_gb / en_au) by
@@ -82,8 +77,6 @@ async function seed(
   opts: {
     userCreated?: boolean;
     metadata?: { speakerGender: 'male' | 'female' | 'neutral' };
-    metadataRequestedAt?: number;
-    metadataAttempts?: number;
     keyedRows?: boolean;
   } = {},
 ) {
@@ -106,12 +99,6 @@ async function seed(
       romanizedText: '',
       ...(opts.metadata
         ? { metadataSource: CURRENT_SENTENCE_METADATA_SOURCE }
-        : {}),
-      ...(opts.metadataRequestedAt !== undefined
-        ? { metadataRequestedAt: opts.metadataRequestedAt }
-        : {}),
-      ...(opts.metadataAttempts !== undefined
-        ? { metadataAttempts: opts.metadataAttempts }
         : {}),
     });
     const rows: Record<string, Id<'translations'>> = {};
@@ -167,43 +154,6 @@ const sweep = (
     return ensureTextContent(ctx, textId, text, ['en'], ['ja', 'de'], opts);
   });
 
-describe('metadataState', () => {
-  it('current for a user text or the current source, else needed, in flight, or exhausted', () => {
-    expect(metadataState({ userCreated: false })).toBe('needed');
-    expect(metadataState({ userCreated: true })).toBe('current');
-    expect(
-      metadataState({
-        userCreated: false,
-        metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
-      }),
-    ).toBe('current');
-    expect(
-      metadataState({
-        userCreated: false,
-        metadataSource: 'some-older-build-v0',
-      }),
-    ).toBe('needed');
-    expect(
-      metadataState({
-        userCreated: false,
-        metadataRequestedAt: Date.now() - 60_000,
-      }),
-    ).toBe('in_flight');
-    expect(
-      metadataState({
-        userCreated: false,
-        metadataRequestedAt: Date.now() - 20 * 60 * 1000,
-      }),
-    ).toBe('needed');
-    expect(
-      metadataState({
-        userCreated: false,
-        metadataAttempts: MAX_METADATA_ATTEMPTS,
-      }),
-    ).toBe('exhausted');
-  });
-});
-
 describe('the sweep no longer classifies up front', () => {
   it('leaves a complete text alone and never asks the classifier', async () => {
     const t = convexTest(schema, modules);
@@ -238,10 +188,7 @@ describe('the sweep no longer classifies up front', () => {
 describe('the source stamp', () => {
   it('a verdict with a speaker gender stamps the current source; the unblock call and a partial patch do not', async () => {
     const t = convexTest(schema, modules);
-    const { textId } = await seed(t, {
-      metadataRequestedAt: Date.now(),
-      metadataAttempts: 1,
-    });
+    const { textId } = await seed(t);
     const apply = (metadata: Record<string, unknown> | undefined) =>
       t.mutation(
         internal.features.sentenceMetadata.applyMetadataAndPrepareCard,
@@ -264,8 +211,6 @@ describe('the source stamp', () => {
     await apply({ speakerGender: 'female', referentGender: 'neutral' });
     const text = await t.run((ctx) => ctx.db.get(textId));
     expect(text?.metadataSource).toBe(CURRENT_SENTENCE_METADATA_SOURCE);
-    expect(text?.metadataRequestedAt).toBeUndefined();
-    expect(text?.metadataAttempts).toBeUndefined();
     expect(text?.speakerGender).toBe('female');
     expect(text?.audioSpeakerGender).toBe('female');
     // No definitive referent: the seeded flip stands in.
@@ -398,5 +343,143 @@ describe('a user-written text follows the verdict', () => {
         async (ctx) => (await ctx.db.query('audioAssets').collect()).length,
       ),
     ).toBe(3);
+  });
+});
+
+describe('a voice move re-keys the row', () => {
+  /** The LLM claim the sweep's regen job holds for (text, lang). */
+  const claimFor = (
+    t: TestConvex<typeof schema>,
+    textId: Id<'texts'>,
+    lang: string,
+  ) =>
+    t.run((ctx) =>
+      ctx.db
+        .query('llmTranslationClaims')
+        .withIndex('by_text_and_language', (q) =>
+          q.eq('textId', textId).eq('targetLanguage', lang),
+        )
+        .first(),
+    );
+
+  it('a regeneration for the other voice stamps the new key, so the next sweep is quiet', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, rows } = await seed(t, { keyedRows: true });
+    await t.run((ctx) =>
+      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
+    );
+    await sweep(t, textId);
+    expect(
+      llmEnqueues().map((j) => [
+        j.targetLanguage,
+        j.renderingKey,
+        j.replaceExisting,
+        j.translationReason,
+      ]),
+    ).toEqual(
+      expect.arrayContaining([
+        ['ja', 'female', true, 'version_bump'],
+        ['de', 'female', true, 'version_bump'],
+      ]),
+    );
+
+    // The worker lands the SAME wording for ja (the common case for a
+    // short sentence: a restamp) and a different one for de (a replace).
+    // Both must move the row onto the voice they were rendered for.
+    const jaClaim = (await claimFor(t, textId, 'ja'))!;
+    await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
+      textId,
+      targetLanguage: 'ja',
+      translatedText: '僕たちは兄弟だ。',
+      voiceName: 'ja-test-female',
+      translationSource: 'openai/gpt-5.6-sol:floor-minimal',
+      replaceExisting: true,
+      translationReason: 'version_bump',
+      speakerGender: 'female',
+      variantKey: 'female',
+      expectedClaimId: jaClaim._id,
+      skipTts: true,
+    });
+    const deClaim = (await claimFor(t, textId, 'de'))!;
+    await t.mutation(internal.features.decks.storeTranslationAndScheduleTTS, {
+      textId,
+      targetLanguage: 'de',
+      translatedText: 'Wir sind Geschwister.',
+      voiceName: 'de-test-female',
+      translationSource: 'openai/gpt-5.6-sol:floor-minimal',
+      replaceExisting: true,
+      translationReason: 'version_bump',
+      speakerGender: 'female',
+      variantKey: 'female',
+      expectedClaimId: deClaim._id,
+      skipTts: true,
+    });
+    expect(await t.run((ctx) => ctx.db.get(rows.ja))).toMatchObject({
+      translatedText: '僕たちは兄弟だ。',
+      variantKey: 'female',
+      speakerGender: 'female',
+    });
+    expect(await t.run((ctx) => ctx.db.get(rows.de))).toMatchObject({
+      translatedText: 'Wir sind Geschwister.',
+      variantKey: 'female',
+      speakerGender: 'female',
+    });
+
+    // The claims are released with the rows, so a stale key here would be
+    // re-bought on this very pass.
+    vi.mocked(llmPool.enqueueAction).mockClear();
+    await sweep(t, textId);
+    expect(llmEnqueues()).toEqual([]);
+  });
+});
+
+describe('the audio sweep on a browse pass', () => {
+  it('a skipTts pass keeps a stale but playable clip; the next full pass detaches it', async () => {
+    const t = convexTest(schema, modules);
+    const { textId } = await seed(t, { keyedRows: true });
+    // The source clip is voiced male; the sentence's voice moves.
+    await t.run((ctx) =>
+      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
+    );
+    await sweep(t, textId, { skipTts: true });
+    expect(await t.run((ctx) => audioPointer(ctx, textId, 'en'))).not.toBe(
+      null,
+    );
+    await sweep(t, textId);
+    expect(await t.run((ctx) => audioPointer(ctx, textId, 'en'))).toBe(null);
+  });
+
+  it('a clip whose wording differs from the row only by punctuation is kept', async () => {
+    const t = convexTest(schema, modules);
+    const { textId, rows } = await seed(t, { keyedRows: true });
+    // A punctuation-only retranslation keeps its clip on landing
+    // (`invalidateAudioIfAudiblyChanged`); the sweep must agree.
+    await t.run((ctx) =>
+      ctx.db.patch(rows.de, { translatedText: 'Wir sind Brüder' }),
+    );
+    await t.run((ctx) =>
+      ctx.db.patch(rows.ja, { translatedText: '僕たちは姉妹だ。' }),
+    );
+    await sweep(t, textId);
+    expect(await t.run((ctx) => audioPointer(ctx, textId, 'de'))).not.toBe(
+      null,
+    );
+    expect(await t.run((ctx) => audioPointer(ctx, textId, 'ja'))).toBe(null);
+  });
+});
+
+describe('a legacy row follows the voice too', () => {
+  it('re-renders a legacy row whose speakerGender stamp names the other voice; a row with no stamp is left alone', async () => {
+    const t = convexTest(schema, modules);
+    // Legacy rows (no key), stamped 'male' by the seed.
+    const { textId, rows } = await seed(t);
+    await t.run((ctx) => ctx.db.patch(rows.de, { speakerGender: undefined }));
+    await t.run((ctx) =>
+      ctx.db.patch(textId, { audioSpeakerGender: 'female' }),
+    );
+    await sweep(t, textId);
+    expect(
+      llmEnqueues().map((j) => [j.targetLanguage, j.renderingKey]),
+    ).toEqual([['ja', 'female']]);
   });
 });

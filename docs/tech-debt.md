@@ -114,12 +114,10 @@ correctness/cost/velocity noted per item.
       2026-09-10: every reader without a card resolves a key like a new card would,
       and `ensureTextContent` is the one sweep for the review, warm and browse
       surfaces (browse passes `skipTts`), so a preview requests the keyed row.
-- [ ] **C41 — Sentence-metadata calls are one per text.** The curriculum
-      classification (`requestSentenceMetadataIfNeeded`, asked by the sweep's
-      metadata gate before a text's first keyed row) sends one classifier call per
-      text. Batching several source sentences into one call would cut the per-row
-      overhead but needs a prompt change and its own `pnpm eval:metadata` run.
-      Effort S.
+- [x] **C41 — Sentence-metadata calls are one per text.** Moot since
+      2026-09-11: no sweep classifies a curriculum text. The speaker verdict
+      comes from the offline corpus scan (`pnpm classify:speaker`) through the
+      dataset upload, and a "wrong speaker" flag runs one one-word check.
 - [x] **C42 — No way to clear a per-card rendering override.** Moot since
       the per-card overrides were withdrawn (2026-09-11): a speaker
       correction moves the sentence's own voice, and flagging it again

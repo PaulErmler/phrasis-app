@@ -32,22 +32,33 @@ only code that reads a key.
 ## The voice
 
 `resolveCardSpeakerGenders` (lib/voices.ts) decides it once and keeps it:
-the classifier's verdict when the sentence fixes its own speaker ("We are
-brothers"), else one flip seeded on the text id, written into
-`audioSpeakerGender` only. `texts.speakerGender` stays the classifier's
-verdict, so a reader can tell evidence from a flip
-(lib/sentenceMetadataSource.ts).
+a verdict when the sentence fixes its own speaker ("We are brothers"),
+else one flip seeded on the text id, written into `audioSpeakerGender`
+only. `texts.speakerGender` holds the verdict, and `metadataSource` says
+who gave it; on a curriculum text an unstamped male/female is the flip the
+pre-2026-09-10 sweep wrote back and is not evidence
+(`definitiveSpeakerGender`, lib/sentenceMetadataSource.ts).
 
-Two things move the voice:
+Where verdicts come from:
 
-- A classifier verdict (`applyTextMetadata`). It re-keys the text's rows in
-  the same transaction and detaches the clips of the old voice, so the next
-  sweep re-voices them.
+- Curriculum texts: the offline corpus scan (`pnpm classify:speaker`,
+  lib/speakerGenderPrompt.ts). Its definitive verdicts are code
+  (`convex/lib/speakerGenderVerdicts.ts`, emitted from the scan's CSV) and
+  the `applySpeakerGenderVerdicts` migration writes them onto every
+  deployment's texts with `runAll`, touching only those sentences. The
+  dataset upload (`scripts/uploadOgteV1.mjs`) carries the CSV too, for
+  texts uploaded after a deploy. No sweep classifies a curriculum text at
+  runtime.
+- User-written texts: the full classifier at creation
+  (`applyTextMetadata`), which re-keys the text's rows in the same
+  transaction and detaches the clips of the old voice when a verdict moves
+  it.
 - A Flag dialog "wrong speaker gender". The learner's pick becomes the
-  text's voice, the classifier is asked about the sentence in the same
-  breath, and the shared row is retranslated for every card on it. The
-  classifier is reached ONLY here: no sweep classifies a curriculum
-  sentence up front.
+  text's voice, the sentence is checked with the scan's own prompt
+  (`checkSpeakerGender`), and the shared row is retranslated for every
+  card on it. A definitive verdict outranks the pick; a neutral one leaves
+  it. Rows keyed or stamped for the old voice are re-rendered by the next
+  sweep.
 
 ## Who reads what
 
@@ -68,10 +79,14 @@ warm loops, card edit, audio regeneration). In order:
 2. Load every required language's rows, pointer and claim in one round.
 3. `sweepStaleTranslations`: regenerate a row in place through the
    version-bump path when the language's `translationVersion` moved past
-   its stamp, or when its key names the other speaker.
+   its stamp, or when the voice it was written for (its key, or on a legacy
+   row its `speakerGender` stamp) is not the sentence's.
 4. `sweepInvalidAudio`: detach a pointer whose blob is gone, whose voice
    disagrees with the sentence's, whose asset speaks another wording, or
    whose provider / `ttsVersion` / accent has moved on. The asset is kept.
+   A pass that may not synthesize (`skipTts`: the collection preview, the
+   library) detaches only unplayable pointers; a stale but playable clip
+   waits for the pass that can replace it.
 5. Fill the gaps per language: the missing row, its annotations
    (romanization, IPA, furigana), its audio, its word timings, and the same
    for every superseded revision a pinned card still reads.

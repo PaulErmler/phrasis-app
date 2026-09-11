@@ -422,11 +422,21 @@ export async function upsertAudioPointer(
     });
     return;
   }
-  if (existing.assetId === assetId && existing.variantKey === variantKey) {
+  if (
+    existing.assetId === assetId &&
+    (variantKey === undefined || existing.variantKey === variantKey)
+  ) {
     return;
   }
   const previousAssetId = existing.assetId;
-  await ctx.db.patch(existing._id, { assetId, variantKey });
+  // A caller without a key (a TTS job enqueued before the keys existed)
+  // re-points the row and leaves its key alone: `patch({ variantKey:
+  // undefined })` would strip it and demote the pointer to a legacy one
+  // the wording check in `sweepInvalidAudio` no longer covers.
+  await ctx.db.patch(existing._id, {
+    assetId,
+    ...(variantKey !== undefined ? { variantKey } : {}),
+  });
   if (previousAssetId === assetId) return;
   await releaseAudioAssetIfUnreferenced(ctx, previousAssetId);
 }

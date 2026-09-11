@@ -14,7 +14,6 @@
 export {
   SENTENCE_METADATA_SOURCES,
   CURRENT_SENTENCE_METADATA_SOURCE,
-  hasCurrentSentenceMetadata,
   definitiveSpeakerGender,
 } from '../../lib/sentenceMetadataSource';
 

@@ -495,28 +495,24 @@ export default defineSchema({
     tenseAspect: v.optional(v.string()), // simple_present / past_continuous / etc.
     sentenceType: v.optional(v.string()), // declarative / interrogative / imperative / exclamatory
     literalFigurative: v.optional(v.string()), // literal / figurative
-    // Which sentence-metadata classifier build produced the linguistic
-    // metadata above (`SENTENCE_METADATA_SOURCES` in
-    // convex/lib/sentenceMetadataShape.ts). Same invalidate-by-source
-    // contract as `romanizationSource`, with one more meaning: on a
-    // curriculum text from before 2026-09-10, undefined means the row was
-    // never classified and `speakerGender` may hold the coin flip the old
-    // sweep wrote back; only a row at the CURRENT source carries verdicts
-    // the resolver may treat as evidence. Stamped by `applyTextMetadata`.
-    // Since the rendering keys (docs/architecture/rendering-keys.md) the
-    // content sweep classifies a curriculum text BEFORE its first keyed row
-    // (`requestSentenceMetadataIfNeeded` in convex/lib/contentScheduling.ts),
-    // so no row is ever generated under a voice a verdict can overturn.
+    // Which classifier stamped `speakerGender` (and, for the full
+    // classifier, the fields above): `SENTENCE_METADATA_SOURCES`
+    // (convex/lib/sentenceMetadataShape.ts) for a user-written text at
+    // creation, `SPEAKER_GENDER_SCAN_SOURCE` for the offline corpus scan
+    // whose verdicts the `applySpeakerGenderVerdicts` migration writes on
+    // every deploy, and `SPEAKER_GENDER_CHECK_SOURCE` for the check a
+    // "wrong speaker" flag runs (lib/speakerGenderPrompt.ts). The resolver
+    // (lib/voices.ts) treats a male/female `speakerGender` on a curriculum
+    // text as evidence ONLY when this is set: unstamped, it is the coin
+    // flip the pre-2026-09-10 sweep wrote back. No sweep classifies a
+    // curriculum text at runtime.
     metadataSource: v.optional(v.string()),
-    // When a sweep last asked the classifier for this text, so the repeated
-    // sweeps of one card do not double the call while it is in flight, and
-    // a blank answer is retried after a cooldown.
-    metadataRequestedAt: v.optional(v.number()),
-    // How many times the classifier has been asked for this text. After
-    // `MAX_METADATA_ATTEMPTS` (contentScheduling.ts) the sweep stops waiting
-    // and renders from defaults (neutral register, the seeded voice), so a
-    // sentence the classifier keeps choking on still gets its cards.
-    metadataAttempts: v.optional(v.number()),
+    // TRANSITIONAL (the withdrawn lazy classifier gate, 2026-09-11): the
+    // request claim and attempt counter the sweep kept while it waited for
+    // a verdict. Dev and staging rows only; unset by the runAll-chained
+    // `dropMetadataRequestState`, then dropped in a later cleanup.
+    metadataRequestedAt: v.optional(v.any()),
+    metadataAttempts: v.optional(v.any()),
     /**
      * When a sweep last asked for this text's missing source annotations;
      * see `translations.annotationRequestedAt` for the contract.
@@ -1726,7 +1722,7 @@ export default defineSchema({
     userId: v.string(),
     period: v.string(), // 'YYYY-MM', UTC
     count: v.number(),
-  }).index('by_user_and_period', ['userId', 'period']),
+  }).index('by_userId_and_period', ['userId', 'period']),
 
   // TTS mismatches. Stores audio that failed validation for later analysis
   ttsMismatches: defineTable({

@@ -1,4 +1,9 @@
 import { Migrations } from '@convex-dev/migrations';
+import { SPEAKER_GENDER_VERDICTS } from './lib/speakerGenderVerdicts';
+import {
+  SPEAKER_GENDER_SCAN_SOURCE,
+  speakerGenderPatch,
+} from '../lib/speakerGenderPrompt';
 import { v } from 'convex/values';
 import { components, internal } from './_generated/api';
 import type { DataModel } from './_generated/dataModel';
@@ -1169,6 +1174,90 @@ export async function dedupeApostropheWordOne(
  * Idempotent: a row whose word is already ASCII is skipped, so later runs
  * find nothing to do.
  */
+/** `{ column: undefined }` for every listed column the doc still carries. */
+function unsetPatch<T extends Record<string, unknown>>(
+  doc: T,
+  columns: readonly (keyof T & string)[],
+): Partial<T> | undefined {
+  const stale = columns.filter((column) => doc[column] !== undefined);
+  if (stale.length === 0) return undefined;
+  return Object.fromEntries(
+    stale.map((column) => [column, undefined]),
+  ) as Partial<T>;
+}
+
+/**
+ * The withdrawn lazy classifier gate's request claim and attempt counter
+ * (2026-09-11). Dev and staging rows only; the columns are transitional
+ * `v.optional(v.any())` until this has run everywhere.
+ */
+export const dropMetadataRequestState = migrations.define({
+  table: 'texts',
+  batchSize: CHECK_SWEEP_BATCH_SIZE,
+  migrateOne: (_ctx, doc) =>
+    unsetPatch(doc, ['metadataRequestedAt', 'metadataAttempts']),
+});
+
+/**
+ * Write the offline speaker-gender scan's definitive verdicts onto the
+ * curriculum texts (kanban speaker-gender-ground-truth-2026-09-11,
+ * lib/speakerGenderPrompt.ts). The verdicts are code
+ * (`SPEAKER_GENDER_VERDICTS`, generated from the scan's CSV by
+ * `pnpm classify:speaker -- --emit`), so every deployment applies them on
+ * `runAll` with no upload step. Walks `datasets` (a handful of rows) and
+ * point-reads each dataset's affected externalIds, so only the sentences
+ * whose English fixes the speaker are read or written, never the 20k
+ * `texts`. A text already carrying the verdict is skipped, and a text
+ * another classifier stamped since (a learner's speaker check,
+ * `speaker-check-v1`) keeps that stamp, so re-runs change nothing. The
+ * rows keyed or stamped for the old voice re-render lazily
+ * (`sweepStaleTranslations`). Permanent: stays in the runner across the
+ * cutover cleanups.
+ */
+export async function applySpeakerGenderVerdictsToDataset(
+  ctx: MutationCtx,
+  dataset: Doc<'datasets'>,
+): Promise<{ patched: number }> {
+  let patched = 0;
+  for (const [externalId, verdict] of Object.entries(SPEAKER_GENDER_VERDICTS)) {
+    const text = await ctx.db
+      .query('texts')
+      .withIndex('by_dataset_and_externalId', (q) =>
+        q.eq('datasetId', dataset._id).eq('externalId', externalId),
+      )
+      .unique();
+    if (!text) continue;
+    if (
+      text.metadataSource !== undefined &&
+      text.metadataSource !== SPEAKER_GENDER_SCAN_SOURCE
+    ) {
+      continue;
+    }
+    if (
+      text.speakerGender === verdict &&
+      text.audioSpeakerGender === verdict &&
+      text.metadataSource === SPEAKER_GENDER_SCAN_SOURCE
+    ) {
+      continue;
+    }
+    await ctx.db.patch(
+      text._id,
+      speakerGenderPatch(verdict, SPEAKER_GENDER_SCAN_SOURCE),
+    );
+    patched++;
+  }
+  return { patched };
+}
+
+export const applySpeakerGenderVerdicts = migrations.define({
+  table: 'datasets',
+  batchSize: 1,
+  migrateOne: async (ctx, doc) => {
+    await applySpeakerGenderVerdictsToDataset(ctx, doc);
+    return undefined;
+  },
+});
+
 export const dedupeApostropheWords = migrations.define({
   table: 'userWords',
   batchSize: CHECK_SWEEP_BATCH_SIZE,
@@ -1204,4 +1293,6 @@ export const runAll = migrations.runner([
   internal.migrations.courseStatsTimeByModeBackfill,
   internal.migrations.backfillAudioAssetAccent,
   internal.migrations.dedupeApostropheWords,
+  internal.migrations.dropMetadataRequestState,
+  internal.migrations.applySpeakerGenderVerdicts,
 ]);

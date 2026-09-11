@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import {
   internalAction,
   internalMutation,
+  internalQuery,
   MutationCtx,
 } from '../_generated/server';
 import { Id } from '../_generated/dataModel';
@@ -15,7 +16,17 @@ import {
 } from '../types';
 import { trackException } from '../analytics';
 import { generateText } from 'ai';
-import { OPENROUTER_MODELS } from '../config/aiModels';
+import {
+  OPENROUTER_MODELS,
+  SPEAKER_GENDER_CHECK_PROVIDER,
+} from '../config/aiModels';
+import { openrouterCallOptions } from './translationLLM';
+import {
+  buildSpeakerGenderSystemPrompt,
+  buildSpeakerGenderUserPrompt,
+  parseSpeakerGenderVerdict,
+  SPEAKER_GENDER_CHECK_SOURCE,
+} from '../../lib/speakerGenderPrompt';
 import { getOpenRouter } from '../lib/openrouter';
 import {
   captureGeneration,
@@ -222,31 +233,136 @@ export const generateSentenceMetadata = internalAction({
 });
 
 /**
- * Entry point of the content sweep for a CURRICULUM text
- * (`requestSentenceMetadataIfNeeded` in convex/lib/contentScheduling.ts):
- * the classifier on the source sentence alone, through the retrier, with no
- * unblock call. The sweep waits for the verdict before it computes a
- * rendering key, so the row's voice and form are decided from data, never
- * from a guess a verdict could overturn (docs/architecture/rendering-keys.md).
+ * The speaker-gender check a "wrong speaker" flag runs on a CURRICULUM text
+ * (`flagTranslation`): the corpus scan's own one-word prompt
+ * (lib/speakerGenderPrompt.ts) on the English sentence, so a flag and the
+ * offline scan cannot disagree on the rule. A male/female verdict becomes
+ * the sentence's voice and outranks the learner's pick; a neutral one
+ * records that the wording fixes nothing and leaves the pick as the voice.
+ * No verdict (an outage, an unparseable answer) changes nothing.
+ * User-written texts never come here: the flag short-circuits on them.
  */
-export const classifyCurriculumText = internalAction({
-  args: metadataJobArgs.fields,
+export const checkSpeakerGender = internalAction({
+  args: {
+    textId: v.id('texts'),
+    baseLanguages: v.array(v.string()),
+    targetLanguages: v.array(v.string()),
+    /** The flagging learner, for cost attribution. */
+    userId: v.optional(v.string()),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const text = await ctx.runQuery(
+      internal.features.sentenceMetadata.getTextForSpeakerCheck,
+      { textId: args.textId },
+    );
+    if (!text) return null;
+    // The prompt reads English, which every curriculum text is.
+    if (text.language !== 'en') return null;
     try {
-      await retrier.run(
-        ctx as unknown as Parameters<typeof retrier.run>[0],
-        internal.features.sentenceMetadata.fetchSentenceMetadata,
-        args,
+      const openrouter = getOpenRouter();
+      const providerOptions = openrouterCallOptions(
+        'none',
+        SPEAKER_GENDER_CHECK_PROVIDER,
+      );
+      const startedAt = Date.now();
+      const {
+        text: answer,
+        usage,
+        providerMetadata,
+      } = await generateText({
+        model: openrouter(OPENROUTER_MODELS.speakerGenderCheck),
+        system: buildSpeakerGenderSystemPrompt(),
+        prompt: buildSpeakerGenderUserPrompt(text.text),
+        maxOutputTokens: 4,
+        temperature: 0,
+        ...(providerOptions ? { providerOptions } : {}),
+      });
+      await captureGeneration(ctx, {
+        distinctId: args.userId,
+        feature: 'speaker_gender_check',
+        model: OPENROUTER_MODELS.speakerGenderCheck,
+        provider: 'openrouter',
+        latencyMs: Date.now() - startedAt,
+        inputTokens: usage?.inputTokens,
+        outputTokens: usage?.outputTokens,
+        costUsd: openrouterCostUsd(providerMetadata),
+        traceId: openrouterGenerationId(providerMetadata),
+        sharedContent: true,
+        extra: { text_id: args.textId },
+      });
+      const verdict = parseSpeakerGenderVerdict(answer);
+      if (!verdict) {
+        console.error('checkSpeakerGender: no verdict', {
+          textId: args.textId,
+          answer,
+        });
+        return null;
+      }
+      await ctx.runMutation(
+        internal.features.sentenceMetadata.applySpeakerGenderVerdict,
+        {
+          textId: args.textId,
+          verdict,
+          baseLanguages: args.baseLanguages,
+          targetLanguages: args.targetLanguages,
+          requestedByUserId: args.userId,
+        },
       );
       return null;
     } catch (error) {
       await trackException(ctx, error, args.userId, {
         textId: args.textId,
-        source: 'classifyCurriculumText',
+        source: 'checkSpeakerGender',
       });
       throw error;
     }
+  },
+});
+
+export const getTextForSpeakerCheck = internalQuery({
+  args: { textId: v.id('texts') },
+  returns: v.union(v.null(), v.object({ text: v.string(), language: v.string() })),
+  handler: async (ctx, args) => {
+    const text = await ctx.db.get(args.textId);
+    return text ? { text: text.text, language: text.language } : null;
+  },
+});
+
+/**
+ * Write a speaker verdict onto a curriculum text and re-run its content:
+ * `speakerGender` is the verdict, `metadataSource` says the check gave it,
+ * and a definitive verdict is the voice (`audioSpeakerGender`). Rows keyed
+ * for the old voice are re-rendered by the sweep the reschedule runs
+ * (`sweepStaleTranslations`). Kept apart from `applyTextMetadata`: the full
+ * classifier's patch also settles the addressee and referent genders, which
+ * a one-word check has no verdict on.
+ */
+export const applySpeakerGenderVerdict = internalMutation({
+  args: {
+    textId: v.id('texts'),
+    verdict: v.union(
+      v.literal('male'),
+      v.literal('female'),
+      v.literal('neutral'),
+    ),
+    baseLanguages: v.array(v.string()),
+    targetLanguages: v.array(v.string()),
+    requestedByUserId: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const text = await ctx.db.get(args.textId);
+    if (!text) return null;
+    await ctx.db.patch(args.textId, {
+      speakerGender: args.verdict,
+      metadataSource: SPEAKER_GENDER_CHECK_SOURCE,
+      ...(args.verdict === 'neutral'
+        ? {}
+        : { audioSpeakerGender: args.verdict }),
+    });
+    await schedulePrepareCardForText(ctx, args.textId, args);
+    return null;
   },
 });
 
@@ -465,8 +581,6 @@ export async function applyTextMetadata(
     ...(classified
       ? {
           metadataSource: CURRENT_SENTENCE_METADATA_SOURCE,
-          metadataRequestedAt: undefined,
-          metadataAttempts: undefined,
         }
       : {}),
   });
@@ -478,8 +592,9 @@ export async function applyTextMetadata(
   // not, and the ensure pass below re-voices them under the new key. A
   // legacy row of a user text (from before the keys) carries the voice in
   // `speakerGender` alone, which its chip reads, so that stamp follows too.
-  // A curriculum text's rows are never touched here: they are generated
-  // for a voice only after the verdict (the sweep's metadata gate).
+  // A curriculum text's rows are not touched here: the sweep the
+  // reschedule runs re-renders the ones keyed for the old voice
+  // (`sweepStaleTranslations`).
   const previousVoice = text.audioSpeakerGender;
   if (isUserCreatedText(text) && previousVoice !== audioSpeakerGender) {
     const translations = await ctx.db
@@ -516,29 +631,41 @@ export async function applyTextMetadata(
   }
 
   if (args.schedulePrepareCard) {
-    // The pass buys audio only when the text is somebody's card: a
-    // collection preview requested this verdict for a text nobody studies
-    // yet, and a browse surface never buys a clip.
-    const cardForText = await ctx.db
-      .query('cards')
-      .withIndex('by_textId', (q) => q.eq('textId', args.textId))
-      .first();
-    await ctx.scheduler.runAfter(
-      0,
-      internal.features.decks.prepareCardContent,
-      {
-        textId: args.textId,
-        baseLanguages: args.baseLanguages,
-        targetLanguages: args.targetLanguages,
-        priority: args.priority,
-        llmPriority: args.llmPriority,
-        requestedByUserId: args.requestedByUserId,
-        skipTts: cardForText === null,
-      },
-    );
+    await schedulePrepareCardForText(ctx, args.textId, args);
   }
 
   return null;
+}
+
+/**
+ * Re-run a text's content after a verdict. The pass buys audio only when
+ * the text is somebody's card: a collection preview requested this verdict
+ * for a text nobody studies yet, and a browse surface never buys a clip.
+ */
+async function schedulePrepareCardForText(
+  ctx: MutationCtx,
+  textId: Id<'texts'>,
+  opts: {
+    baseLanguages: string[];
+    targetLanguages: string[];
+    priority?: TtsPriority;
+    llmPriority?: LlmPriority;
+    requestedByUserId?: string;
+  },
+): Promise<void> {
+  const cardForText = await ctx.db
+    .query('cards')
+    .withIndex('by_textId', (q) => q.eq('textId', textId))
+    .first();
+  await ctx.scheduler.runAfter(0, internal.features.decks.prepareCardContent, {
+    textId,
+    baseLanguages: opts.baseLanguages,
+    targetLanguages: opts.targetLanguages,
+    priority: opts.priority,
+    llmPriority: opts.llmPriority,
+    requestedByUserId: opts.requestedByUserId,
+    skipTts: cardForText === null,
+  });
 }
 
 export const applyMetadataAndPrepareCard = internalMutation({

@@ -16,7 +16,6 @@ import {
   usesSourceTextVerbatim,
 } from '../../lib/languages';
 import { mayRegenerateTranslation } from '../../lib/translationProvenance';
-import { hasCurrentSentenceMetadata } from '../../lib/sentenceMetadataSource';
 import { shouldOverwriteProvider } from '../../lib/ttsPrecedence';
 import {
   annotationRequestInFlight,
@@ -26,6 +25,8 @@ import {
   TEXT_ANNOTATIONS,
 } from './textAnnotations';
 import { deleteAudioRow } from './audio';
+import { soundsSame } from './textComparison';
+import { parseRenderingKey } from '../../lib/preferenceResolution';
 import {
   findReusableAudioAssetForVoice,
   resolveAudioPayload,
@@ -497,10 +498,10 @@ export async function regenerateSupersededRevisionAudio(
  */
 function audioAssetMismatch(
   lang: string,
-  asset: Pick<
-    Doc<'audioAssets'>,
-    'ttsProvider' | 'ttsVersion' | 'regionVariant'
-  >,
+  // The asset row itself, never a `ResolvedAudioPayload`: the payload has
+  // no top-level `regionVariant`, and without it an accent variant's own
+  // `ttsVersion` bump (en_au) was never seen by the live-pointer sweep.
+  asset: Doc<'audioAssets'>,
 ): { providerMismatch: boolean; versionMismatch: boolean } {
   return {
     providerMismatch: shouldOverwriteProvider(
@@ -687,7 +688,9 @@ async function loadContentState(
  * accent drift). All checks read the row's RESOLVED payload (the shared
  * `audioAssets` row). Detaching a pointer leaves a still-shared asset
  * untouched; the re-synthesis a stale asset triggers patches that asset in
- * place, healing every other text sharing the string at once.
+ * place, healing every other text sharing the string at once. A `skipTts`
+ * pass detaches only unplayable pointers (asset or blob gone): it may not
+ * re-synthesize, so a stale but playable clip stays for the pass that can.
  * Do not delete while TTS is in flight: `processTTSForCard` may have
  * attached a row whose URL is not yet resolvable, or concurrent cleanup
  * would remove the row while later validation updates expect it to exist
@@ -752,14 +755,17 @@ async function sweepInvalidAudio(
     // (a late synthesis after the wording moved on). Only for a pointer
     // this pipeline stamped: an unstamped one predates the rule, and its
     // asset's `spokenText` is not a reliable claim about the wording.
+    // `soundsSame`, not equality: a retranslation that only moved
+    // punctuation keeps its clip on purpose (`invalidateAudioIfAudiblyChanged`),
+    // and a strict compare here would detach it on the next pass anyway.
     const wordingMismatch =
       audio.variantKey !== undefined &&
       slot.lang !== text.language &&
       slot.served !== null &&
-      payload.asset.spokenText !== slot.served.translatedText;
+      !soundsSame(payload.asset.spokenText, slot.served.translatedText);
     const { providerMismatch, versionMismatch } = audioAssetMismatch(
       lang,
-      payload,
+      payload.asset,
     );
     // A user-created text keeps the accent it was voiced in. Its clip was
     // made for its own hash, or carried over from the shared text the
@@ -775,6 +781,11 @@ async function sweepInvalidAudio(
       versionMismatch ||
       accentMismatch
     ) {
+      // A pass that may not synthesize (`skipTts`: the collection preview,
+      // the library) leaves a stale but playable clip in place. Detaching
+      // it here would silence another learner's card until their own sweep
+      // re-bought it; the next pass that may synthesize does both at once.
+      if (opts?.skipTts) continue;
       if (opts?.probe) throw new ProbeNeedsWork();
       // Detach only: the asset and its blob stay even as the last pointer.
       // That audio is still CORRECT for its string+voice+accent+setup and
@@ -799,9 +810,10 @@ async function sweepInvalidAudio(
  *
  *  1. Version-stale: the language's `translationVersion` config was bumped
  *     above the row's stamp (a new model or prompt).
- *  2. Voice-stale: the row was written for the other speaker (a flag moved
- *     the sentence's voice). A row with no key is from before the stamp
- *     existed and is left alone.
+ *  2. Voice-stale: the row was written for the other speaker (a flag or a
+ *     verdict moved the sentence's voice). A keyed row says so in its key,
+ *     a legacy row in its `speakerGender` stamp; a row with neither is
+ *     left alone.
  *
  * Content we may not touch is skipped (`mayRegenerateTranslation`). Skipped
  * too while TTS is in flight or an LLM job already owns the row. Returns
@@ -825,8 +837,14 @@ async function sweepStaleTranslations(
       lang,
       served.translationVersion,
     );
-    const voiceStale =
-      served.variantKey !== undefined && served.variantKey !== slot.key;
+    // A keyed row names its voice in the key; a legacy row in its
+    // `speakerGender` stamp (the voice requested when it was written). A
+    // row with neither predates both stamps and is left alone.
+    const rowVoice =
+      served.variantKey !== undefined
+        ? parseRenderingKey(served.variantKey).voice
+        : served.speakerGender;
+    const voiceStale = rowVoice !== undefined && rowVoice !== slot.voiceGender;
     if (!isVersionStale && !voiceStale) continue;
     if (await hasActiveTtsClaim(ctx, textId, lang)) continue;
     // Defer while a job for this key is in flight. It will overwrite the
@@ -1286,99 +1304,4 @@ export async function ensureRenderingAudio(
     variantKey: key,
   });
   return true;
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Sentence metadata for curriculum texts (lib/sentenceMetadataSource.ts)
-// ────────────────────────────────────────────────────────────────────────────
-
-/**
- * How many classifier calls one curriculum text may cost before the sweep
- * stops waiting for a verdict and renders from defaults (neutral register,
- * the seeded voice, the legacy addressee fallback).
- */
-export const MAX_METADATA_ATTEMPTS = 3;
-
-/** How long a metadata request is honoured before a sweep asks again. */
-const METADATA_REQUEST_COOLDOWN_MS = 15 * 60 * 1000;
-
-export type MetadataState = 'current' | 'exhausted' | 'in_flight' | 'needed';
-
-/**
- * Where a text stands with the sentence-metadata classifier. A user-written
- * text is classified at creation and never again (`current`). A curriculum
- * text is `current` at the current classifier source, `exhausted` after
- * `MAX_METADATA_ATTEMPTS`, `in_flight` while a request is inside its
- * cooldown, else `needed`.
- */
-export function metadataState(
-  text: Pick<
-    Doc<'texts'>,
-    | 'userCreated'
-    | 'metadataSource'
-    | 'metadataRequestedAt'
-    | 'metadataAttempts'
-  >,
-): MetadataState {
-  if (text.userCreated) return 'current';
-  if (hasCurrentSentenceMetadata(text)) return 'current';
-  // A request inside its cooldown is in flight whatever the count: the
-  // last permitted call may still land, and a keyed row written meanwhile
-  // would be stranded by its verdict.
-  if (
-    text.metadataRequestedAt !== undefined &&
-    Date.now() - text.metadataRequestedAt < METADATA_REQUEST_COOLDOWN_MS
-  ) {
-    return 'in_flight';
-  }
-  if ((text.metadataAttempts ?? 0) >= MAX_METADATA_ATTEMPTS) return 'exhausted';
-  return 'needed';
-}
-
-/**
- * Claim the text and schedule the classifier on its SOURCE sentence alone
- * when it still needs one. Reached from the FLAG path only (Paul,
- * 2026-09-11): a learner reporting the wrong speaker asks the classifier
- * about that one sentence. No sweep classifies a curriculum text up front.
- * The verdict lands through `applyTextMetadata`, which stamps
- * `metadataSource` and re-runs the sweep. `metadataRequestedAt` and
- * `metadataAttempts` keep two learners flagging the same sentence from
- * buying two calls. Returns the text's state after this call (`requested`
- * when a call was scheduled); in probe mode throws ProbeNeedsWork iff it
- * would schedule.
- */
-export async function requestSentenceMetadataIfNeeded(
-  ctx: MutationCtx,
-  text: Doc<'texts'>,
-  baseLanguages: string[],
-  targetLanguages: string[],
-  opts:
-    | Pick<
-        ContentSweepOpts,
-        'probe' | 'requestedByUserId' | 'priority' | 'llmPriority'
-      >
-    | undefined,
-): Promise<MetadataState | 'requested'> {
-  const state = metadataState(text);
-  if (state !== 'needed') return state;
-  if (opts?.probe) throw new ProbeNeedsWork();
-  await ctx.db.patch(text._id, {
-    metadataRequestedAt: Date.now(),
-    metadataAttempts: (text.metadataAttempts ?? 0) + 1,
-  });
-  await ctx.scheduler.runAfter(
-    0,
-    internal.features.sentenceMetadata.classifyCurriculumText,
-    {
-      textId: text._id,
-      translations: [{ language: text.language, text: text.text }],
-      schedulePrepareCard: true,
-      baseLanguages,
-      targetLanguages,
-      userId: opts?.requestedByUserId,
-      priority: opts?.priority,
-      llmPriority: opts?.llmPriority,
-    },
-  );
-  return 'requested';
 }
