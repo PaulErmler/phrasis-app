@@ -17,9 +17,20 @@ const inflight = new Map<string, Promise<number>>();
 
 let sharedCtx: AudioContext | null = null;
 
+/**
+ * The shared context exists only to call `decodeAudioData`; nothing is ever
+ * connected to its destination. A running `AudioContext` is a second
+ * participant in the iOS audio session next to the card element (WebKit
+ * counts it when it picks the session category, and it flips to
+ * `interrupted` on screen lock), so it is suspended as soon as it exists.
+ * Decoding works on a suspended context.
+ */
 export function getDecodeContext(): AudioContext {
   if (!sharedCtx || sharedCtx.state === 'closed') {
     sharedCtx = new AudioContext();
+    if (sharedCtx.state === 'running') {
+      sharedCtx.suspend().catch(() => {});
+    }
   }
   return sharedCtx;
 }

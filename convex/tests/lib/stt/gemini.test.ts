@@ -77,6 +77,7 @@ describe('lib/stt/gemini transcribeAudioWithGemini', () => {
       text: 'Salom! Qalaysan?',
       wordTimings: [],
       costUsd: 0.00015,
+      attempts: 1,
       detectedLanguage: 'uz',
     });
   });

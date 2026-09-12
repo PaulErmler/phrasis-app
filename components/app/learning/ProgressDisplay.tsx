@@ -26,7 +26,7 @@ import { isComposingKeyEvent } from '@/hooks/use-ime-safe-enter';
 import { ConfettiBurst } from '@/components/effects/ConfettiBurst';
 import { PROGRESS_DISPLAY_DURATION_MS } from '@/lib/constants/learning';
 import {
-  setupMediaSession,
+  pushMediaSession,
   setMediaSessionPlaybackState,
 } from '@/lib/audio/mediaSession';
 import {
@@ -506,7 +506,9 @@ function CelebrationContent({
     const fallback = setTimeout(begin, AUDIO_START_FALLBACK_MS);
     started.then(begin, begin);
 
-    const teardown = setupMediaSession({
+    // On top of the card player's registration; `pop` below hands the
+    // lock-screen buttons back to it.
+    const session = pushMediaSession({
       title: mediaSessionTitle,
       artist: 'Flexling',
       onPlay: () => resumeSync(),
@@ -530,8 +532,10 @@ function CelebrationContent({
       clearTimeout(fallback);
       stopCelebrationSound();
       audioRef.current = null;
-      setMediaSessionPlaybackState('none');
-      teardown();
+      // `paused`, not `none`: the card element below is paused and about to
+      // resume; `none` would give the Now Playing slot away mid-lesson.
+      setMediaSessionPlaybackState('paused');
+      session.pop();
     };
   }, [mediaSessionTitle, pauseSync, resumeSync]);
 

@@ -11,6 +11,7 @@
 
 import type { TtsProvider } from '../types';
 import { getTtsProvider } from '../lib/tts';
+import type { SpeakResult } from '../lib/tts/types';
 
 export { normalizeForComparison, textsMatch } from '../lib/textComparison';
 
@@ -18,6 +19,10 @@ export { normalizeForComparison, textsMatch } from '../lib/textComparison';
  * Provider-agnostic entry point used by ttsProcessing's validation loop.
  * Dispatches through the `TTSProvider` registry so adding a new backend is
  * a new file in ../lib/tts, not another branch in this function.
+ *
+ * Returns the whole `SpeakResult`, not just the audio: `generationIds` is what
+ * lets the caller price an OpenRouter clip (see convex/lib/openrouterGeneration.ts),
+ * and dropping it here is how synthesis spend went unrecorded.
  */
 export async function synthesizeSpeech(
   text: string,
@@ -25,12 +30,11 @@ export async function synthesizeSpeech(
   speed: number,
   provider: TtsProvider,
   language: string,
-): Promise<Blob> {
-  const { audio } = await getTtsProvider(provider).speak({
+): Promise<SpeakResult> {
+  return await getTtsProvider(provider).speak({
     text,
     language,
     voiceApiCode: voiceName,
     speed,
   });
-  return audio;
 }

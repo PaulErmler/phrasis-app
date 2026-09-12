@@ -11,13 +11,13 @@ export type AiFeature =
   | 'chat_voice_input'
   | 'translation'
   | 'translation_autofill'
+  | 'romanization'
   | 'sentence_metadata'
   | 'speaker_gender_check'
   | 'rendering_classifier'
   | 'tts_synthesis'
   | 'tts_validation_judge'
   | 'word_timing_backfill'
-  | 'machine_translation'
   | 'writing_feedback'
   | 'hyperliteral';
 
@@ -34,7 +34,7 @@ export type AiFeature =
  */
 const PIPELINE_FEATURES: ReadonlySet<AiFeature> = new Set([
   'translation',
-  'machine_translation',
+  'romanization',
   'sentence_metadata',
   'speaker_gender_check',
   'rendering_classifier',

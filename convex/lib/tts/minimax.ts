@@ -1,4 +1,5 @@
 import type { SpeakInput, SpeakResult, TTSProvider } from './types';
+import { TtsSynthesisFailedError } from './types';
 import { requireEnv } from '../env';
 import { MAX_RETRIES, isRetryableStatus, retryDelayMs } from '../httpRetry';
 
@@ -39,6 +40,9 @@ export const minimaxTts: TTSProvider = {
     const apiKey = requireEnv('OPENROUTER_API_KEY');
 
     let lastError = '';
+    // Every 200 billed, including one whose body turned out not to be MP3.
+    // All of them belong in the clip's cost.
+    const generationIds: string[] = [];
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const response = await fetch(ENDPOINT, {
         method: 'POST',
@@ -64,7 +68,9 @@ export const minimaxTts: TTSProvider = {
 
       if (!response.ok) {
         lastError = `MiniMax TTS API error: ${response.status} - ${await response.text()}`;
-        if (!isRetryableStatus(response.status)) throw new Error(lastError);
+        if (!isRetryableStatus(response.status)) {
+          throw new TtsSynthesisFailedError(lastError, generationIds);
+        }
         if (attempt < MAX_RETRIES) {
           await new Promise((resolve) =>
             setTimeout(resolve, retryDelayMs(response, attempt)),
@@ -73,11 +79,17 @@ export const minimaxTts: TTSProvider = {
         continue;
       }
 
+      // A 200 is billed whatever the body turned out to be. Record the charge
+      // before deciding whether the payload is usable.
+      const generationId = response.headers.get('x-generation-id');
+      if (generationId) generationIds.push(generationId);
+
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (looksLikeMp3(bytes)) {
         return {
           audio: new Blob([bytes], { type: 'audio/mp3' }),
           provider: 'minimax',
+          generationIds,
         };
       }
       lastError = `MiniMax TTS returned non-MP3 payload (${bytes.byteLength} bytes)`;
@@ -93,8 +105,10 @@ export const minimaxTts: TTSProvider = {
         );
       }
     }
-    throw new Error(
+    // Whatever the attempts cost travels with the error; see types.ts.
+    throw new TtsSynthesisFailedError(
       lastError || 'No audio content returned from MiniMax TTS API',
+      generationIds,
     );
   },
 };

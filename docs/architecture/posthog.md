@@ -5,11 +5,11 @@ vendor, one identity, one consent gate. EU Cloud (Frankfurt).
 
 ## Projects
 
-| Environment | Project ID | Used by |
-|---|---|---|
-| development | `234370` | local `pnpm dev`, Convex dev deployment, CI builds |
-| staging | `234379` | Coolify staging build + its Convex deployment |
-| production | `234368` | Coolify production build, Convex prod deployment |
+| Environment | Project ID | Used by                                            |
+| ----------- | ---------- | -------------------------------------------------- |
+| development | `234370`   | local `pnpm dev`, Convex dev deployment, CI builds |
+| staging     | `234379`   | Coolify staging build + its Convex deployment      |
+| production  | `234368`   | Coolify production build, Convex prod deployment   |
 
 Project tokens (`phc_…`) are **public** client-side identifiers. They ship in the
 browser bundle. `POSTHOG_API_KEY` (personal, source-map upload) is the only secret.
@@ -34,7 +34,7 @@ Deployment Settings → Integrations, **per deployment**:
 - **PostHog Log Streams.** 14-day triage buffer (see retention below).
 
 Set the **Host** field to `https://eu.i.posthog.com`. It defaults to US Cloud, and
-a valid EU token against the US endpoint is rejected as *unauthorized*, and that is
+a valid EU token against the US endpoint is rejected as _unauthorized_, and that is
 the single most likely reason this step fails.
 
 ### 3. Environment variables
@@ -43,14 +43,14 @@ the single most likely reason this step fails.
 arguments**, not runtime variables, or they resolve to `undefined` in the shipped
 bundle and analytics silently no-op.
 
-| Where | Variables |
-|---|---|
+| Where                           | Variables                                                                                                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Coolify production (build args) | `NEXT_PUBLIC_POSTHOG_KEY` (prod token) · `NEXT_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com` · `POSTHOG_PROJECT_ID=234368` · `POSTHOG_API_KEY` (secret) |
-| Coolify staging (build args) | same shape, staging token, `POSTHOG_PROJECT_ID=234379` |
-| Convex prod | `npx convex env set POSTHOG_PROJECT_TOKEN <prod token> --prod`<br>`npx convex env set POSTHOG_HOST https://eu.i.posthog.com --prod` |
-| Convex dev | same with the development token |
-| GitHub Actions secrets | `NEXT_PUBLIC_POSTHOG_KEY` (dev token), `NEXT_PUBLIC_POSTHOG_HOST` |
-| `.env.local` | `POSTHOG_API_KEY`, plus the development token + host for local dev |
+| Coolify staging (build args)    | same shape, staging token, `POSTHOG_PROJECT_ID=234379`                                                                                                  |
+| Convex prod                     | `npx convex env set POSTHOG_PROJECT_TOKEN <prod token> --prod`<br>`npx convex env set POSTHOG_HOST https://eu.i.posthog.com --prod`                     |
+| Convex dev                      | same with the development token                                                                                                                         |
+| GitHub Actions secrets          | `NEXT_PUBLIC_POSTHOG_KEY` (dev token), `NEXT_PUBLIC_POSTHOG_HOST`                                                                                       |
+| `.env.local`                    | `POSTHOG_API_KEY`, plus the development token + host for local dev                                                                                      |
 
 `POSTHOG_PROJECT_TOKEN` is a **required** Convex component env var. `convex dev`
 and `convex deploy` fail without it. Everything else degrades gracefully: a build
@@ -87,21 +87,21 @@ customer id. Deviating fragments one person into two ghosts that never meet.
 
 ### Files
 
-| File | Role |
-|---|---|
-| `lib/posthog/hosts.ts` | Dependency-free constants, shared with `next.config.ts` |
-| `lib/posthog/client.ts` | Browser SDK init + masking attributes |
-| `lib/posthog/consent.ts` | Consent state machine over PostHog's own consent API |
-| `lib/posthog/events.ts` | Client event names + `capture()` |
-| `lib/posthog/server.ts` | `posthog-node` singleton for the Next server |
-| `lib/report-error.ts` | `reportError`, the console.error replacement |
-| `convex/posthog.ts` | Server SDK instance |
-| `convex/analytics.ts` | Backend event names + `track` / `identifyUser` / `trackException` |
-| `convex/features/consent.ts` | `setAnalyticsConsent`, account mirror of the browser choice |
-| `convex/lib/posthogAi.ts` | `$ai_generation` cost events |
-| `convex/config/aiCosts.ts` | Rate table for providers PostHog can't price |
-| `components/consent/*` | Banner, settings dialog, footer link |
-| `components/analytics/*` | Provider, identify, consent sync, replay suspension |
+| File                         | Role                                                              |
+| ---------------------------- | ----------------------------------------------------------------- |
+| `lib/posthog/hosts.ts`       | Dependency-free constants, shared with `next.config.ts`           |
+| `lib/posthog/client.ts`      | Browser SDK init + masking attributes                             |
+| `lib/posthog/consent.ts`     | Consent state machine over PostHog's own consent API              |
+| `lib/posthog/events.ts`      | Client event names + `capture()`                                  |
+| `lib/posthog/server.ts`      | `posthog-node` singleton for the Next server                      |
+| `lib/report-error.ts`        | `reportError`, the console.error replacement                      |
+| `convex/posthog.ts`          | Server SDK instance                                               |
+| `convex/analytics.ts`        | Backend event names + `track` / `identifyUser` / `trackException` |
+| `convex/features/consent.ts` | `setAnalyticsConsent`, account mirror of the browser choice       |
+| `convex/lib/posthogAi.ts`    | `$ai_generation` cost events                                      |
+| `convex/config/aiCosts.ts`   | Rate table for providers PostHog can't price                      |
+| `components/consent/*`       | Banner, settings dialog, footer link                              |
+| `components/analytics/*`     | Provider, identify, consent sync, replay suspension               |
 
 ## Consent
 
@@ -115,7 +115,7 @@ non-essential storage in the app, and PostHog's own consent primitives cover it.
 - **Before a choice:** cookieless capture (`opt_out_capturing_by_default: true`
   makes the SDK treat pending like reject). Nothing is written to or read from
   the device, the banner stays up, and landing/onboarding funnels include the
-  people who ignore it. Without the flag the SDK silently *drops* every event
+  people who ignore it. Without the flag the SDK silently _drops_ every event
   until a choice is made.
 - **Accept:** cookies + localStorage, `identify()`, session replay.
 - **Reject:** cookieless mode. Events still flow under a daily-rotated server-side
@@ -125,7 +125,7 @@ non-essential storage in the app, and PostHog's own consent primitives cover it.
 
 **Legal bases are split** (privacy policy §§ 4.4, 5C, 6): storage-free
 measurement and backend usage/cost/error telemetry run under legitimate
-interest (Art. 6(1)(f)); cookies, session replay, and AI chat *content* require
+interest (Art. 6(1)(f)); cookies, session replay, and AI chat _content_ require
 consent (Art. 6(1)(a) + § 25(1) TTDSG).
 
 **The backend honors the choice for content.** `ConsentSync` mirrors the
@@ -160,26 +160,56 @@ therefore only be captured client-side.
 
 ## AI cost attribution
 
-Every provider call emits `$ai_generation`. PostHog prices OpenRouter LLM calls
-itself from OpenRouter's pricing table; for Google TTS and Google Translate we
-compute `$ai_total_cost_usd` from `convex/config/aiCosts.ts`. OpenRouter STT
-(MAI-Transcribe-2) reports its exact charge in the transcription response's
-`usage.cost`; the rate table only covers a response that came back without it.
+Every provider call emits a cost event. Conversational features use
+`$ai_generation`; the content pipeline uses the plain `ai_cost` event (see
+`PIPELINE_FEATURES` in `convex/lib/posthogAi.ts` for why, and for which is
+which). Both carry the same numbers under different property names, so a query
+spanning the 2026-08-29 split has to union them.
 
-| Feature | Provider | Cost source |
-|---|---|---|
-| `chat` | OpenRouter | exact USD from usage accounting, per step |
-| `chat_title` | OpenRouter | exact USD |
-| `translation` | OpenRouter | exact USD, **per stage attempt including failures** |
-| `translation_autofill` | OpenRouter | exact USD |
-| `sentence_metadata` | OpenRouter | exact USD |
-| `tts_validation_judge` | OpenRouter | exact USD |
-| `tts_synthesis` | Google | characters × rate |
-| `tts_synthesis` | Gemini/OpenRouter | ⚠️ volume only, no USD, see below |
-| `tts_synthesis` (STT leg) | OpenRouter | exact USD from `usage.cost`, folded into the clip's event as `stt_cost_usd` |
-| `word_timing_backfill` | OpenRouter | exact USD from `usage.cost` |
-| `chat_voice_input` | OpenRouter | exact USD from `usage.cost` |
-| `machine_translation` | Google | characters × rate |
+Every figure is the charge the provider reported, never a token estimate:
+
+- **LLM calls** set `usage: { include: true }` and read `usage.cost` back off
+  `providerMetadata`. PostHog's own model pricing does not run on `ai_cost`, so
+  pipeline call sites pass the figure themselves.
+- **OpenRouter speech** (`/audio/speech`, Gemini and MiniMax) answers with audio
+  bytes and no usage block. The `x-generation-id` response header is kept and
+  the charge read back from `/api/v1/generation`
+  (`convex/lib/openrouterGeneration.ts`). One clip can be several charges: both
+  providers re-POST after a 200 that billed but returned unusable audio, and
+  every id is priced.
+- **OpenRouter STT** reports its exact charge in the transcription response's
+  `usage.cost`. The rate table only covers a response that came back without one.
+- **Google TTS** is the only per-rate case, computed from the character count
+  via `convex/config/aiCosts.ts`.
+
+| Feature                   | Provider                      | Cost source                                                                 |
+| ------------------------- | ----------------------------- | --------------------------------------------------------------------------- |
+| `chat`                    | OpenRouter                    | exact USD from usage accounting, per step                                   |
+| `chat_title`              | OpenRouter                    | exact USD                                                                   |
+| `translation`             | OpenRouter                    | exact USD, **per stage attempt including failures**                         |
+| `translation_autofill`    | OpenRouter                    | exact USD                                                                   |
+| `romanization`            | OpenRouter                    | exact USD, **per attempt including unusable replies**                       |
+| `sentence_metadata`       | OpenRouter                    | exact USD                                                                   |
+| `tts_validation_judge`    | OpenRouter                    | exact USD                                                                   |
+| `tts_synthesis`           | Gemini/MiniMax via OpenRouter | exact USD per billed request, from the generation id                        |
+| `tts_synthesis`           | Google                        | characters × rate                                                           |
+| `tts_synthesis` (STT leg) | OpenRouter                    | exact USD from `usage.cost`, folded into the clip's event as `stt_cost_usd` |
+| `word_timing_backfill`    | OpenRouter                    | exact USD from `usage.cost`                                                 |
+| `chat_voice_input`        | OpenRouter                    | exact USD from `usage.cost`                                                 |
+
+### Reading a cost event without double counting
+
+Two shapes to watch for, both of which turn correct data into a wrong number:
+
+- **`cost_usd` on a `tts_synthesis` event is already the sum of both legs**
+  (`synth_cost_usd + stt_cost_usd`), and each leg also rides in its own
+  property. Adding a leg back onto `cost_usd` counts it twice.
+- **`synth_cost_source` / `stt_cost_source` say how solid the figure is.**
+  `generation_api` and `usage` are exact charges; `rate_table` is a list price;
+  `generation_api_partial` means some of the clip's requests never priced, so
+  the sum is a floor (`synth_priced_requests` vs `synth_billed_requests` says
+  how far off); `unavailable` means there is no figure, which is deliberately
+  not a zero.
 
 ### Attribution policy
 
@@ -192,14 +222,21 @@ the money was still spent.
 
 ### Known gaps
 
-1. **Gemini TTS has no USD figure.** OpenRouter's `/audio/speech` returns cost only
-   via a follow-up lookup on the generation id. The event fires with
-   `cost_source: 'unavailable'` so the gap is visible in the dashboard rather than
-   appearing as free.
+1. **Google Translate spend is not tracked.** The machine-translation fallback and
+   Google v3 `romanizeText` bill Google Cloud and emit no cost event. There is no
+   `googleTranslate` rate in `convex/config/aiCosts.ts` to price them with. This
+   does not affect an OpenRouter reconciliation.
 2. **Rate table needs sign-off.** `convex/config/aiCosts.ts` holds hand-transcribed
    list prices with `sourceUrl` + `lastVerified` on each entry. Reconcile against a
    real invoice before making a pricing decision on top of them.
-3. **Infrastructure cost is not AI cost.** Convex, Coolify and PostHog's own bills
+3. **Retried-away provider calls.** The STT clients re-POST on 429/5xx and report
+   only the successful attempt's charge. OpenRouter does not bill a failed
+   generation, so nothing is lost; `stt_attempts` records the retries so a climbing
+   number is still visible.
+4. **Events carry no `insert_id`.** `convex/analytics.ts` never passes `uuid`, so
+   PostHog cannot dedupe a re-sent event. A workpool retry that re-runs a worker
+   after a capture emits again, and those duplicates are permanent.
+5. **Infrastructure cost is not AI cost.** Convex, Coolify and PostHog's own bills
    are not tracked here.
 
 ## Session replay
@@ -223,12 +260,12 @@ React tree, and `AppUpdateGate`'s `window.location.reload()` splits sessions.
 
 ## Retention
 
-| Data | Retention |
-|---|---|
-| Events (incl. `$ai_generation`) | 1 year free / **7 years paid** |
-| Exceptions | same as events, this is the long-term error store |
-| Session recordings | 30 days (configurable) |
-| Logs (Convex log stream) | **14 days**, triage buffer only |
+| Data                            | Retention                                         |
+| ------------------------------- | ------------------------------------------------- |
+| Events (incl. `$ai_generation`) | 1 year free / **7 years paid**                    |
+| Exceptions                      | same as events, this is the long-term error store |
+| Session recordings              | 30 days (configurable)                            |
+| Logs (Convex log stream)        | **14 days**, triage buffer only                   |
 
 Anything needed long-term must go through **Error Tracking / `captureException`**,
 not the Logs product.

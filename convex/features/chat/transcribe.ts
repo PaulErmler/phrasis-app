@@ -147,6 +147,7 @@ export const transcribeAudio = action({
           detected_language: detectedLanguage,
           pinned_language: args.language,
           cost_source: cost.source,
+          stt_attempts: raw.attempts,
         },
       });
       await track(ctx, userId, EVENTS.VOICE_TRANSCRIBED, {

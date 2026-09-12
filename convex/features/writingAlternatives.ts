@@ -41,7 +41,7 @@ import { reserveRateLimitToken } from '../lib/rateLimitReserve';
 import { TTS_RATE_LIMIT_BY_PROVIDER } from '../rateLimiter';
 import { requireAuthUserId } from '../db/users';
 import { captureGeneration } from '../lib/posthogAi';
-import { costForCharacters } from '../config/aiCosts';
+import { synthCostForEvent } from '../lib/tts/cost';
 import { ttsProviderValidator, voiceGenderValidator } from '../types';
 
 /**
@@ -490,28 +490,33 @@ export const generateAlternativeAudio = internalAction({
       { maxWaitMs: 30_000 },
     );
     const startedAt = Date.now();
-    const blob = await synthesizeSpeech(
+    const { audio: blob, generationIds } = await synthesizeSpeech(
       context.text,
       voiceName,
       1,
       provider,
       context.language,
     );
+    const synthCost = await synthCostForEvent({
+      provider,
+      characterCount: context.text.length,
+      generationIds,
+    });
     await captureGeneration(ctx, {
       distinctId: context.userId,
       feature: 'tts_synthesis',
       model: voiceName,
       provider,
       latencyMs: Date.now() - startedAt,
-      costUsd:
-        provider === 'google'
-          ? costForCharacters('googleTts', context.text.length)
-          : undefined,
+      costUsd: synthCost.costUsd,
       sharedContent: true,
       extra: {
         language: context.language,
         character_count: context.text.length,
         source: 'writing_alternative',
+        synth_cost_source: synthCost.source,
+        synth_billed_requests: synthCost.billedRequests,
+        synth_priced_requests: synthCost.pricedRequests,
       },
     });
     const storageId = await ctx.storage.store(blob);

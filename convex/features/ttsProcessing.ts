@@ -29,7 +29,11 @@ import {
   type SemanticValidationTelemetry,
 } from '../lib/ttsSemanticValidation';
 import { captureGeneration } from '../lib/posthogAi';
-import { costForCharacters } from '../config/aiCosts';
+import {
+  synthCostForEvent,
+  synthesisFailureCost,
+  type SynthCost,
+} from '../lib/tts/cost';
 import { OPENROUTER_MODELS } from '../config/aiModels';
 import { deleteStorageBlobIfUnreferenced } from '../lib/audio';
 import {
@@ -320,40 +324,80 @@ async function synthesizeAndValidate(
       maxWaitMs: tokenMaxWaitMs,
     });
     const synthStartedAt = Date.now();
-    const blob = await synthesizeSpeech(
-      args.text,
-      args.voiceName,
-      args.speed,
-      args.provider,
-      args.language,
-    );
+    let blob: Blob;
+    let generationIds: string[];
+    try {
+      ({ audio: blob, generationIds } = await synthesizeSpeech(
+        args.text,
+        args.voiceName,
+        args.speed,
+        args.provider,
+        args.language,
+      ));
+    } catch (synthErr) {
+      // A synthesis that gave up still billed for the attempts it made, and
+      // this is the most expensive outcome there is: the pool retries the whole
+      // job, so a clip stuck in a failure loop burns a provider call per
+      // attempt. Reporting it is the only way that shows up as spend.
+      await captureGeneration(ctx, {
+        distinctId: args.requestedByUserId,
+        feature: 'tts_synthesis',
+        model: args.voiceName,
+        provider: args.provider,
+        latencyMs: Date.now() - synthStartedAt,
+        ...(await synthesisFailureCost(args.provider, synthErr)),
+        isError: true,
+        error: synthErr instanceof Error ? synthErr.message : String(synthErr),
+        sharedContent: true,
+        extra: {
+          text_id: args.textId,
+          language: args.language,
+          character_count: args.text.length,
+          attempt,
+          regen: args.forceRegen === true,
+          stt_status: 'skipped',
+        },
+      });
+      throw synthErr;
+    }
     const synthLatencyMs = Date.now() - synthStartedAt;
-    // Google bills per character of input text, so the cost is exactly
-    // derivable. Gemini TTS goes through OpenRouter, whose per-request cost is
-    // only retrievable by a follow-up lookup on the generation id. Recorded
-    // without a cost figure so the call volume is at least visible, and
-    // flagged so a zero can't be mistaken for "free".
-    const synthCostUsd =
-      args.provider === 'google'
-        ? costForCharacters('googleTts', args.text.length)
-        : undefined;
+    // The synthesis charge, resolved lazily and at most once per attempt.
+    // Lazily because for the OpenRouter providers it costs an HTTP lookup
+    // (../lib/tts/cost.ts), and on the common path that lookup happens AFTER
+    // the STT round-trip, by which point OpenRouter's stats row has certainly
+    // landed. Once, because `emitTtsEvent` fires from four places.
+    let synthCost: SynthCost | undefined;
+    const resolveSynthCost = async (): Promise<SynthCost> =>
+      (synthCost ??= await synthCostForEvent({
+        provider: args.provider,
+        characterCount: args.text.length,
+        generationIds,
+      }));
     // ONE event per synthesized clip, covering both the synthesis and its
     // STT validation round-trip (they fire 1:1, and as separate events they
     // doubled TTS event volume in PostHog). Every exit path of this attempt
     // emits exactly once, with `stt_status` recording whether the validation
-    // leg ran; `cost_usd` is the sum of both legs. The STT leg's cost is the
-    // exact figure OpenRouter reports; the rate table is the fallback for a
-    // response that came back without one.
-    const emitTtsEvent = (stt: {
+    // leg ran; `cost_usd` is the sum of both legs. Both legs report the exact
+    // figure the provider billed, with a rate table as the STT fallback and
+    // for Google synthesis.
+    const emitTtsEvent = async (stt: {
       status: 'ok' | 'error' | 'skipped' | 'backpressure';
       latencyMs?: number;
       audioDurationMs?: number;
       billedSeconds?: number;
       costUsd?: number;
+      /** Requests the transcription took. >1 means STT was re-POSTed. */
+      attempts?: number;
       error?: string;
     }) => {
       const { costUsd: sttCostUsd, source: sttCostSource } =
         sttCostForEvent(stt);
+      const {
+        costUsd: synthCostUsd,
+        source: synthCostSource,
+        billedRequests,
+        pricedRequests,
+      } = await resolveSynthCost();
       return captureGeneration(ctx, {
         distinctId: args.requestedByUserId,
         feature: 'tts_synthesis',
@@ -372,12 +416,14 @@ async function synthesizeAndValidate(
           attempt,
           regen: args.forceRegen === true,
           synth_cost_usd: synthCostUsd,
-          synth_cost_source:
-            args.provider === 'google' ? 'rate_table' : 'unavailable',
+          synth_cost_source: synthCostSource,
+          synth_billed_requests: billedRequests,
+          synth_priced_requests: pricedRequests,
           stt_status: stt.status,
           stt_cost_usd: sttCostUsd,
           stt_cost_source: sttCostSource,
           stt_latency_ms: stt.latencyMs,
+          stt_attempts: stt.attempts,
           audio_duration_ms: stt.audioDurationMs,
           stt_error: stt.error,
         },
@@ -440,98 +486,20 @@ async function synthesizeAndValidate(
     }
 
     const sttStartedAt = Date.now();
+    // ONLY the transcription is guarded. The catch below is for "STT failed",
+    // and everything after this point (the semantic judge, its own cost event,
+    // storeTtsMismatch) is not STT. Those used to sit inside this try, so a
+    // throw from any of them ran the catch and emitted a SECOND event for one
+    // synthesis, double-counting the charge.
+    let transcription: TranscriptionResult;
     try {
       // The transcript is converted into the language's script before any
       // comparison: the model returns Latin Serbian and Simplified Mandarin
       // regardless of the target, and the comparator has no script leniency.
-      const {
-        text: transcribed,
-        wordTimings,
-        audioDurationMs,
-        billedSeconds,
-        costUsd: sttCostUsd,
-      } = normalizeTranscriptScript(
+      transcription = normalizeTranscriptScript(
         await transcribeAudio(blob, args.language),
         args.language,
       );
-
-      // Every synthesized clip is round-tripped through STT to validate it.
-      // That makes it one of the larger spend lines in the app, folded into
-      // the clip's event here.
-      await emitTtsEvent({
-        status: 'ok',
-        latencyMs: Date.now() - sttStartedAt,
-        audioDurationMs,
-        billedSeconds,
-        costUsd: sttCostUsd,
-      });
-
-      // Cheap strict check first. For Chinese/Korean this compares
-      // pinyin/hangul-romanized strings so the STT model's homophone-character
-      // substitutions pass at edit distance 0. If strict still fails, ask
-      // Gemini, which also tolerates phonetic names, digits-vs-words,
-      // abbreviations, diacritic drift, and single-char noise. Only
-      // regenerate if both say no. Gemini errors fall back to the strict
-      // verdict (already "no match" at this point), so a flaky LLM can't
-      // let bad audio through.
-      let isMatch = textsMatchForLanguage(
-        args.text,
-        transcribed,
-        args.language,
-      );
-      if (!isMatch) {
-        // Only reached on a near-miss, so its volume is itself a signal: a
-        // spike here means TTS quality regressed for some language.
-        const judgeTelemetry: SemanticValidationTelemetry[] = [];
-        const semantic = await textsMatchSemantic(
-          args.text,
-          transcribed,
-          args.language,
-          (telemetry) => judgeTelemetry.push(telemetry),
-        );
-        for (const telemetry of judgeTelemetry) {
-          await captureGeneration(ctx, {
-            distinctId: args.requestedByUserId,
-            feature: 'tts_validation_judge',
-            model: OPENROUTER_MODELS.ttsValidation,
-            provider: 'openrouter',
-            latencyMs: telemetry.latencyMs,
-            inputTokens: telemetry.inputTokens,
-            outputTokens: telemetry.outputTokens,
-            costUsd: telemetry.costUsd,
-            traceId: telemetry.generationId,
-            sharedContent: true,
-            extra: {
-              text_id: args.textId,
-              language: args.language,
-              verdict: semantic,
-            },
-          });
-        }
-        if (semantic === 'match') isMatch = true;
-      }
-
-      if (isMatch) {
-        return {
-          validated: true,
-          lastStorageId,
-          wordTimings,
-          sttErrored: false,
-        };
-      }
-      console.warn(
-        `TTS validation mismatch (attempt ${attempt + 1}/${maxAttempts})`,
-        { expected: args.text, got: transcribed },
-      );
-      await ctx.runMutation(internal.features.ttsProcessing.storeTtsMismatch, {
-        textId: args.textId,
-        language: args.language,
-        voiceName: args.voiceName,
-        storageId,
-        expectedText: args.text,
-        transcribedText: transcribed,
-        attempt: attempt + 1,
-      });
     } catch (transcriptionErr) {
       // STT failed, not the clip. A rate limit or an outage says nothing
       // about the audio. Re-synthesizing would spend a second TTS call on a
@@ -556,6 +524,90 @@ async function synthesizeAndValidate(
         sttErrored: true,
       };
     }
+
+    const {
+      text: transcribed,
+      wordTimings,
+      audioDurationMs,
+      billedSeconds,
+      costUsd: sttCostUsd,
+      attempts: sttAttempts,
+    } = transcription;
+
+    // Every synthesized clip is round-tripped through STT to validate it.
+    // That makes it one of the larger spend lines in the app, folded into
+    // the clip's event here.
+    await emitTtsEvent({
+      status: 'ok',
+      latencyMs: Date.now() - sttStartedAt,
+      audioDurationMs,
+      billedSeconds,
+      costUsd: sttCostUsd,
+      attempts: sttAttempts,
+    });
+
+    // Cheap strict check first. For Chinese/Korean this compares
+    // pinyin/hangul-romanized strings so the STT model's homophone-character
+    // substitutions pass at edit distance 0. If strict still fails, ask
+    // Gemini, which also tolerates phonetic names, digits-vs-words,
+    // abbreviations, diacritic drift, and single-char noise. Only
+    // regenerate if both say no. Gemini errors fall back to the strict
+    // verdict (already "no match" at this point), so a flaky LLM can't
+    // let bad audio through.
+    let isMatch = textsMatchForLanguage(args.text, transcribed, args.language);
+    if (!isMatch) {
+      // Only reached on a near-miss, so its volume is itself a signal: a
+      // spike here means TTS quality regressed for some language.
+      const judgeTelemetry: SemanticValidationTelemetry[] = [];
+      const semantic = await textsMatchSemantic(
+        args.text,
+        transcribed,
+        args.language,
+        (telemetry) => judgeTelemetry.push(telemetry),
+      );
+      for (const telemetry of judgeTelemetry) {
+        await captureGeneration(ctx, {
+          distinctId: args.requestedByUserId,
+          feature: 'tts_validation_judge',
+          model: OPENROUTER_MODELS.ttsValidation,
+          provider: 'openrouter',
+          latencyMs: telemetry.latencyMs,
+          inputTokens: telemetry.inputTokens,
+          outputTokens: telemetry.outputTokens,
+          costUsd: telemetry.costUsd,
+          traceId: telemetry.generationId,
+          sharedContent: true,
+          extra: {
+            text_id: args.textId,
+            language: args.language,
+            verdict: semantic,
+          },
+        });
+      }
+      if (semantic === 'match') isMatch = true;
+    }
+
+    if (isMatch) {
+      return {
+        validated: true,
+        lastStorageId,
+        wordTimings,
+        sttErrored: false,
+      };
+    }
+    console.warn(
+      `TTS validation mismatch (attempt ${attempt + 1}/${maxAttempts})`,
+      { expected: args.text, got: transcribed },
+    );
+    await ctx.runMutation(internal.features.ttsProcessing.storeTtsMismatch, {
+      textId: args.textId,
+      language: args.language,
+      voiceName: args.voiceName,
+      storageId,
+      expectedText: args.text,
+      transcribedText: transcribed,
+      attempt: attempt + 1,
+    });
   }
   return {
     validated: false,
@@ -969,6 +1021,8 @@ export const backfillWordTimings = internalAction({
         audioDurationMs?: number;
         billedSeconds?: number;
         costUsd?: number;
+        /** Requests the transcription took. >1 means STT was re-POSTed. */
+        attempts?: number;
         wordCount?: number;
         error?: string;
       }) => {
@@ -988,6 +1042,7 @@ export const backfillWordTimings = internalAction({
             language: args.language,
             audio_duration_ms: stt.audioDurationMs,
             billed_seconds: stt.billedSeconds,
+            stt_attempts: stt.attempts,
             word_count: stt.wordCount,
             cost_source: cost.source,
           },
@@ -1013,11 +1068,13 @@ export const backfillWordTimings = internalAction({
         );
         throw sttErr;
       }
-      const { wordTimings, audioDurationMs, billedSeconds, costUsd } = result;
+      const { wordTimings, audioDurationMs, billedSeconds, costUsd, attempts } =
+        result;
       await emitBackfillEvent({
         audioDurationMs,
         billedSeconds,
         costUsd,
+        attempts,
         wordCount: wordTimings.length,
       });
 

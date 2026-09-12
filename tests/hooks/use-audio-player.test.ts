@@ -19,10 +19,19 @@ vi.mock('@/lib/audio/silence', () => ({
   getSilenceBlobUrl: () => SILENCE_URL,
 }));
 
+// The milestone chime the player plays in place of the celebration screen
+// while the page is hidden.
+const CHIME_URL = 'blob:chime';
+vi.mock('@/lib/audio/celebrationSound', () => ({
+  getProgressSoundBlobUrl: () => CHIME_URL,
+}));
+
 import {
   useAudioPlayer,
+  type ScheduleCompleteResult,
   type UseAudioPlayerOptions,
 } from '@/hooks/use-audio-player';
+import { resetCardPlayerElementForTests } from '@/lib/audio/cardPlayerElement';
 
 // jsdom reports readyState 0 and never fires loadedmetadata; force HAVE_METADATA
 // so the hook's post-merge start logic runs synchronously after `audio.src =`.
@@ -117,7 +126,7 @@ function baseOptions(
     autoPlay: false,
     settingsOpen: false,
     getReviewInitiatedByThisTab: () => false,
-    onScheduleComplete: () => false,
+    onScheduleComplete: () => 'hold',
     onResetReviewFlag: () => {},
     onNext: () => {},
     ...overrides,
@@ -146,6 +155,8 @@ let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 describe('useAudioPlayer', () => {
   beforeEach(() => {
+    // One element per page in production; one per test here.
+    resetCardPlayerElementForTests();
     pendingMerges = [];
     objectUrlSeq = 0;
     mediaCurrentTime = 0;
@@ -169,8 +180,8 @@ describe('useAudioPlayer', () => {
   });
 
   describe('play() rejection guard', () => {
-    it('is a no-op while no source is loaded', () => {
-      const { result } = renderPlayer();
+    it('is a no-op while there is no card', () => {
+      const { result } = renderPlayer({ cardId: null, audioRecordings: [] });
       act(() => result.current.play());
       expect(playMock).not.toHaveBeenCalled();
       expect(result.current.isPlaying).toBe(false);
@@ -492,7 +503,7 @@ describe('useAudioPlayer', () => {
       });
 
     it('starts the prefetched next blob inside the `ended` handler when the caller advances', async () => {
-      const onScheduleComplete = vi.fn(() => true);
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'advance');
       const { result, r1, r2 } = await primeWithPrefetch({
         onScheduleComplete,
       });
@@ -510,7 +521,7 @@ describe('useAudioPlayer', () => {
     });
 
     it('adopts the running audio when the server serves that card, without a teardown or a second play', async () => {
-      const onScheduleComplete = vi.fn(() => true);
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'advance');
       const onResetReviewFlag = vi.fn();
       const { result, rerender, r2 } = await primeWithPrefetch({
         onScheduleComplete,
@@ -540,7 +551,7 @@ describe('useAudioPlayer', () => {
     });
 
     it('pauses the adopted audio when autoplay was muted in the meantime (celebration)', async () => {
-      const onScheduleComplete = vi.fn(() => true);
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'advance');
       const { result, rerender } = await primeWithPrefetch({
         onScheduleComplete,
       });
@@ -572,7 +583,7 @@ describe('useAudioPlayer', () => {
 
     it('leaves the element ended when the caller does not advance', async () => {
       const { result, r1 } = await primeWithPrefetch({
-        onScheduleComplete: () => false,
+        onScheduleComplete: () => 'hold',
       });
       const audio = result.current.audioRef.current!;
 
@@ -584,7 +595,7 @@ describe('useAudioPlayer', () => {
     });
 
     it('tears the handoff down when the server serves a different card', async () => {
-      const onScheduleComplete = vi.fn(() => true);
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'advance');
       const { result, rerender, r2 } = await primeWithPrefetch({
         onScheduleComplete,
       });
@@ -611,7 +622,7 @@ describe('useAudioPlayer', () => {
     });
 
     it('hands off from the prefetch completion when the card ended before the prefetch finished', async () => {
-      const onScheduleComplete = vi.fn(() => true);
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'advance');
       const { result, rerender } = renderPlayer({
         autoPlay: true,
         onScheduleComplete,
@@ -659,7 +670,7 @@ describe('useAudioPlayer', () => {
     /** Card 1 merged and playing; the caller advances on `ended` but the
      *  next card is not known yet (no prefetch), so the bridge starts. */
     async function primeBridge(overrides: Partial<UseAudioPlayerOptions> = {}) {
-      const onScheduleComplete = vi.fn(() => true);
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'advance');
       const hook = renderPlayer({
         autoPlay: true,
         onScheduleComplete,
@@ -771,7 +782,7 @@ describe('useAudioPlayer', () => {
     });
 
     it('a pause during the bridge is not overridden when the prefetch lands', async () => {
-      const onScheduleComplete = vi.fn(() => true);
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'advance');
       const { result, rerender } = renderPlayer({
         autoPlay: true,
         onScheduleComplete,
@@ -798,15 +809,17 @@ describe('useAudioPlayer', () => {
       expect(result.current.isPlaying).toBe(false);
 
       // The prefetch the bridge was waiting for lands. The user said stop, so
-      // it must not hand off into playback.
+      // it must not hand off into playback. The silence stays loaded: an
+      // emptied element hands the Now Playing slot to another app.
       const r2 = await resolveMerge(1, makeResult({ durationSec: 7 }));
-      expect(audio.getAttribute('src')).toBeNull();
+      expect(audio.src).toBe(SILENCE_URL);
+      expect(audio.loop).toBe(false);
       expect(audio.src).not.toBe(r2.blobUrl);
       expect(playMock).toHaveBeenCalledTimes(1);
     });
 
     it('drops a bridge the browser refused instead of treating it as playback', async () => {
-      const onScheduleComplete = vi.fn(() => true);
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'advance');
       const { result, rerender } = renderPlayer({
         autoPlay: true,
         onScheduleComplete,
@@ -823,7 +836,8 @@ describe('useAudioPlayer', () => {
         await Promise.resolve();
       });
       expect(playMock).toHaveBeenCalledTimes(1);
-      expect(audio.getAttribute('src')).toBeNull();
+      // Parked, not emptied: still loaded, paused, ours on the lock screen.
+      expect(audio.src).toBe(SILENCE_URL);
       expect(audio.loop).toBe(false);
       expect(result.current.isPlaying).toBe(false);
 
@@ -842,14 +856,14 @@ describe('useAudioPlayer', () => {
       expect(playMock).toHaveBeenCalledTimes(1);
     });
 
-    it('a user pause during the bridge unloads the silence and leaves the merged card paused', async () => {
+    it('a user pause during the bridge parks on the silence and leaves the merged card paused', async () => {
       const { result, rerender, audio, onScheduleComplete } =
         await primeBridge();
       const pauseSpy = vi.spyOn(audio, 'pause').mockImplementation(() => {});
 
       act(() => result.current.pause());
       expect(pauseSpy).toHaveBeenCalled();
-      expect(audio.getAttribute('src')).toBeNull();
+      expect(audio.src).toBe(SILENCE_URL);
       expect(audio.loop).toBe(false);
       expect(result.current.isPlaying).toBe(false);
 
@@ -927,14 +941,14 @@ describe('useAudioPlayer', () => {
       expect(result.current.isPlaying).toBe(false);
     });
 
-    it('gives up after the cap when nothing playable arrives', async () => {
+    it('gives up after the cap when nothing playable arrives, staying loaded', async () => {
       vi.useFakeTimers();
       try {
         const { result, audio } = await primeBridge();
         act(() => {
           vi.advanceTimersByTime(120_000);
         });
-        expect(audio.getAttribute('src')).toBeNull();
+        expect(audio.src).toBe(SILENCE_URL);
         expect(audio.loop).toBe(false);
         expect(result.current.isPlaying).toBe(false);
       } finally {
@@ -945,7 +959,7 @@ describe('useAudioPlayer', () => {
     it('does not bridge when the caller does not advance', async () => {
       const { result } = renderPlayer({
         autoPlay: true,
-        onScheduleComplete: () => false,
+        onScheduleComplete: () => 'hold',
       });
       const r1 = await resolveMerge(0, makeResult({ durationSec: 3 }));
       const audio = result.current.audioRef.current!;
@@ -953,6 +967,515 @@ describe('useAudioPlayer', () => {
       ended(audio);
       expect(audio.src).toBe(r1.blobUrl);
       expect(playMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('parked element', () => {
+    const nextRecordings = [rec('en', 'en-B'), rec('es', 'es-B')];
+    const ended = (audio: HTMLAudioElement) =>
+      act(() => {
+        audio.dispatchEvent(new Event('ended'));
+      });
+    const played = (audio: HTMLAudioElement) =>
+      act(() => {
+        audio.dispatchEvent(new Event('play'));
+      });
+
+    it('a manual card change parks on silence instead of emptying the element', async () => {
+      const { result, rerender } = renderPlayer();
+      const r1 = await resolveMerge(0, makeResult());
+      const audio = result.current.audioRef.current!;
+      expect(audio.src).toBe(r1.blobUrl);
+
+      rerender(baseOptions({ cardId: 'card-2', audioRecordings: nextRecordings }));
+      // Card 2 is merging. The element keeps a source the whole time: an
+      // emptied element hands the Now Playing slot to the app we interrupted.
+      expect(audio.src).toBe(SILENCE_URL);
+      expect(audio.loop).toBe(false);
+      expect(result.current.isPlaying).toBe(false);
+      expect(revokeCallsFor(r1.blobUrl)).toBe(1);
+
+      const r2 = await resolveMerge(1, makeResult());
+      expect(audio.src).toBe(r2.blobUrl);
+    });
+
+    it('Play after the bridge gave up restarts the bridge and the served card starts on it', async () => {
+      vi.useFakeTimers();
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'advance');
+      const hook = renderPlayer({ autoPlay: true, onScheduleComplete });
+      await resolveMerge(0, makeResult({ durationSec: 3 }));
+      const audio = hook.result.current.audioRef.current!;
+      ended(audio);
+      played(audio);
+      act(() => {
+        vi.advanceTimersByTime(120_000);
+      });
+      vi.useRealTimers();
+      expect(audio.src).toBe(SILENCE_URL);
+      expect(hook.result.current.isPlaying).toBe(false);
+      playMock.mockClear();
+
+      act(() => hook.result.current.play());
+      expect(audio.src).toBe(SILENCE_URL);
+      expect(audio.loop).toBe(true);
+      expect(playMock).toHaveBeenCalledTimes(1);
+      played(audio);
+      expect(hook.result.current.isPlaying).toBe(true);
+
+      hook.rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          cardId: 'card-2',
+          audioRecordings: nextRecordings,
+          nextCard: null,
+        }),
+      );
+      const r2 = await resolveMerge(1, makeResult({ durationSec: 7 }));
+      expect(audio.src).toBe(r2.blobUrl);
+      expect(audio.loop).toBe(false);
+      expect(playMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('Play after a pause during the bridge starts the prefetched card at once', async () => {
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'advance');
+      const { result, rerender } = renderPlayer({
+        autoPlay: true,
+        onScheduleComplete,
+      });
+      await resolveMerge(0, makeResult({ durationSec: 3 }));
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          nextCard: { cardId: 'card-2', audioRecordings: nextRecordings },
+        }),
+      );
+      const audio = result.current.audioRef.current!;
+      playMock.mockClear();
+      ended(audio);
+      expect(audio.src).toBe(SILENCE_URL);
+      played(audio);
+      vi.spyOn(audio, 'pause').mockImplementation(() => {});
+      act(() => result.current.pause());
+      // The prefetch lands while paused: held in the cache, not played.
+      const r2 = await resolveMerge(1, makeResult({ durationSec: 7 }));
+      expect(audio.src).toBe(SILENCE_URL);
+      expect(playMock).toHaveBeenCalledTimes(1);
+
+      act(() => result.current.play());
+      expect(audio.src).toBe(r2.blobUrl);
+      expect(audio.loop).toBe(false);
+      expect(playMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('Play on a card parked for missing audio URLs starts it when they arrive, autoplay off', async () => {
+      const { result, rerender } = renderPlayer();
+      await resolveMerge(0, makeResult());
+      const audio = result.current.audioRef.current!;
+      rerender(
+        baseOptions({
+          cardId: 'card-2',
+          audioRecordings: [rec('en', 'en-B', null), rec('es', 'es-B')],
+        }),
+      );
+      expect(audio.src).toBe(SILENCE_URL);
+      expect(mergeCardAudioMock).toHaveBeenCalledTimes(1);
+      playMock.mockClear();
+
+      act(() => result.current.play());
+      expect(audio.loop).toBe(true);
+      expect(playMock).toHaveBeenCalledTimes(1);
+      played(audio);
+
+      rerender(baseOptions({ cardId: 'card-2', audioRecordings: nextRecordings }));
+      const r2 = await resolveMerge(1, makeResult());
+      expect(audio.src).toBe(r2.blobUrl);
+      // Autoplay is off and this tab did not initiate anything, but the user
+      // pressed Play: the blob starts.
+      expect(playMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('milestone chime while hidden', () => {
+    const nextRecordings = [rec('en', 'en-B'), rec('es', 'es-B')];
+    const ended = (audio: HTMLAudioElement) =>
+      act(() => {
+        audio.dispatchEvent(new Event('ended'));
+      });
+
+    it('plays the chime before the prefetched card and hands off when it ends', async () => {
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'chime');
+      const { result, rerender } = renderPlayer({
+        autoPlay: true,
+        onScheduleComplete,
+      });
+      await resolveMerge(0, makeResult({ durationSec: 3 }));
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          nextCard: { cardId: 'card-2', audioRecordings: nextRecordings },
+        }),
+      );
+      const r2 = await resolveMerge(1, makeResult({ durationSec: 7 }));
+      const audio = result.current.audioRef.current!;
+      playMock.mockClear();
+
+      ended(audio);
+      expect(audio.src).toBe(CHIME_URL);
+      expect(audio.loop).toBe(false);
+      expect(playMock).toHaveBeenCalledTimes(1);
+
+      ended(audio);
+      expect(audio.src).toBe(r2.blobUrl);
+      expect(playMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('a prefetch landing mid-chime waits for the chime to end', async () => {
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'chime');
+      const { result, rerender } = renderPlayer({
+        autoPlay: true,
+        onScheduleComplete,
+      });
+      await resolveMerge(0, makeResult({ durationSec: 3 }));
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          nextCard: { cardId: 'card-2', audioRecordings: nextRecordings },
+        }),
+      );
+      expect(mergeCardAudioMock).toHaveBeenCalledTimes(2);
+      const audio = result.current.audioRef.current!;
+      playMock.mockClear();
+
+      ended(audio);
+      expect(audio.src).toBe(CHIME_URL);
+      const r2 = await resolveMerge(1, makeResult({ durationSec: 7 }));
+      expect(audio.src).toBe(CHIME_URL);
+      expect(playMock).toHaveBeenCalledTimes(1);
+
+      ended(audio);
+      expect(audio.src).toBe(r2.blobUrl);
+      expect(playMock).toHaveBeenCalledTimes(2);
+    });
+
+    it("the served card's merge waits for the chime to end", async () => {
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'chime');
+      const { result, rerender } = renderPlayer({
+        autoPlay: true,
+        onScheduleComplete,
+      });
+      await resolveMerge(0, makeResult({ durationSec: 3 }));
+      const audio = result.current.audioRef.current!;
+      playMock.mockClear();
+
+      ended(audio);
+      expect(audio.src).toBe(CHIME_URL);
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          cardId: 'card-2',
+          audioRecordings: nextRecordings,
+          nextCard: null,
+        }),
+      );
+      // The card change did not touch the chime.
+      expect(audio.src).toBe(CHIME_URL);
+      const r2 = await resolveMerge(1, makeResult({ durationSec: 7 }));
+      expect(audio.src).toBe(CHIME_URL);
+      expect(playMock).toHaveBeenCalledTimes(1);
+
+      ended(audio);
+      expect(audio.src).toBe(r2.blobUrl);
+      expect(playMock).toHaveBeenCalledTimes(2);
+      expect(result.current.durationSec).toBe(7);
+    });
+
+    it('a refused chime advances at once', async () => {
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'chime');
+      const { result } = renderPlayer({ autoPlay: true, onScheduleComplete });
+      await resolveMerge(0, makeResult({ durationSec: 3 }));
+      const audio = result.current.audioRef.current!;
+      playMock.mockClear();
+      playMock.mockRejectedValueOnce(
+        new DOMException('autoplay blocked', 'NotAllowedError'),
+      );
+      await act(async () => {
+        audio.dispatchEvent(new Event('ended'));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      // Chime refused, nothing prefetched: the plain advance's bridge.
+      expect(audio.src).toBe(SILENCE_URL);
+      expect(audio.loop).toBe(true);
+      expect(playMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('media session ownership', () => {
+    type Handlers = Map<string, MediaSessionActionHandler | null>;
+    let handlers: Handlers;
+    let states: string[];
+
+    beforeEach(() => {
+      handlers = new Map();
+      states = [];
+      let playbackState = 'none';
+      const session = {
+        metadata: null as unknown,
+        get playbackState() {
+          return playbackState;
+        },
+        set playbackState(value: string) {
+          playbackState = value;
+          states.push(value);
+        },
+        setActionHandler: (
+          action: string,
+          handler: MediaSessionActionHandler | null,
+        ) => {
+          handlers.set(action, handler);
+        },
+        setPositionState: vi.fn(),
+      };
+      Object.defineProperty(navigator, 'mediaSession', {
+        configurable: true,
+        value: session,
+      });
+      (globalThis as { MediaMetadata?: unknown }).MediaMetadata = class {
+        constructor(init: Record<string, unknown>) {
+          Object.assign(this, init);
+        }
+      };
+    });
+
+    afterEach(() => {
+      delete (navigator as { mediaSession?: unknown }).mediaSession;
+      delete (globalThis as { MediaMetadata?: unknown }).MediaMetadata;
+    });
+
+    it('stays paused (never none) across a bridge pause and a card change, and releases on unmount', async () => {
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'advance');
+      const { result, rerender, unmount } = renderPlayer({
+        autoPlay: true,
+        onScheduleComplete,
+      });
+      await resolveMerge(0, makeResult({ durationSec: 3 }));
+      const audio = result.current.audioRef.current!;
+      expect(typeof handlers.get('play')).toBe('function');
+      expect(typeof handlers.get('seekto')).toBe('function');
+
+      act(() => {
+        audio.dispatchEvent(new Event('ended'));
+      });
+      vi.spyOn(audio, 'pause').mockImplementation(() => {});
+      act(() => result.current.pause());
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          cardId: 'card-2',
+          audioRecordings: [rec('en', 'en-B'), rec('es', 'es-B')],
+          nextCard: null,
+        }),
+      );
+      await resolveMerge(1, makeResult({ durationSec: 7 }));
+      expect(states).not.toContain('none');
+      expect(states).toContain('paused');
+
+      unmount();
+      expect(states[states.length - 1]).toBe('none');
+      expect(handlers.get('play')).toBeNull();
+    });
+
+    it('routes the lock-screen Play on a parked element back into the player', async () => {
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'advance');
+      const { result } = renderPlayer({ autoPlay: true, onScheduleComplete });
+      await resolveMerge(0, makeResult({ durationSec: 3 }));
+      const audio = result.current.audioRef.current!;
+      act(() => {
+        audio.dispatchEvent(new Event('ended'));
+      });
+      vi.spyOn(audio, 'pause').mockImplementation(() => {});
+      act(() => result.current.pause());
+      playMock.mockClear();
+
+      act(() => {
+        handlers.get('play')?.({ action: 'play' });
+      });
+      expect(audio.src).toBe(SILENCE_URL);
+      expect(audio.loop).toBe(true);
+      expect(playMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('parked element: recovery paths', () => {
+    const nextRecordings = [rec('en', 'en-B'), rec('es', 'es-B')];
+    const ended = (audio: HTMLAudioElement) =>
+      act(() => {
+        audio.dispatchEvent(new Event('ended'));
+      });
+    const played = (audio: HTMLAudioElement) =>
+      act(() => {
+        audio.dispatchEvent(new Event('play'));
+      });
+
+    it('Play after the served card merged to nothing asks for it again and starts it', async () => {
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'advance');
+      const { result, rerender } = renderPlayer({
+        autoPlay: true,
+        onScheduleComplete,
+      });
+      await resolveMerge(0, makeResult({ durationSec: 3 }));
+      const audio = result.current.audioRef.current!;
+      ended(audio);
+      played(audio);
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          cardId: 'card-2',
+          audioRecordings: nextRecordings,
+          nextCard: null,
+        }),
+      );
+      expect(mergeCardAudioMock).toHaveBeenCalledTimes(2);
+      // The merge came back empty (a clip fetch failed): parked, loaded.
+      await resolveMerge(1, null as unknown as MergeResult);
+      expect(audio.src).toBe(SILENCE_URL);
+      expect(audio.loop).toBe(false);
+      expect(result.current.isPlaying).toBe(false);
+      playMock.mockClear();
+
+      act(() => result.current.play());
+      expect(audio.loop).toBe(true);
+      expect(playMock).toHaveBeenCalledTimes(1);
+      expect(mergeCardAudioMock).toHaveBeenCalledTimes(3);
+      played(audio);
+      const r2 = await resolveMerge(2, makeResult({ durationSec: 7 }));
+      expect(audio.src).toBe(r2.blobUrl);
+      expect(playMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('a gated Play (tutorial, settings sheet) lands the card paused instead of starting it', async () => {
+      const { result, rerender } = renderPlayer();
+      await resolveMerge(0, makeResult());
+      const audio = result.current.audioRef.current!;
+      rerender(
+        baseOptions({
+          cardId: 'card-2',
+          audioRecordings: [rec('en', 'en-B', null), rec('es', 'es-B')],
+        }),
+      );
+      expect(audio.src).toBe(SILENCE_URL);
+      playMock.mockClear();
+      act(() => result.current.play());
+      expect(playMock).toHaveBeenCalledTimes(1);
+      Object.defineProperty(audio, 'paused', {
+        configurable: true,
+        get: () => false,
+      });
+      vi.spyOn(audio, 'pause').mockImplementation(() => {
+        audio.dispatchEvent(new Event('pause'));
+      });
+
+      // A tutorial popover opened while the bridge waited.
+      rerender(
+        baseOptions({
+          cardId: 'card-2',
+          audioRecordings: nextRecordings,
+          playbackGated: true,
+        }),
+      );
+      const r2 = await resolveMerge(1, makeResult());
+      expect(audio.src).toBe(r2.blobUrl);
+      expect(playMock).toHaveBeenCalledTimes(1);
+      expect(result.current.isPlaying).toBe(false);
+    });
+  });
+
+  describe('milestone chime while hidden: edge cases', () => {
+    const nextRecordings = [rec('en', 'en-B'), rec('es', 'es-B')];
+    const ended = (audio: HTMLAudioElement) =>
+      act(() => {
+        audio.dispatchEvent(new Event('ended'));
+      });
+
+    it("the user's pause in the chime's first frames does not advance past it", async () => {
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'chime');
+      const { result } = renderPlayer({ autoPlay: true, onScheduleComplete });
+      await resolveMerge(0, makeResult({ durationSec: 3 }));
+      const audio = result.current.audioRef.current!;
+      playMock.mockClear();
+      playMock.mockRejectedValueOnce(
+        new DOMException('interrupted by pause', 'AbortError'),
+      );
+      await act(async () => {
+        audio.dispatchEvent(new Event('ended'));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(audio.src).toBe(CHIME_URL);
+      expect(audio.loop).toBe(false);
+      expect(playMock).toHaveBeenCalledTimes(1);
+
+      // Play resumes the chime; its end still advances.
+      act(() => result.current.play());
+      expect(playMock).toHaveBeenCalledTimes(2);
+      ended(audio);
+      expect(audio.src).toBe(SILENCE_URL);
+      expect(audio.loop).toBe(true);
+    });
+
+    it('holds the next card\'s cues back with its start: the chime reveals nothing', async () => {
+      const onScheduleComplete = vi.fn((): ScheduleCompleteResult => 'chime');
+      const { result, rerender } = renderPlayer({
+        autoPlay: true,
+        onScheduleComplete,
+      });
+      await resolveMerge(0, makeResult({ durationSec: 3 }));
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          nextCard: { cardId: 'card-2', audioRecordings: nextRecordings },
+        }),
+      );
+      const r2 = await resolveMerge(
+        1,
+        makeResult({
+          durationSec: 7,
+          languageCues: [{ language: 'es', startSec: 0 }],
+        }),
+      );
+      const audio = result.current.audioRef.current!;
+      ended(audio);
+      expect(audio.src).toBe(CHIME_URL);
+
+      // The server serves card 2 mid-chime: the cache hit is deferred.
+      rerender(
+        baseOptions({
+          autoPlay: true,
+          onScheduleComplete,
+          cardId: 'card-2',
+          audioRecordings: nextRecordings,
+          nextCard: null,
+        }),
+      );
+      expect(audio.src).toBe(CHIME_URL);
+      act(() => {
+        mediaCurrentTime = 0.5;
+        audio.dispatchEvent(new Event('timeupdate'));
+      });
+      expect(result.current.revealedLanguages.size).toBe(0);
+      expect(result.current.languageCues).toEqual([]);
+
+      ended(audio);
+      expect(audio.src).toBe(r2.blobUrl);
+      expect(result.current.languageCues).toEqual(r2.languageCues);
     });
   });
 

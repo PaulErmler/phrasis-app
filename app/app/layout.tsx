@@ -8,6 +8,7 @@ import { AppUpdateGate } from '@/components/app/AppUpdateGate';
 import { PostHogIdentify } from '@/components/analytics/PostHogIdentify';
 import { ConsentSync } from '@/components/analytics/ConsentSync';
 import { OpenAIPixelConversions } from '@/components/analytics/OpenAIPixelConversions';
+import { AudioGestureUnlock } from '@/components/app/AudioGestureUnlock';
 
 export default async function AppLayout({
   children,
@@ -39,6 +40,9 @@ export default async function AppLayout({
         <PostHogIdentify />
         <ConsentSync />
         <OpenAIPixelConversions />
+        {/* First tap anywhere in the app unlocks the audio elements and
+            declares the iOS audio session, before the learn view exists. */}
+        <AudioGestureUnlock />
         {/* Wraps rather than sits beside the guard so useReloadBlock is
             reachable from every view, notably LearnView, whose detached
             audio element cannot be detected from outside the hook tree. */}

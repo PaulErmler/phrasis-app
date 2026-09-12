@@ -791,6 +791,7 @@ async function storeRenderedWording(
       romanizedText = await romanizeText(
         wording.translatedText,
         args.targetLanguage,
+        { ctx, userId: args.requestedByUserId },
       );
     } catch (err) {
       romanizedText = romanizationAfterFailure(

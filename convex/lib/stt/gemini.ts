@@ -183,6 +183,7 @@ export async function transcribeAudioWithGemini(
         typeof usage.cost === 'number' && Number.isFinite(usage.cost)
           ? usage.cost
           : undefined,
+      attempts: attempt + 1,
       detectedLanguage: internalLanguageCode
         ? toSttLanguage(internalLanguageCode)
         : undefined,

@@ -44,6 +44,7 @@ import {
   ENSURE_CONTENT_REVIEW_INTERVAL,
   predictsMilestone,
 } from '@/lib/constants/learning';
+import { isPageHidden } from '@/lib/audio/audioSurface';
 import { DEFAULT_AUTO_ADVANCE } from '@/lib/constants/audioPlayback';
 import { collectionRemaining } from '@/convex/lib/collections';
 import { useCelebration } from './useCelebration';
@@ -1095,10 +1096,16 @@ export function useLearningMode(
       // true and the audio for the next card never starts. This is best-effort
       // (the local count can be stale across tabs); the server's
       // `triggerCelebration` is the authoritative verdict.
-      const predictedMilestone = predictsMilestone(
-        dailyReviewsToday,
-        progressDisplayEnabled,
-      );
+      //
+      // Not while the page is hidden (screen locked, another tab): the
+      // screen would pause card audio for a display nobody sees, its
+      // interval-driven auto-advance is throttled once nothing plays, and by
+      // the time the user looks its numbers are stale. The review is already
+      // recorded; the audio hook plays the success sound in its place (see
+      // `handleScheduleComplete` in useLearningAudio).
+      const hidden = isPageHidden();
+      const predictedMilestone =
+        !hidden && predictsMilestone(dailyReviewsToday, progressDisplayEnabled);
       if (predictedMilestone) {
         setProgressDisplayActive(true);
       }
@@ -1130,7 +1137,7 @@ export function useLearningMode(
         setDailyNewWordsToday(result.dailyNewWordsToday);
         setSessionCardCount((n) => n + 1);
 
-        if (result.triggerCelebration) {
+        if (result.triggerCelebration && !hidden) {
           setProgressDisplayActive(true);
           // Mutation has resolved. Daily totals are fresh and userWords for
           // this review are committed, so the celebration's queries will

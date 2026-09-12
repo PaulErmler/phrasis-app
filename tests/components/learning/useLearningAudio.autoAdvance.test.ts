@@ -20,6 +20,7 @@ vi.mock('@/hooks/use-audio-player', () => ({
 }));
 
 import { useLearningAudio } from '@/components/app/learning/useLearningAudio';
+import type { ScheduleCompleteResult } from '@/hooks/use-audio-player';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
 import { PROGRESS_DISPLAY_INTERVAL } from '@/lib/constants/learning';
 
@@ -59,11 +60,11 @@ const review = (extra: Settings = {}): Settings => ({
   ...extra,
 });
 
-function fireScheduleComplete(state: LearningState): boolean {
+function fireScheduleComplete(state: LearningState): ScheduleCompleteResult {
   renderHook(() => useLearningAudio(state));
-  let ahead = false;
+  let ahead: ScheduleCompleteResult = 'hold';
   act(() => {
-    ahead = (player.lastProps?.onScheduleComplete as () => boolean)();
+    ahead = (player.lastProps?.onScheduleComplete as () => ScheduleCompleteResult)();
   });
   return ahead;
 }
@@ -78,19 +79,19 @@ beforeEach(() => {
 describe('useLearningAudio: auto-advance in review', () => {
   it('advances and lets the audio run ahead with auto-advance on', () => {
     const state = reviewingState(review(), 3);
-    expect(fireScheduleComplete(state)).toBe(true);
+    expect(fireScheduleComplete(state)).toBe('advance');
     expect(handleNextOf(state)).toHaveBeenCalledTimes(1);
   });
 
   it('does nothing with auto-advance off', () => {
     const state = reviewingState(review({ autoAdvance: false }));
-    expect(fireScheduleComplete(state)).toBe(false);
+    expect(fireScheduleComplete(state)).toBe('hold');
     expect(handleNextOf(state)).not.toHaveBeenCalled();
   });
 
   it('advances but holds the audio back on the review that hits the milestone', () => {
     const state = reviewingState(review(), PROGRESS_DISPLAY_INTERVAL - 1);
-    expect(fireScheduleComplete(state)).toBe(false);
+    expect(fireScheduleComplete(state)).toBe('hold');
     expect(handleNextOf(state)).toHaveBeenCalledTimes(1);
   });
 
@@ -99,17 +100,36 @@ describe('useLearningAudio: auto-advance in review', () => {
       review({ progressDisplayEnabled: false }),
       PROGRESS_DISPLAY_INTERVAL - 1,
     );
-    expect(fireScheduleComplete(state)).toBe(true);
+    expect(fireScheduleComplete(state)).toBe('advance');
   });
 
   it('does not advance while a card action is in flight', () => {
     const state = reviewingState(review());
     renderHook(() => useLearningAudio(state, { disableAutoAdvance: true }));
-    let ahead = true;
+    let ahead: ScheduleCompleteResult | undefined;
     act(() => {
-      ahead = (player.lastProps?.onScheduleComplete as () => boolean)();
+      ahead = (player.lastProps?.onScheduleComplete as () => ScheduleCompleteResult)();
     });
-    expect(ahead).toBe(false);
+    expect(ahead).toBe('hold');
     expect(handleNextOf(state)).not.toHaveBeenCalled();
+  });
+
+  it("plays the chime instead of holding when the milestone lands while the page is hidden", () => {
+    // Screen locked: the celebration screen is skipped (useLearningMode
+    // never flips progressDisplayActive while hidden), so the player must
+    // keep going and play the success sound itself.
+    const state = reviewingState(review(), PROGRESS_DISPLAY_INTERVAL - 1);
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'hidden',
+    });
+    try {
+      expect(fireScheduleComplete(state)).toBe('chime');
+    } finally {
+      delete (document as { visibilityState?: unknown }).visibilityState;
+    }
+    expect(
+      state.status === 'reviewing' && state.handleNext,
+    ).toHaveBeenCalledTimes(1);
   });
 });

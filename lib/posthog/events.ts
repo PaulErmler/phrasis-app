@@ -69,12 +69,35 @@ export const CLIENT_EVENTS = {
 
   /**
    * `audio.play()` on the card player rejected with NotAllowedError. Carries
-   * `path` ('manual' | 'auto' | 'resume' | 'handoff') and `visibility`
-   * (document.visibilityState at the time). A cluster of `handoff` +
-   * `hidden` is a browser refusing to continue Radio / auto-advance while
-   * the screen is locked.
+   * `path` ('manual' | 'auto' | 'resume' | 'handoff' | 'bridge' | 'chime' |
+   * 'mediaSession' | 'parked') plus the surface (`visibility`,
+   * `display_mode`, `native_shell`, see `lib/audio/audioSurface.ts`). A
+   * cluster of `handoff` + `hidden` is a browser refusing to continue Radio /
+   * auto-advance while the screen is locked; `auto` + `visible` is an element
+   * that no gesture has unlocked yet.
    */
   AUDIO_PLAY_BLOCKED: 'audio_play_blocked',
+  /**
+   * WebKit's `navigator.audioSession` left the `active` state. Carries
+   * `state` ('interrupted' | 'inactive') and the surface. Another app or the
+   * OS took the audio session; the card element is paused by the browser at
+   * the same moment.
+   */
+  AUDIO_SESSION_STATE: 'audio_session_state',
+  /**
+   * The silent bridge between two cards looped for its full cap without a
+   * playable card arriving, and the player parked. Carries the surface. This
+   * is the "Radio just stopped" signal from a locked phone.
+   */
+  AUDIO_BRIDGE_TIMEOUT: 'audio_bridge_timeout',
+  /**
+   * Play was pressed on a parked player (nothing loaded but silence).
+   * Carries `path`, `merging`, `audio_ready`, `waiting` (the park had
+   * interrupted a wait for the next card), `handed_off` (that card's
+   * prefetched blob started at once), `remerge` (the card was asked for
+   * again) and the surface.
+   */
+  AUDIO_PARKED_RESUME: 'audio_parked_resume',
 
   /**
    * A card action was clicked in the UI. Carries `action` (favorite, master,

@@ -69,6 +69,17 @@ export interface TranscriptionResult {
   billedSeconds?: number;
   /** Exact USD charge reported by OpenRouter for this call. */
   costUsd?: number;
+  /**
+   * How many requests it took to get this transcript, the successful one
+   * included. Above 1 means the endpoint 429'd or 5xx'd and we re-POSTed.
+   *
+   * Reported, not billed: `costUsd` covers the attempt that succeeded, and a
+   * non-2xx carries no `usage.cost` because OpenRouter does not charge for a
+   * failed generation. So there is no lost spend to add here, and inventing a
+   * figure for a failed attempt would be worse than counting the retries. A
+   * number that climbs is a signal about upstream health, not about cost.
+   */
+  attempts: number;
   /** Language the model settled on (bare code), pinned or detected. */
   detectedLanguage?: string;
 }
@@ -202,6 +213,7 @@ export async function transcribeAudio(
         duration === undefined ? undefined : Math.round(duration * 1000),
       billedSeconds: finiteOrUndefined(usage.seconds),
       costUsd: finiteOrUndefined(usage.cost),
+      attempts: attempt + 1,
       detectedLanguage:
         typeof data.language === 'string' ? data.language : undefined,
     };

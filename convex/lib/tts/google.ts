@@ -44,6 +44,8 @@ export const googleTts: TTSProvider = {
       [Uint8Array.from(atob(data.audioContent), (c) => c.charCodeAt(0))],
       { type: 'audio/mp3' },
     );
-    return { audio, provider: 'google' };
+    // Google TTS doesn't go through OpenRouter, so there is no generation to
+    // price. Its cost is derived from the character count instead.
+    return { audio, provider: 'google', generationIds: [] };
   },
 };

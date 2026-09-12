@@ -1,4 +1,5 @@
 import { PROGRESS_SOUND_URL } from '@/lib/constants/learning';
+import { unlockElementInGesture } from './unlockElement';
 
 /**
  * The milestone celebration's success sound, as ONE long-lived
@@ -26,6 +27,8 @@ import { PROGRESS_SOUND_URL } from '@/lib/constants/learning';
 
 let element: HTMLAudioElement | null = null;
 let unlocked = false;
+let progressBlobUrl: string | null = null;
+let progressBlobPending: Promise<string | null> | null = null;
 
 export function getCelebrationSound(): HTMLAudioElement | null {
   if (typeof window === 'undefined' || typeof Audio === 'undefined') {
@@ -57,51 +60,19 @@ export function isCelebrationSoundUnlocked(): boolean {
 }
 
 /**
- * Listen for the first user gesture and use it to unlock the element: call
- * `play()` inside the gesture, then `pause()` synchronously so nothing is
- * audible. WebKit lifts the element's gesture restriction at the top of
- * `play()`, before any data is loaded, so the immediate pause doesn't undo
- * it; the rejected play promise (AbortError) is expected and dropped.
- *
- * Returns a teardown. Listeners remove themselves after a successful unlock.
- * `touchend` and `click` are the events WebKit counts as media gestures
- * (`touchstart` / `pointerdown` are not), `keydown` covers desktop.
+ * Unlock the element from inside a user gesture (see
+ * `unlockElementInGesture`); the app's first-tap installer in
+ * `lib/audio/gestureUnlock.ts` calls this. Returns whether the element is
+ * unlocked afterwards (false only where there is no `Audio` at all). A
+ * celebration already playing must not be reset, so it just counts.
  */
-export function installCelebrationSoundUnlock(): () => void {
-  if (typeof window === 'undefined' || unlocked) return () => {};
+export function unlockCelebrationSoundInGesture(): boolean {
+  if (unlocked) return true;
   const el = getCelebrationSound();
-  if (!el) return () => {};
-
-  const events = ['touchend', 'click', 'keydown'] as const;
-  const remove = () => {
-    for (const ev of events) {
-      window.removeEventListener(ev, unlock, true);
-    }
-  };
-  const unlock = () => {
-    if (unlocked) {
-      remove();
-      return;
-    }
-    // A celebration already playing (the unlock listener is installed by the
-    // learning screen, which also hosts the celebration) must not be reset.
-    if (!el.paused) {
-      unlocked = true;
-      remove();
-      return;
-    }
-    const attempt = el.play();
-    el.pause();
-    if (attempt && typeof attempt.catch === 'function') {
-      attempt.catch(() => {});
-    }
-    unlocked = true;
-    remove();
-  };
-  for (const ev of events) {
-    window.addEventListener(ev, unlock, true);
-  }
-  return remove;
+  if (!el) return false;
+  if (el.paused) unlockElementInGesture(el);
+  unlocked = true;
+  return true;
 }
 
 /**
@@ -159,8 +130,44 @@ export function stopCelebrationSound(): void {
   }
 }
 
-/** Test hook: drop the cached element and the unlocked flag. */
+/**
+ * The success sound as a blob URL, for the card player to play through its
+ * own element when a milestone lands while the page is hidden (the screen is
+ * skipped there, the sound is not). Fetched once at session start so the
+ * hidden path never depends on the network. Resolves null on failure and
+ * lets the next call retry.
+ */
+export function warmProgressSoundBlob(): Promise<string | null> {
+  if (progressBlobUrl) return Promise.resolve(progressBlobUrl);
+  if (progressBlobPending) return progressBlobPending;
+  if (typeof window === 'undefined' || typeof fetch !== 'function') {
+    return Promise.resolve(null);
+  }
+  progressBlobPending = (async () => {
+    try {
+      const res = await fetch(PROGRESS_SOUND_URL);
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      progressBlobUrl = URL.createObjectURL(blob);
+      return progressBlobUrl;
+    } catch {
+      return null;
+    } finally {
+      progressBlobPending = null;
+    }
+  })();
+  return progressBlobPending;
+}
+
+/** Blob URL of the success sound, or null until `warmProgressSoundBlob` ran. */
+export function getProgressSoundBlobUrl(): string | null {
+  return progressBlobUrl;
+}
+
+/** Test hook: drop the cached element, the blob and the unlocked flag. */
 export function resetCelebrationSoundForTests(): void {
   element = null;
   unlocked = false;
+  progressBlobUrl = null;
+  progressBlobPending = null;
 }

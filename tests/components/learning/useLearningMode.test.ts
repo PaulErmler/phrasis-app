@@ -153,7 +153,10 @@ import {
   useLearningMode,
   type LearningState,
 } from '@/components/app/learning/useLearningMode';
-import { MAX_UNSERVED_ADD_RUNS } from '@/lib/constants/learning';
+import {
+  MAX_UNSERVED_ADD_RUNS,
+  PROGRESS_DISPLAY_INTERVAL,
+} from '@/lib/constants/learning';
 
 const { REFS } = harness;
 
@@ -1016,6 +1019,79 @@ describe('useLearningMode', () => {
       renderHook(() => useLearningMode());
       await act(async () => {});
       expect(add).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * The milestone screen pauses card audio and auto-dismisses on an
+   * interval, both of which strand a locked-screen session, so while the
+   * page is hidden the review is recorded and the screen is skipped (the
+   * audio hook plays the success sound instead). Shown later it would be
+   * stale, so it is not deferred either.
+   */
+  describe('milestone while the page is hidden', () => {
+    const confirmed = {
+      dailyReviewsToday: PROGRESS_DISPLAY_INTERVAL,
+      dailyTimeMsToday: 100,
+      dailyNewWordsToday: 0,
+      triggerCelebration: true,
+    };
+
+    function hidePage() {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'hidden',
+      });
+      return () => {
+        delete (document as { visibilityState?: unknown }).visibilityState;
+      };
+    }
+
+    it('visible: the prediction latches the screen and the server confirms it', async () => {
+      seedReviewing({ dailyReviewsToday: PROGRESS_DISPLAY_INTERVAL - 1 });
+      const review = harness.mutationFor(REFS.reviewCard);
+      const gate = deferred<Record<string, unknown>>();
+      review.mockReturnValueOnce(gate.promise);
+
+      const { result } = renderHook(() => useLearningMode());
+      await act(async () => {
+        void reviewing(result).handleNext();
+      });
+      expect(result.current.progressDisplayActive).toBe(true);
+
+      await act(async () => {
+        gate.resolve(confirmed);
+        await gate.promise;
+      });
+      expect(result.current.progressDisplayActive).toBe(true);
+      expect(result.current.progressDisplayReady).toBe(true);
+    });
+
+    it('hidden: the review counts but the screen never shows, even on a confirmed milestone', async () => {
+      const restore = hidePage();
+      try {
+        seedReviewing({ dailyReviewsToday: PROGRESS_DISPLAY_INTERVAL - 1 });
+        const review = harness.mutationFor(REFS.reviewCard);
+        const gate = deferred<Record<string, unknown>>();
+        review.mockReturnValueOnce(gate.promise);
+
+        const { result } = renderHook(() => useLearningMode());
+        await act(async () => {
+          void reviewing(result).handleNext();
+        });
+        expect(review).toHaveBeenCalledTimes(1);
+        expect(result.current.progressDisplayActive).toBe(false);
+
+        await act(async () => {
+          gate.resolve(confirmed);
+          await gate.promise;
+        });
+        expect(result.current.progressDisplayActive).toBe(false);
+        expect(result.current.progressDisplayReady).toBe(false);
+        expect(result.current.dailyReviewsToday).toBe(PROGRESS_DISPLAY_INTERVAL);
+      } finally {
+        restore();
+      }
     });
   });
 });

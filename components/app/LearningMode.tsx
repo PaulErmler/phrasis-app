@@ -49,8 +49,8 @@ import {
   type AudioSettingsMode,
 } from '@/lib/audio/mergeAudio';
 import {
-  installCelebrationSoundUnlock,
   warmCelebrationSound,
+  warmProgressSoundBlob,
 } from '@/lib/audio/celebrationSound';
 import { resolveShowFurigana } from '@/lib/furigana';
 
@@ -126,14 +126,14 @@ export function LearningMode({
     setWritingAccuracy(null);
   }, [cardId, reviewingReviewMode, reviewingWritingInputMode]);
 
-  // Warm the celebration sound at session start and unlock its shared
-  // element on the first tap / key. The celebration itself mounts after a
-  // mutation resolves (never inside a gesture), so without this WebKit
-  // refuses its `play()` and the milestone screen runs silent. See
-  // lib/audio/celebrationSound.ts.
+  // Warm the celebration sound at session start: the element's buffer for
+  // the milestone screen, and the blob the card player plays in its place
+  // when a milestone lands while the page is hidden. The gesture unlock for
+  // both audio elements lives at the /app root (AudioGestureUnlock), so the
+  // tap that opened this view already counted.
   useEffect(() => {
     warmCelebrationSound();
-    return installCelebrationSoundUnlock();
+    void warmProgressSoundBlob();
   }, []);
 
   // Pause card audio while the celebration screen is showing. The success

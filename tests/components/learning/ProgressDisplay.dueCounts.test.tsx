@@ -29,7 +29,7 @@ vi.mock('@/components/effects/ConfettiBurst', () => ({
 }));
 
 vi.mock('@/lib/audio/mediaSession', () => ({
-  setupMediaSession: () => () => {},
+  pushMediaSession: () => ({ update: () => {}, pop: () => {} }),
   setMediaSessionPlaybackState: () => {},
 }));
 

@@ -29,7 +29,7 @@ import {
 import { reserveRateLimitToken } from '../../lib/rateLimitReserve';
 import { TTS_RATE_LIMIT_BY_PROVIDER } from '../../rateLimiter';
 import { captureGeneration } from '../../lib/posthogAi';
-import { costForCharacters } from '../../config/aiCosts';
+import { synthCostForEvent } from '../../lib/tts/cost';
 import { ttsProviderValidator, voiceGenderValidator } from '../../types';
 
 /**
@@ -242,29 +242,34 @@ export const synthesizeApprovalAudio = internalAction({
       { maxWaitMs: APPROVAL_TTS_TOKEN_MAX_WAIT_MS },
     );
     const synthStartedAt = Date.now();
-    const blob = await synthesizeSpeech(
+    const { audio: blob, generationIds } = await synthesizeSpeech(
       args.spokenText,
       args.voiceName,
       1,
       args.provider,
       args.language,
     );
+    const synthCost = await synthCostForEvent({
+      provider: args.provider,
+      characterCount: args.spokenText.length,
+      generationIds,
+    });
     await captureGeneration(ctx, {
       distinctId: args.userId,
       feature: 'tts_synthesis',
       model: args.voiceName,
       provider: args.provider,
       latencyMs: Date.now() - synthStartedAt,
-      costUsd:
-        args.provider === 'google'
-          ? costForCharacters('googleTts', args.spokenText.length)
-          : undefined,
+      costUsd: synthCost.costUsd,
       sharedContent: true,
       extra: {
         approval_id: args.approvalId,
         language: args.language,
         character_count: args.spokenText.length,
         source: 'chat_approval_preview',
+        synth_cost_source: synthCost.source,
+        synth_billed_requests: synthCost.billedRequests,
+        synth_priced_requests: synthCost.pricedRequests,
       },
     });
     const storageId = await ctx.storage.store(blob);

@@ -27,6 +27,7 @@ vi.mock('@/hooks/use-audio-player', () => ({
 }));
 
 import { useLearningAudio } from '@/components/app/learning/useLearningAudio';
+import type { ScheduleCompleteResult } from '@/hooks/use-audio-player';
 import type { LearningState } from '@/components/app/learning/useLearningMode';
 
 type Settings = Record<string, unknown>;
@@ -91,7 +92,7 @@ describe('useLearningAudio: free-play faces', () => {
     const state = reviewingState(freePlay('audio'));
     renderHook(() => useLearningAudio(state));
     act(() => {
-      (player.lastProps?.onScheduleComplete as () => boolean)();
+      (player.lastProps?.onScheduleComplete as () => ScheduleCompleteResult)();
     });
     expect(
       state.status === 'reviewing' && state.handleNext,
@@ -100,28 +101,28 @@ describe('useLearningAudio: free-play faces', () => {
 
   it('lets the audio run ahead of the server in the listening face', () => {
     // The player hands the element the prefetched next blob only when this
-    // returns true. Radio never rates, so no celebration can interfere.
+    // returns 'advance'. Radio never rates, so no celebration can interfere.
     const state = reviewingState(freePlay('audio'));
     renderHook(() => useLearningAudio(state));
-    let ahead: boolean | undefined;
+    let ahead: ScheduleCompleteResult | undefined;
     act(() => {
-      ahead = (player.lastProps?.onScheduleComplete as () => boolean)();
+      ahead = (player.lastProps?.onScheduleComplete as () => ScheduleCompleteResult)();
     });
-    expect(ahead).toBe(true);
+    expect(ahead).toBe('advance');
   });
 
   it('never auto-advances in the writing face', () => {
     const state = reviewingState(freePlay('full'));
     renderHook(() => useLearningAudio(state));
     act(() => {
-      (player.lastProps?.onScheduleComplete as () => boolean)();
+      (player.lastProps?.onScheduleComplete as () => ScheduleCompleteResult)();
     });
     expect(
       state.status === 'reviewing' && state.handleNext,
     ).not.toHaveBeenCalled();
-    expect((player.lastProps?.onScheduleComplete as () => boolean)()).toBe(
-      false,
-    );
+    expect(
+      (player.lastProps?.onScheduleComplete as () => ScheduleCompleteResult)(),
+    ).toBe('hold');
     // Writing also strips the trailing pause-before-advance from the blob.
     expect((player.lastProps?.settings as Settings).autoAdvance).toBe(false);
   });
@@ -285,7 +286,7 @@ describe('useLearningAudio: the Radio settings split', () => {
     const { result } = renderHook(() => useLearningAudio(state));
     expect(result.current.userAutoPlay).toBe(true);
     act(() => {
-      (player.lastProps?.onScheduleComplete as () => boolean)();
+      (player.lastProps?.onScheduleComplete as () => ScheduleCompleteResult)();
     });
     expect(
       state.status === 'reviewing' && state.handleNext,

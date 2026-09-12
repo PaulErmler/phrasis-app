@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getCelebrationSound,
-  installCelebrationSoundUnlock,
+  getProgressSoundBlobUrl,
   isCelebrationSoundUnlocked,
   playCelebrationSound,
   resetCelebrationSoundForTests,
   stopCelebrationSound,
+  unlockCelebrationSoundInGesture,
+  warmProgressSoundBlob,
 } from '@/lib/audio/celebrationSound';
 
 class FakeAudio extends EventTarget {
@@ -54,29 +56,26 @@ describe('celebrationSound', () => {
     expect(FakeAudio.instances[0].src).toBe('/sounds/progress-success.mp3');
   });
 
-  it('unlocks on the first gesture with a silent play+pause and then stops listening', () => {
-    const teardown = installCelebrationSoundUnlock();
-    const el = FakeAudio.instances[0];
+  it('unlocks with a silent play+pause, once', () => {
     expect(isCelebrationSoundUnlocked()).toBe(false);
-
-    window.dispatchEvent(new Event('click'));
+    expect(unlockCelebrationSoundInGesture()).toBe(true);
+    const el = FakeAudio.instances[0];
     expect(isCelebrationSoundUnlocked()).toBe(true);
     expect(el.playCalls).toBe(1);
     expect(el.pauseCalls).toBe(1);
     expect(el.paused).toBe(true);
 
-    window.dispatchEvent(new Event('click'));
+    expect(unlockCelebrationSoundInGesture()).toBe(true);
     expect(el.playCalls).toBe(1);
-    teardown();
   });
 
   it('does not interrupt a celebration already playing when the unlock gesture lands', () => {
-    installCelebrationSoundUnlock();
+    getCelebrationSound();
     const el = FakeAudio.instances[0];
     void playCelebrationSound();
     expect(el.paused).toBe(false);
 
-    window.dispatchEvent(new Event('touchend'));
+    expect(unlockCelebrationSoundInGesture()).toBe(true);
     expect(el.pauseCalls).toBe(0);
     expect(isCelebrationSoundUnlocked()).toBe(true);
   });
@@ -116,5 +115,46 @@ describe('celebrationSound', () => {
     stopCelebrationSound();
     expect(el.paused).toBe(true);
     expect(el.currentTime).toBe(0);
+  });
+});
+
+describe('warmProgressSoundBlob', () => {
+  const originalCreateObjectURL = URL.createObjectURL;
+
+  afterEach(() => {
+    URL.createObjectURL = originalCreateObjectURL;
+  });
+
+  it('fetches the sound once and caches its blob URL', async () => {
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      blob: async () => new Blob(['ding']),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    URL.createObjectURL = vi.fn(() => 'blob:chime');
+
+    expect(getProgressSoundBlobUrl()).toBeNull();
+    const first = warmProgressSoundBlob();
+    const second = warmProgressSoundBlob();
+    await expect(first).resolves.toBe('blob:chime');
+    await expect(second).resolves.toBe('blob:chime');
+    await expect(warmProgressSoundBlob()).resolves.toBe('blob:chime');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith('/sounds/progress-success.mp3');
+    expect(getProgressSoundBlobUrl()).toBe('blob:chime');
+  });
+
+  it('resolves null on a failed fetch and lets the next call retry', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce({ ok: true, blob: async () => new Blob(['x']) });
+    vi.stubGlobal('fetch', fetchMock);
+    URL.createObjectURL = vi.fn(() => 'blob:chime');
+
+    await expect(warmProgressSoundBlob()).resolves.toBeNull();
+    expect(getProgressSoundBlobUrl()).toBeNull();
+    await expect(warmProgressSoundBlob()).resolves.toBe('blob:chime');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

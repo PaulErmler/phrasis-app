@@ -8,6 +8,10 @@ vi.mock('ai', async (importOriginal) => ({
 vi.mock('@openrouter/ai-sdk-provider', () => ({
   createOpenRouter: () => (modelSlug: string) => ({ modelId: modelSlug }),
 }));
+vi.mock('../../lib/posthogAi', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../lib/posthogAi')>()),
+  captureGeneration: vi.fn(),
+}));
 
 import { APICallError, generateText } from 'ai';
 import {
@@ -15,6 +19,11 @@ import {
   romanizeText,
 } from '../../features/translation';
 import { TransientAnnotationError } from '../../lib/textAnnotations';
+import { captureGeneration } from '../../lib/posthogAi';
+
+const mockCapture = vi.mocked(captureGeneration);
+/** A no-op scheduler ctx: `captureGeneration` is mocked, so it is never used. */
+const telemetry = { ctx: { scheduler: {} } as never };
 
 function apiError(statusCode: number | undefined, isRetryable = false) {
   return new APICallError({
@@ -26,9 +35,13 @@ function apiError(statusCode: number | undefined, isRetryable = false) {
   });
 }
 
-function reply(text: string) {
+function reply(text: string, costUsd = 0.00004, generationId = 'gen-rom') {
   vi.mocked(generateText).mockResolvedValueOnce({
     text,
+    usage: { inputTokens: 12, outputTokens: 8 },
+    providerMetadata: {
+      openrouter: { id: generationId, usage: { cost: costUsd } },
+    },
   } as unknown as Awaited<ReturnType<typeof generateText>>);
 }
 
@@ -41,6 +54,7 @@ function reply(text: string) {
 describe('romanizeViaLlm (Thai / Hebrew through the model)', () => {
   beforeEach(() => {
     vi.mocked(generateText).mockReset();
+    mockCapture.mockReset().mockResolvedValue(undefined);
     vi.stubEnv('OPENROUTER_API_KEY', 'test-key');
   });
   afterEach(() => {
@@ -51,6 +65,47 @@ describe('romanizeViaLlm (Thai / Hebrew through the model)', () => {
     reply('{"romanization": "sawatdi khrap"}');
     expect(await romanizeText('สวัสดีครับ', 'th')).toBe('sawatdi khrap');
     expect(generateText).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports the billed cost of the call', async () => {
+    reply('{"romanization": "sawatdi khrap"}', 0.00004, 'gen-th');
+
+    await romanizeText('สวัสดีครับ', 'th', telemetry);
+
+    expect(mockCapture).toHaveBeenCalledTimes(1);
+    expect(mockCapture.mock.calls[0][1]).toMatchObject({
+      feature: 'romanization',
+      provider: 'openrouter',
+      costUsd: 0.00004,
+      traceId: 'gen-th',
+      sharedContent: true,
+      extra: { language: 'th', attempt: 1 },
+    });
+  });
+
+  it('reports every attempt, because an unusable reply was billed too', async () => {
+    reply('nonsense', 0.00003, 'gen-bad');
+    reply('{"romanization": "shalom"}', 0.00005, 'gen-good');
+
+    await romanizeText('שלום', 'he', telemetry);
+
+    // Charging only for the reply we could use would under-report by a third.
+    expect(mockCapture).toHaveBeenCalledTimes(2);
+    expect(mockCapture.mock.calls.map((c) => c[1].costUsd)).toEqual([
+      0.00003, 0.00005,
+    ]);
+    expect(mockCapture.mock.calls.map((c) => c[1].extra?.attempt)).toEqual([
+      1, 2,
+    ]);
+  });
+
+  it('reports nothing when the call never reached the model', async () => {
+    vi.mocked(generateText).mockRejectedValueOnce(apiError(401));
+
+    await expect(romanizeText('שלום', 'he', telemetry)).rejects.toThrow();
+
+    // A transport failure is not a charge.
+    expect(mockCapture).not.toHaveBeenCalled();
   });
 
   it('recovers when a later reply parses', async () => {

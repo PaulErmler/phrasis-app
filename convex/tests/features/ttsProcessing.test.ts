@@ -764,6 +764,89 @@ describe('features/ttsProcessing', () => {
         expect(mismatches.map((m) => m.attempt).sort()).toEqual([1, 2]);
       });
 
+      it('reports a synthesis that failed outright, so its attempts are not free', async () => {
+        const t = convexTest(schema, modules);
+        const { textId } = await seedText(t);
+        mockSemantic.mockReset();
+        vi.stubEnv('GOOGLE_TTS_API_KEY', 'dummy');
+
+        // Google TTS 500s on every attempt. The clip never exists, so the
+        // pipeline used to emit nothing at all for the work it attempted.
+        const fetchMock = vi.fn(
+          async () => new Response('nope', { status: 500 }),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+        try {
+          await expect(
+            t.action(internal.features.ttsProcessing.processTTSForCard, {
+              textId,
+              text: 'Hola',
+              language: 'es',
+              voiceName: 'es-ES-Chirp3-HD-Leda',
+              provider: 'google' as const,
+              voiceGender: 'female' as const,
+              speed: 1,
+            }),
+          ).rejects.toThrow();
+        } finally {
+          vi.unstubAllGlobals();
+          vi.unstubAllEnvs();
+        }
+
+        const synthEvents = mockCapture.mock.calls
+          .map((c) => c[1])
+          .filter((e) => e.feature === 'tts_synthesis');
+        expect(synthEvents).toHaveLength(1);
+        expect(synthEvents[0].isError).toBe(true);
+        // Google bills for a request that returned audio, so this one is free.
+        // An OpenRouter provider would carry the abandoned attempts' charge.
+        expect(synthEvents[0].costUsd).toBeUndefined();
+      });
+
+      it('a throw AFTER the success event emits exactly one synthesis event', async () => {
+        const t = convexTest(schema, modules);
+        const { textId } = await seedText(t);
+        mockSemantic.mockReset();
+        // The semantic judge runs after the clip's cost event has already
+        // fired. It used to sit inside the STT try/catch, so a throw here ran
+        // the catch and emitted a SECOND tts_synthesis event for one
+        // synthesis, double-counting the charge.
+        mockSemantic.mockRejectedValue(new Error('judge exploded'));
+
+        await expect(
+          runPipeline(t, textId, { transcribed: 'Ola amigo' }),
+        ).rejects.toThrow('judge exploded');
+
+        const synthEvents = mockCapture.mock.calls
+          .map((c) => c[1])
+          .filter((e) => e.feature === 'tts_synthesis');
+        expect(synthEvents).toHaveLength(1);
+        expect(synthEvents[0].extra?.stt_status).toBe('ok');
+      });
+
+      it('prices a Google clip from the character rate and records the source', async () => {
+        const t = convexTest(schema, modules);
+        const { textId } = await seedText(t);
+        mockSemantic.mockReset();
+
+        await runPipeline(t, textId, { transcribed: 'Hola' });
+
+        const synthEvents = mockCapture.mock.calls
+          .map((c) => c[1])
+          .filter((e) => e.feature === 'tts_synthesis');
+        expect(synthEvents).toHaveLength(1);
+        // 'Hola' is 4 characters at $30/1M. A dashboard can tell this list
+        // price from an exact OpenRouter charge by the source.
+        expect(synthEvents[0].extra?.synth_cost_usd).toBeCloseTo(
+          (4 / 1_000_000) * 30,
+          12,
+        );
+        expect(synthEvents[0].extra?.synth_cost_source).toBe('rate_table');
+        // Reported so a retried STT is visible without inventing a cost for
+        // the attempts OpenRouter did not bill.
+        expect(synthEvents[0].extra?.stt_attempts).toBe(1);
+      });
+
       it('STT itself failing keeps the clip: no re-synthesis, stored unchecked without timings', async () => {
         const t = convexTest(schema, modules);
         const { textId } = await seedText(t);

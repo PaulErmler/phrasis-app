@@ -1,4 +1,5 @@
 import type { SpeakInput, SpeakResult, TTSProvider } from './types';
+import { TtsSynthesisFailedError } from './types';
 import { requireEnv } from '../env';
 import { Mp3Encoder } from '@breezystack/lamejs';
 import { toGeminiBcp47 } from './languageCodes';
@@ -134,7 +135,8 @@ function parseVoiceApiCode(apiCode: string): {
 }
 
 /** One PCM synthesis request. Returns raw headerless PCM (possibly zero-byte.
- * The caller decides whether to retry). Throws on a non-2xx HTTP response. */
+ * The caller decides whether to retry) plus OpenRouter's generation id for the
+ * charge this request incurred. Throws on a non-2xx HTTP response. */
 async function requestGeminiPcm(
   apiKey: string,
   args: {
@@ -144,7 +146,7 @@ async function requestGeminiPcm(
     languageCode: string;
     speed: number;
   },
-): Promise<Uint8Array<ArrayBuffer>> {
+): Promise<{ pcm: Uint8Array<ArrayBuffer>; generationId: string | null }> {
   const response = await fetch(ENDPOINT, {
     method: 'POST',
     headers: {
@@ -179,7 +181,13 @@ async function requestGeminiPcm(
     const errorText = await response.text();
     throw new Error(`Gemini TTS API error: ${response.status} - ${errorText}`);
   }
-  return new Uint8Array(await response.arrayBuffer());
+  // The only handle on what this request cost. `/audio/speech` returns audio
+  // bytes with no usage block, so the charge is read back from the stats
+  // endpoint later (convex/lib/openrouterGeneration.ts).
+  return {
+    pcm: new Uint8Array(await response.arrayBuffer()),
+    generationId: response.headers.get('x-generation-id'),
+  };
 }
 
 // Gemini (via OpenRouter) intermittently returns an empty (zero-byte) 200 for an
@@ -224,26 +232,48 @@ export const geminiTts: TTSProvider = {
     );
 
     let pcm = new Uint8Array(0);
-    for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {
-      // First attempt sends the sentence as-is; retries randomly pad edge spaces.
-      const sentence = attempt === 0 ? input.text : padRandomSpaces(input.text);
-      pcm = await requestGeminiPcm(apiKey, {
-        input: buildStyledInput(sentence, languageName, promptNotes),
-        voiceName,
-        languageCode,
-        speed: input.speed,
-      });
-      if (pcm.byteLength > 0) break;
-      console.warn(
-        `[geminiTts] empty audio for "${input.text.slice(0, 40)}" ` +
-          `(attempt ${attempt + 1}/${MAX_EMPTY_RETRIES + 1})` +
-          (attempt < MAX_EMPTY_RETRIES
-            ? ' — retrying with random space padding'
-            : ''),
+    // Every 200 billed, including the ones that came back empty. All of them
+    // belong in the clip's cost, so ids accumulate across attempts.
+    const generationIds: string[] = [];
+    try {
+      for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {
+        // First attempt sends the sentence as-is; retries randomly pad edge spaces.
+        const sentence =
+          attempt === 0 ? input.text : padRandomSpaces(input.text);
+        const { pcm: attemptPcm, generationId } = await requestGeminiPcm(
+          apiKey,
+          {
+            input: buildStyledInput(sentence, languageName, promptNotes),
+            voiceName,
+            languageCode,
+            speed: input.speed,
+          },
+        );
+        pcm = attemptPcm;
+        if (generationId) generationIds.push(generationId);
+        if (pcm.byteLength > 0) break;
+        console.warn(
+          `[geminiTts] empty audio for "${input.text.slice(0, 40)}" ` +
+            `(attempt ${attempt + 1}/${MAX_EMPTY_RETRIES + 1})` +
+            (attempt < MAX_EMPTY_RETRIES
+              ? ' — retrying with random space padding'
+              : ''),
+        );
+      }
+    } catch (err) {
+      // Carry what the abandoned attempts already cost. Message and cause are
+      // preserved, so callers matching on the text still work.
+      throw new TtsSynthesisFailedError(
+        err instanceof Error ? err.message : String(err),
+        generationIds,
+        err,
       );
     }
     if (pcm.byteLength === 0) {
-      throw new Error('No audio content returned from Gemini TTS API');
+      throw new TtsSynthesisFailedError(
+        'No audio content returned from Gemini TTS API',
+        generationIds,
+      );
     }
 
     // Gemini intermittently appends a short, loud "hiccup" after the sentence,
@@ -258,6 +288,7 @@ export const geminiTts: TTSProvider = {
     return {
       audio: new Blob([pcmToMp3(cleaned)], { type: 'audio/mp3' }),
       provider: 'gemini',
+      generationIds,
     };
   },
 };

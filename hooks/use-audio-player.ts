@@ -12,15 +12,19 @@ import {
   mergedTimeForCuePosition,
 } from '@/lib/audio/activeClip';
 import {
-  setupMediaSession,
+  pushMediaSession,
   updateMediaSessionPosition,
   setMediaSessionPlaybackState,
+  type MediaSessionHandle,
 } from '@/lib/audio/mediaSession';
 import {
   createPlaybackClock,
   type PlaybackClock,
 } from '@/lib/audio/playbackClock';
 import { getSilenceBlobUrl } from '@/lib/audio/silence';
+import { getCardPlayerElement } from '@/lib/audio/cardPlayerElement';
+import { getProgressSoundBlobUrl } from '@/lib/audio/celebrationSound';
+import { audioSurfaceProperties } from '@/lib/audio/audioSurface';
 import type { CardAudioRecording } from '@/components/app/learning/types';
 
 import { reportError } from '@/lib/report-error';
@@ -39,28 +43,43 @@ export interface UseAudioPlayerOptions {
   sourceText: string;
   languageNames: string;
   autoPlay: boolean;
+  /**
+   * True while something outside the player must keep audio silent: a
+   * tutorial popover, the settings sheet, the celebration. `autoPlay` is
+   * also false then, but `autoPlay` is false for a user who simply turned
+   * autoplay off, and a Play that user pressed on a parked element must
+   * still start the card when it lands. This flag is what holds that Play
+   * back too.
+   */
+  playbackGated?: boolean;
   /** True while the settings sheet is open. A remerge triggered from settings
    *  (a speed/rep/pause tweak, or a language reorder) resets playback to the
    *  start instead of resuming the prior position. */
   settingsOpen: boolean;
   getReviewInitiatedByThisTab: () => boolean;
   /**
-   * Fired when the merged blob plays to its end. Return `true` when the
+   * Fired when the merged blob plays to its end. Return `'advance'` when the
    * caller advanced to the next card in response: the player then hands the
    * element the prefetched next blob in the same tick (see `tryHandoff`), so
    * playback never pauses while the server round-trip and re-render happen.
-   * Return `false` to leave the element ended and wait for the next card the
+   * Return `'hold'` to leave the element ended and wait for the next card the
    * ordinary way (no advance, or the advance is about to show a celebration
-   * that must not have audio talking over it).
+   * that must not have audio talking over it). Return `'chime'` when the
+   * advance lands on a milestone while the page is hidden: the celebration
+   * screen is skipped there, so the player plays the success sound itself
+   * and starts the next card after it.
    */
-  onScheduleComplete: () => boolean;
+  onScheduleComplete: () => ScheduleCompleteResult;
   onResetReviewFlag: () => void;
   onNext: () => void;
 }
 
+export type ScheduleCompleteResult = 'advance' | 'hold' | 'chime';
+
 export interface AudioPlayerState {
   play: () => void;
   pause: () => void;
+  /** Pause and rewind to the top, keeping the element loaded. */
   stop: () => void;
   seekTo: (seconds: number) => void;
   /** Re-blur every timeline-revealed language ("restart card"); the next
@@ -92,7 +111,32 @@ export interface AudioPlayerState {
 
 /** Which code path asked the element to play. Carried on the blocked-play
  *  event so a hidden-tab refusal can be told apart from a foreground one. */
-type PlayPath = 'manual' | 'auto' | 'resume' | 'handoff' | 'bridge';
+type PlayPath =
+  | 'manual'
+  | 'auto'
+  | 'resume'
+  | 'handoff'
+  | 'bridge'
+  | 'chime'
+  | 'mediaSession'
+  | 'parked';
+
+/**
+ * What the element has as its source. It is never emptied mid-session: iOS
+ * keeps the Now Playing slot on the page only while the element holds a
+ * source, and emptying it hands the slot back to whatever app we
+ * interrupted, so the next lock-screen Play resumed that app instead of us.
+ * Idle is `silence` (see `park`), not empty. `none` only exists before the
+ * first load and after the queue ran out.
+ */
+type LoadedSource =
+  | { kind: 'none' }
+  | { kind: 'silence' }
+  | { kind: 'chime' }
+  | { kind: 'card'; cardId: string };
+
+/** A card that ended and advanced, waiting for its successor's blob. */
+type PendingHandoff = { fromCardId: string | null; nextCardId: string };
 
 /**
  * Longest a bridge (see `bridgingRef`) may loop silence before giving up.
@@ -115,10 +159,7 @@ function ignorePlayInterrupt(label: string, path: PlayPath = 'manual') {
     if (err.name === 'NotAllowedError') {
       capture(CLIENT_EVENTS.AUDIO_PLAY_BLOCKED, {
         path,
-        visibility:
-          typeof document === 'undefined'
-            ? 'unknown'
-            : document.visibilityState,
+        ...audioSurfaceProperties(),
       });
       return;
     }
@@ -160,6 +201,7 @@ export function useAudioPlayer(
     sourceText,
     languageNames,
     autoPlay,
+    playbackGated = false,
     settingsOpen,
     getReviewInitiatedByThisTab,
     onScheduleComplete,
@@ -203,8 +245,40 @@ export function useAudioPlayer(
   // otherwise reset `hasAutoPlayedForCardRef` when it does and start it.
   // Consumed by that effect once, cleared by an explicit play.
   const pausedDuringBridgeRef = useRef(false);
+  const loadedRef = useRef<LoadedSource>({ kind: 'none' });
+  // Set by a Play on a parked element: the merge that lands next starts its
+  // blob regardless of the autoplay gates, because the user asked for it.
+  const pendingPlayRef = useRef(false);
+  // Milestone chime (see `handleEnded`): while it plays, the next card must
+  // not start over it. The places that would start a card record a pending
+  // start here instead, and `runAfterChime` runs it when the chime ends.
+  const chimeHoldRef = useRef(false);
+  const pendingAfterChimeRef = useRef<'handoff' | (() => boolean) | null>(
+    null,
+  );
+  // What the card that ended before the chime was waiting for, so the chime
+  // can resume exactly that wait and not whatever the peek says by then.
+  const chimeAwaitingRef = useRef<PendingHandoff | null>(null);
+  const allAudioReadyRef = useRef(false);
+  // Published for the once-bound `ended` listener; assigned where
+  // `tryHandoff` is defined below.
+  const tryHandoffRef = useRef<() => boolean>(() => false);
+  // What a parked element was waiting for when it parked (see `park`): a
+  // Play on it resumes exactly that wait instead of guessing.
+  const parkedAwaitingRef = useRef<PendingHandoff | null>(null);
+  // The card whose blob played to its end and advanced, until the server
+  // serves the next one. A park in that window (bridge timed out, refused,
+  // paused) is a wait for the server; a park outside it is a card with
+  // nothing loaded, which a Play may ask for again.
+  const endedCardIdRef = useRef<string | null>(null);
+  const parkedEndedCardIdRef = useRef<string | null>(null);
+  // Bumped by a Play on a parked element whose card has audio ready but
+  // nothing loading it (its merge came back empty or threw): re-runs the
+  // merge effect for the same card.
+  const [remergeNonce, setRemergeNonce] = useState(0);
+  const prevRemergeNonceRef = useRef(0);
   const mergeAbortRef = useRef<AbortController | null>(null);
-  const mediaSessionCleanupRef = useRef<(() => void) | null>(null);
+  const mediaSessionRef = useRef<MediaSessionHandle | null>(null);
   const languageCuesRef = useRef<LanguageCue[]>([]);
   // Mirrors the current merged-audio bake-in speeds so the merge effect can
   // convert a merged-timeline `currentTime` to an (original-frame) cue
@@ -224,10 +298,7 @@ export function useAudioPlayer(
     settingsKey: string;
     compositionKey: string;
   } | null>(null);
-  const awaitingHandoffRef = useRef<{
-    fromCardId: string | null;
-    nextCardId: string;
-  } | null>(null);
+  const awaitingHandoffRef = useRef<PendingHandoff | null>(null);
   const currentCardIdRef = useRef(cardId);
   currentCardIdRef.current = cardId;
   // Bridging: the element is looping the silent track (see `getSilenceBlobUrl`)
@@ -271,35 +342,218 @@ export function useAudioPlayer(
   // to honor the *current* value, not the stale closure.
   const autoPlayRef = useRef(autoPlay);
   autoPlayRef.current = autoPlay;
+  const playbackGatedRef = useRef(playbackGated);
+  playbackGatedRef.current = playbackGated;
   // Latest settings-sheet state, read at remerge time. A remerge while the
   // sheet is open is a settings edit → reset to the start rather than resume.
   const settingsOpenRef = useRef(settingsOpen);
   settingsOpenRef.current = settingsOpen;
 
+  // The page's one card element (see lib/audio/cardPlayerElement.ts): shared
+  // across LearnView mounts so the gesture unlock survives them.
   const getAudio = useCallback((): HTMLAudioElement => {
     if (!audioRef.current) {
-      audioRef.current = new Audio();
+      audioRef.current = getCardPlayerElement();
       clock.attach(audioRef.current);
-      audioRef.current.preload = 'auto';
-      // Defensive: modern browsers default preservesPitch to true, but set it
-      // explicitly (plus the webkit prefix for older Safari) so any future
-      // call that touches `playbackRate` on this element stays pitch-stable.
-      audioRef.current.preservesPitch = true;
-      const el = audioRef.current as HTMLAudioElement & {
-        webkitPreservesPitch?: boolean;
-      };
-      el.webkitPreservesPitch = true;
     }
     return audioRef.current;
   }, [clock]);
 
   // --------------------------------------------------------------------------
+  // Element state helpers
+  // --------------------------------------------------------------------------
+  const acquireWebLock = useCallback(() => {
+    if (webLockResolveRef.current) return; // already held
+    if (webLockTimeoutRef.current) {
+      clearTimeout(webLockTimeoutRef.current);
+      webLockTimeoutRef.current = null;
+      return; // lock still held from delayed release
+    }
+    if (!navigator.locks) return;
+    navigator.locks.request('audio-playback', () => {
+      return new Promise<void>((resolve) => {
+        webLockResolveRef.current = resolve;
+      });
+    });
+  }, []);
+
+  const releaseWebLockDelayed = useCallback(() => {
+    if (webLockTimeoutRef.current) clearTimeout(webLockTimeoutRef.current);
+    webLockTimeoutRef.current = setTimeout(() => {
+      webLockTimeoutRef.current = null;
+      webLockResolveRef.current?.();
+      webLockResolveRef.current = null;
+    }, 180_000);
+  }, []);
+
+  /**
+   * Leave the element loaded but idle: paused on the silent track, playback
+   * state `paused`. Every mid-session stop lands here instead of emptying
+   * the element, so the page stays the Now Playing owner and a lock-screen
+   * Play comes back to us (`resumeParked`) rather than to the app we
+   * interrupted.
+   */
+  const park = useCallback(
+    (audio: HTMLAudioElement) => {
+      parkedAwaitingRef.current = awaitingHandoffRef.current;
+      parkedEndedCardIdRef.current = endedCardIdRef.current;
+      pendingPlayRef.current = false;
+      endBridge(audio);
+      if (!audio.paused) audio.pause();
+      const silence = getSilenceBlobUrl();
+      if (audio.src !== silence) audio.src = silence;
+      loadedRef.current = { kind: 'silence' };
+      setIsPlaying(false);
+      setMediaSessionPlaybackState('paused');
+      releaseWebLockDelayed();
+    },
+    [endBridge, releaseWebLockDelayed],
+  );
+
+  const startBridge = useCallback(
+    (audio: HTMLAudioElement) => {
+      endBridge(audio);
+      bridgingRef.current = true;
+      audio.loop = true;
+      audio.src = getSilenceBlobUrl();
+      loadedRef.current = { kind: 'silence' };
+      const reportBlocked = ignorePlayInterrupt(
+        'Bridge play failed:',
+        'bridge',
+      );
+      audio.play().catch((err: { name?: string }) => {
+        reportBlocked(err);
+        // The browser refused the silence: there is no continuous playback
+        // to hand the next card, so the bridge must not be treated as one
+        // (the merge path would otherwise skip the tab-initiated gate on its
+        // strength). Park and fall back to the plain paused state.
+        if (err.name === 'NotAllowedError' && bridgingRef.current) park(audio);
+      });
+      bridgeTimeoutRef.current = setTimeout(() => {
+        bridgeTimeoutRef.current = null;
+        if (!bridgingRef.current) return;
+        // Nothing arrived to play. Stop looping silence rather than look
+        // "playing" for the rest of the session, but stay loaded: a Play
+        // restarts the bridge (see `resumeParked`).
+        capture(CLIENT_EVENTS.AUDIO_BRIDGE_TIMEOUT, {
+          ...audioSurfaceProperties(),
+        });
+        park(audio);
+      }, BRIDGE_MAX_MS);
+    },
+    [endBridge, park],
+  );
+
+  /** Remember that the card that just ended waits for its successor's blob. */
+  const armAwaitingHandoff = useCallback(() => {
+    const next = nextCardRef.current;
+    awaitingHandoffRef.current = next
+      ? { fromCardId: currentCardIdRef.current, nextCardId: next.cardId }
+      : null;
+  }, []);
+
+  /**
+   * The chime finished (or was refused): start whatever it held back, else
+   * resume the wait the ended card was in when the chime started. The
+   * server may have served the next card in the meantime (its start is the
+   * pending closure) or not (still waiting: hand off or bridge, with the
+   * pair captured at chime start, not whatever the peek says now).
+   */
+  const runAfterChime = useCallback(
+    (audio: HTMLAudioElement) => {
+      chimeHoldRef.current = false;
+      const pending = pendingAfterChimeRef.current;
+      pendingAfterChimeRef.current = null;
+      const waiting = chimeAwaitingRef.current;
+      chimeAwaitingRef.current = null;
+      if (typeof pending === 'function') {
+        // The served card arrived during the chime. Whatever the closure did
+        // (started the blob, or parked on an empty merge) is the answer.
+        pending();
+        return;
+      }
+      if (pending === 'handoff' && tryHandoffRef.current()) return;
+      if (waiting && waiting.fromCardId === currentCardIdRef.current) {
+        if (tryHandoffRef.current()) return;
+        awaitingHandoffRef.current = waiting;
+      }
+      // Either still waiting for the successor, or the card changed with
+      // nothing to start yet (audio URLs missing): keep the element busy.
+      startBridge(audio);
+    },
+    [startBridge],
+  );
+
+  /**
+   * Play on a parked element. Nothing but silence is loaded, so resume the
+   * wait the park interrupted. A park after a card ended and advanced (the
+   * bridge timed out, was refused, or was paused) is still waiting for the
+   * next card: its prefetched blob starts now if it is there, else the
+   * bridge restarts and the card lands on it. A park from a card change
+   * (audio not ready, merge in flight) just restarts the bridge: the gesture
+   * claims the audio session and keeps the page alive, and the merge that
+   * lands starts its blob because `pendingPlayRef` says the user asked.
+   */
+  const resumeParked = useCallback(
+    (audio: HTMLAudioElement, path: PlayPath) => {
+      const waiting = parkedAwaitingRef.current;
+      parkedAwaitingRef.current = null;
+      const endedHere =
+        parkedEndedCardIdRef.current !== null &&
+        parkedEndedCardIdRef.current === currentCardIdRef.current;
+      parkedEndedCardIdRef.current = null;
+      const stillWaiting =
+        waiting !== null && waiting.fromCardId === currentCardIdRef.current;
+      pendingPlayRef.current = true;
+      const handedOff = stillWaiting && tryHandoffRef.current();
+      // The card did not end here, its audio is ready and nothing is
+      // loading it: its merge came back empty or threw. Ask for it again.
+      // (A card that ended is done; the bridge waits for its successor.)
+      const remerge =
+        !stillWaiting &&
+        !endedHere &&
+        !handedOff &&
+        allAudioReadyRef.current &&
+        !isMergingRef.current;
+      capture(CLIENT_EVENTS.AUDIO_PARKED_RESUME, {
+        path,
+        merging: isMergingRef.current,
+        audio_ready: allAudioReadyRef.current,
+        waiting: stillWaiting,
+        handed_off: handedOff,
+        remerge,
+        ...audioSurfaceProperties(),
+      });
+      if (handedOff) {
+        pendingPlayRef.current = false;
+        return;
+      }
+      if (stillWaiting) awaitingHandoffRef.current = waiting;
+      startBridge(audio);
+      if (remerge) setRemergeNonce((n) => n + 1);
+    },
+    [startBridge],
+  );
+
+  // --------------------------------------------------------------------------
   // Playback controls
   // --------------------------------------------------------------------------
-  const play = useCallback(() => {
-    const audio = getAudio();
-    pausedDuringBridgeRef.current = false;
-    if (!audio.src || audio.src === '') return;
+  const playFrom = useCallback(
+    (path: PlayPath) => {
+      const audio = getAudio();
+      pausedDuringBridgeRef.current = false;
+      const loaded = loadedRef.current;
+      if (loaded.kind === 'none') return;
+      if (loaded.kind === 'silence') {
+        if (bridgingRef.current) return; // already waiting for the next card
+        resumeParked(audio, path);
+        return;
+      }
+      if (loaded.kind === 'chime') {
+        // A paused chime resumes; its `ended` still runs the advance.
+        audio.play().catch(ignorePlayInterrupt('Chime play failed:', 'chime'));
+        return;
+      }
     // Replaying after the audio has run to completion: browsers are
     // inconsistent about what a bare .play() call does on an ended element.
     // In practice the element can stay "stuck". Play() resolves, but no
@@ -309,76 +563,80 @@ export function useAudioPlayer(
     // .pause() + currentTime=0 first forces a clean "paused at 0" state;
     // the subsequent .play() then reliably fires 'play' and the clock snaps
     // back so the highlight starts from the first word.
-    if (
-      audio.ended ||
-      (audio.duration && audio.currentTime >= audio.duration - 0.05)
-    ) {
-      audio.pause();
-      audio.currentTime = 0;
-      clock.notifyOnce();
-      setIsPlaying(false);
-    }
-    audio
-      .play()
-      .then(() => {
-        // Safety net: a handful of browsers skip the 'play' event after a
-        // post-`ended` replay, leaving isPlaying stale-false. Re-asserting
-        // here guarantees the rAF effect resubscribes and highlights update.
-        setIsPlaying(true);
-      })
-      .catch(ignorePlayInterrupt('Audio play failed:'));
-  }, [getAudio, clock]);
+      if (
+        audio.ended ||
+        (audio.duration && audio.currentTime >= audio.duration - 0.05)
+      ) {
+        audio.pause();
+        audio.currentTime = 0;
+        clock.notifyOnce();
+        setIsPlaying(false);
+      }
+      audio
+        .play()
+        .then(() => {
+          // Safety net: a handful of browsers skip the 'play' event after a
+          // post-`ended` replay, leaving isPlaying stale-false. Re-asserting
+          // here guarantees the rAF effect resubscribes and highlights update.
+          setIsPlaying(true);
+        })
+        .catch(ignorePlayInterrupt('Audio play failed:', path));
+    },
+    [getAudio, clock, resumeParked],
+  );
+
+  const play = useCallback(() => playFrom('manual'), [playFrom]);
 
   const pause = useCallback(() => {
     hasAutoPlayedForCardRef.current = true; // suppress pending auto-play
+    pendingPlayRef.current = false;
     const audio = audioRef.current;
     if (!audio) return;
-    if (endBridge(audio)) {
-      // The user stopped a bridge: nothing real is loaded, so unload the
-      // silence rather than leave a Play tap resuming it. The card's blob
-      // lands paused when its merge finishes (`hasAutoPlayed` is set above
-      // and, since the next card may still be on its way, held across the
-      // card change by `pausedDuringBridgeRef`), and the prefetch the bridge
-      // was waiting for must not hand off into playback either: a pause is
-      // the user's answer to "keep going".
+    if (bridgingRef.current) {
+      // The user stopped a bridge. The card's blob lands paused when its
+      // merge finishes (`hasAutoPlayed` is set above and, since the next
+      // card may still be on its way, held across the card change by
+      // `pausedDuringBridgeRef`), and the prefetch the bridge was waiting
+      // for must not hand off into playback either: a pause is the user's
+      // answer to "keep going". The silence stays loaded, paused: emptying
+      // the element would hand the Now Playing slot to another app.
       pausedDuringBridgeRef.current = true;
+      park(audio);
       awaitingHandoffRef.current = null;
-      audio.pause();
-      audio.removeAttribute('src');
-      audio.load();
-      setIsPlaying(false);
-      setMediaSessionPlaybackState('paused');
       return;
     }
     if (!audio.paused) {
       audio.pause();
     }
-  }, [endBridge]);
+  }, [park]);
 
+  // Pause and rewind, for a single-clip button taking over the card. The
+  // element stays loaded; `none` playback state and an emptied element are
+  // reserved for the end of the lesson. During a bridge this is a pause
+  // (the arriving card lands paused): the user chose to hear a single clip,
+  // and the next card must not start over it.
   const stop = useCallback(() => {
+    pause();
     const audio = audioRef.current;
-    if (audio) {
-      if (endBridge(audio)) {
-        awaitingHandoffRef.current = null;
-        audio.removeAttribute('src');
-        audio.load();
-      }
-      audio.pause();
+    if (audio && loadedRef.current.kind === 'card') {
       audio.currentTime = 0;
+      clock.notifyOnce();
     }
-    setIsPlaying(false);
-    setMediaSessionPlaybackState('none');
-  }, [endBridge]);
+  }, [pause, clock]);
 
   const seekTo = useCallback(
     (seconds: number) => {
       const audio = audioRef.current;
-      if (audio && audio.duration) {
+      if (audio && audio.duration && loadedRef.current.kind === 'card') {
         audio.currentTime = Math.max(0, Math.min(seconds, audio.duration));
         // Paused seeks won't tick the rAF loop. Push one update so word
         // highlights track the new position immediately.
         clock.notifyOnce();
-        updateMediaSessionPosition(audio.duration, audio.currentTime);
+        updateMediaSessionPosition(
+          audio.duration,
+          audio.currentTime,
+          audio.playbackRate,
+        );
       }
     },
     [clock],
@@ -389,21 +647,36 @@ export function useAudioPlayer(
   }, []);
 
   /**
-   * Drop the loaded blob and its bookkeeping. `keepBridge` leaves a running
-   * bridge (the silent loop) playing: a card change or a wait for audio URLs
-   * is exactly the gap the bridge exists to cover, so the element must not be
-   * unloaded there. Without it the bridge is stopped along with everything
-   * else (no card to wait for).
+   * Drop the loaded blob and its bookkeeping. `keepBridge` leaves continuous
+   * playback (a running bridge, or the milestone chime) alone: a card change
+   * or a wait for audio URLs is exactly the gap they exist to cover, so the
+   * element must not be touched there. Without it the element is parked:
+   * paused on silence, still loaded, still the Now Playing owner. `release`
+   * empties the element instead and gives the slot up; that is for the end
+   * of the queue, when there is nothing left to resume.
    */
   const clearCurrentAudio = useCallback(
-    (opts?: { keepBridge?: boolean }) => {
+    (opts?: { keepBridge?: boolean; release?: boolean }) => {
       const audio = getAudio();
-      const bridging = opts?.keepBridge === true && bridgingRef.current;
+      const bridging =
+        opts?.keepBridge === true &&
+        (bridgingRef.current || loadedRef.current.kind === 'chime');
       if (!bridging) {
-        endBridge(audio);
-        if (!audio.paused) audio.pause();
-        audio.removeAttribute('src');
-        audio.load();
+        if (opts?.release) {
+          endBridge(audio);
+          chimeHoldRef.current = false;
+          pendingAfterChimeRef.current = null;
+          chimeAwaitingRef.current = null;
+          parkedAwaitingRef.current = null;
+          endedCardIdRef.current = null;
+          parkedEndedCardIdRef.current = null;
+          if (!audio.paused) audio.pause();
+          audio.removeAttribute('src');
+          audio.load();
+          loadedRef.current = { kind: 'none' };
+        } else {
+          park(audio);
+        }
       }
 
       if (blobUrlRef.current) {
@@ -420,12 +693,13 @@ export function useAudioPlayer(
       clock.notifyOnce();
       setLanguageCues([]);
       setSpeedByLanguage({});
-      if (!bridging) {
+      if (!bridging && opts?.release) {
         setIsPlaying(false);
         setMediaSessionPlaybackState('none');
+        releaseWebLockDelayed();
       }
     },
-    [getAudio, clock, endBridge],
+    [getAudio, clock, endBridge, park, releaseWebLockDelayed],
   );
 
   // --------------------------------------------------------------------------
@@ -446,6 +720,7 @@ export function useAudioPlayer(
   // --------------------------------------------------------------------------
   const allAudioReady =
     audioRecordings.length > 0 && audioRecordings.every((a) => a.url);
+  allAudioReadyRef.current = allAudioReady;
 
   // Identity key for the audio set. See `audioIdentityKeyOf`. Stable across
   // signed-URL refreshes while allAudioReady stays true.
@@ -534,6 +809,11 @@ export function useAudioPlayer(
     ) {
       return false;
     }
+    if (chimeHoldRef.current) {
+      // The milestone chime is playing; start this blob when it ends.
+      pendingAfterChimeRef.current = 'handoff';
+      return true;
+    }
     prefetchCacheRef.current.delete(next.cardId);
 
     const audio = getAudio();
@@ -554,6 +834,7 @@ export function useAudioPlayer(
       compositionKey: entry.compositionKey,
     };
     audio.src = entry.result.blobUrl;
+    loadedRef.current = { kind: 'card', cardId: next.cardId };
     clock.notifyOnce();
     audio.play().catch(ignorePlayInterrupt('Handoff play failed:', 'handoff'));
     return true;
@@ -561,7 +842,6 @@ export function useAudioPlayer(
   // Published through a ref for the once-bound `ended` listener below. The
   // listener effect is declared after this line on purpose: the React
   // Compiler forbids mutating a ref in render once an effect has read it.
-  const tryHandoffRef = useRef(tryHandoff);
   tryHandoffRef.current = tryHandoff;
 
   // --------------------------------------------------------------------------
@@ -570,43 +850,45 @@ export function useAudioPlayer(
   useEffect(() => {
     const audio = getAudio();
 
-    const acquireWebLock = () => {
-      if (webLockResolveRef.current) return; // already held
-      if (webLockTimeoutRef.current) {
-        clearTimeout(webLockTimeoutRef.current);
-        webLockTimeoutRef.current = null;
-        return; // lock still held from delayed release
-      }
-      if (!navigator.locks) return;
-      navigator.locks.request('audio-playback', () => {
-        return new Promise<void>((resolve) => {
-          webLockResolveRef.current = resolve;
-        });
-      });
-    };
-
-    const releaseWebLockDelayed = () => {
-      if (webLockTimeoutRef.current) clearTimeout(webLockTimeoutRef.current);
-      webLockTimeoutRef.current = setTimeout(() => {
-        webLockTimeoutRef.current = null;
-        webLockResolveRef.current?.();
-        webLockResolveRef.current = null;
-      }, 180_000);
+    // Lock-screen scrubber. Only a card has a timeline worth showing.
+    const publishPosition = () => {
+      if (loadedRef.current.kind !== 'card') return;
+      updateMediaSessionPosition(
+        audio.duration,
+        audio.currentTime,
+        audio.playbackRate,
+      );
     };
 
     const handlePlay = () => {
+      // Nothing of ours is running (the element is empty or parked): the
+      // only `play` event in that state is the gesture unlock's muted
+      // play/pause (lib/audio/cardPlayerElement.ts), not playback.
+      if (
+        loadedRef.current.kind === 'none' ||
+        (loadedRef.current.kind === 'silence' && !bridgingRef.current)
+      ) {
+        return;
+      }
       // Playback resumed on its own (user replay, media-session play): a late
       // prefetch must not hijack the element any more. The bridge's own play
-      // is the one exception: it is waiting for exactly that prefetch.
-      if (!bridgingRef.current) awaitingHandoffRef.current = null;
+      // is the one exception, it is waiting for exactly that prefetch, and so
+      // is the chime, which hands over when it ends.
+      if (!bridgingRef.current && loadedRef.current.kind !== 'chime') {
+        awaitingHandoffRef.current = null;
+      }
       setIsPlaying(true);
       setMediaSessionPlaybackState('playing');
+      publishPosition();
       acquireWebLock();
     };
 
     const handlePause = () => {
+      // The gesture unlock's muted play/pause on the empty element.
+      if (loadedRef.current.kind === 'none') return;
       setIsPlaying(false);
       setMediaSessionPlaybackState('paused');
+      publishPosition();
       releaseWebLockDelayed();
     };
 
@@ -628,46 +910,12 @@ export function useAudioPlayer(
       });
     };
 
-    const startBridge = () => {
-      endBridge(audio);
-      bridgingRef.current = true;
-      audio.loop = true;
-      audio.src = getSilenceBlobUrl();
-      const reportBlocked = ignorePlayInterrupt(
-        'Bridge play failed:',
-        'bridge',
-      );
-      audio.play().catch((err: { name?: string }) => {
-        reportBlocked(err);
-        // The browser refused the silence: there is no continuous playback
-        // to hand the next card, so the bridge must not be treated as one
-        // (the merge path would otherwise skip the tab-initiated gate on its
-        // strength). Unload and fall back to the plain paused state.
-        if (err.name === 'NotAllowedError' && bridgingRef.current) {
-          endBridge(audio);
-          audio.removeAttribute('src');
-          audio.load();
-          setIsPlaying(false);
-          setMediaSessionPlaybackState('paused');
-          releaseWebLockDelayed();
-        }
-      });
-      bridgeTimeoutRef.current = setTimeout(() => {
-        bridgeTimeoutRef.current = null;
-        if (!bridgingRef.current) return;
-        // Nothing arrived to play. Stop looping silence rather than look
-        // "playing" for the rest of the session.
-        endBridge(audio);
-        audio.pause();
-        audio.removeAttribute('src');
-        audio.load();
-        setIsPlaying(false);
-        setMediaSessionPlaybackState('paused');
-        releaseWebLockDelayed();
-      }, BRIDGE_MAX_MS);
-    };
-
     const handleEnded = () => {
+      if (loadedRef.current.kind === 'chime') {
+        runAfterChime(audio);
+        return;
+      }
+      if (loadedRef.current.kind !== 'card') return;
       // Playback reached the end, so every revealing cue is behind us. The last
       // cue can sit exactly at the blob duration. A silent placeholder for a
       // zero-repetition language in the final group, and `timeupdate` is not
@@ -680,39 +928,80 @@ export function useAudioPlayer(
       // update and a fresh media load all complete is where mobile browsers
       // drop continuous playback; an element that goes straight from one blob
       // to the next never gives them the chance.
-      const advancing = onScheduleCompleteRef.current();
-      if (advancing) {
-        if (tryHandoffRef.current()) return;
-        const next = nextCardRef.current;
-        awaitingHandoffRef.current = next
-          ? { fromCardId: currentCardIdRef.current, nextCardId: next.cardId }
-          : null;
-        // Nothing to hand off yet (prefetch still running, or the next card
-        // is not even known until the server answers). Keep the element
-        // playing regardless: loop silence until a real blob loads. The
-        // in-blob pauses are already rendered silence; this closes the one
-        // remaining real pause, the gap between two cards.
-        startBridge();
+      const outcome = onScheduleCompleteRef.current();
+      if (outcome === 'hold') {
+        setIsPlaying(false);
+        setMediaSessionPlaybackState('paused');
+        releaseWebLockDelayed();
         return;
       }
-      setIsPlaying(false);
-      setMediaSessionPlaybackState('paused');
-      releaseWebLockDelayed();
+      endedCardIdRef.current = currentCardIdRef.current;
+      if (outcome === 'chime') {
+        const chime = getProgressSoundBlobUrl();
+        if (chime) {
+          // A milestone landed while the page is hidden: the celebration
+          // screen is skipped (its numbers would be stale by the time the
+          // user looks), the sound is not. It plays through this element so
+          // playback never pauses, and the next card waits for its `ended`.
+          chimeHoldRef.current = true;
+          loadedRef.current = { kind: 'chime' };
+          audio.loop = false;
+          audio.src = chime;
+          armAwaitingHandoff();
+          chimeAwaitingRef.current = awaitingHandoffRef.current;
+          const reportBlocked = ignorePlayInterrupt(
+            'Chime play failed:',
+            'chime',
+          );
+          audio.play().catch((err: { name?: string }) => {
+            reportBlocked(err);
+            // A refusal means no chime is coming: advance now. An AbortError
+            // is the user's own pause in the chime's first frames, and the
+            // paused chime resumes (and advances) on their next Play.
+            if (
+              err.name !== 'AbortError' &&
+              loadedRef.current.kind === 'chime'
+            ) {
+              runAfterChime(audio);
+            }
+          });
+          return;
+        }
+      }
+      if (tryHandoffRef.current()) return;
+      armAwaitingHandoff();
+      // Nothing to hand off yet (prefetch still running, or the next card
+      // is not even known until the server answers). Keep the element
+      // playing regardless: loop silence until a real blob loads. The
+      // in-blob pauses are already rendered silence; this closes the one
+      // remaining real pause, the gap between two cards.
+      startBridge(audio);
     };
 
     const handleLoadedMetadata = () => {
-      if (audio.duration && isFinite(audio.duration)) {
+      if (
+        loadedRef.current.kind === 'card' &&
+        audio.duration &&
+        isFinite(audio.duration)
+      ) {
         setDurationSec(audio.duration);
       }
+      publishPosition();
     };
 
-    const handleTimeUpdate = () => revealThrough(audio.currentTime);
+    const handleTimeUpdate = () => {
+      // The chime's clock must not un-blur the next card's languages.
+      if (loadedRef.current.kind === 'card') revealThrough(audio.currentTime);
+      publishPosition();
+    };
 
     audio.addEventListener('play', handlePlay);
     audio.addEventListener('pause', handlePause);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('seeked', publishPosition);
+    audio.addEventListener('ratechange', publishPosition);
 
     return () => {
       audio.removeEventListener('play', handlePlay);
@@ -720,8 +1009,17 @@ export function useAudioPlayer(
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('seeked', publishPosition);
+      audio.removeEventListener('ratechange', publishPosition);
     };
-  }, [getAudio, endBridge]);
+  }, [
+    getAudio,
+    startBridge,
+    runAfterChime,
+    armAwaitingHandoff,
+    acquireWebLock,
+    releaseWebLockDelayed,
+  ]);
 
   const prevCardIdRef = useRef<string | null>(null);
   const prevCompositionKeyRef = useRef<string | null>(null);
@@ -729,6 +1027,10 @@ export function useAudioPlayer(
   useEffect(() => {
     const isCardChange = prevCardIdRef.current !== cardId;
     prevCardIdRef.current = cardId;
+    // A Play on a parked element asked for this card again (see
+    // `resumeParked`): merge it fresh and start from the top.
+    const isParkedResume = prevRemergeNonceRef.current !== remergeNonce;
+    prevRemergeNonceRef.current = remergeNonce;
 
     // Composition change = the languages baked into the merged blob differ
     // from the prior merge (e.g. switching review mode flips target-language
@@ -764,7 +1066,12 @@ export function useAudioPlayer(
     // resolves to other settings or audio than the blob was merged under)
     // falls through to the ordinary clear-and-merge path, which stops the
     // running audio and plays the right thing.
-    if (isCardChange) awaitingHandoffRef.current = null;
+    if (isCardChange) {
+      awaitingHandoffRef.current = null;
+      parkedAwaitingRef.current = null;
+      endedCardIdRef.current = null;
+      parkedEndedCardIdRef.current = null;
+    }
     const handoff = handoffRef.current;
     if (handoff && isCardChange) {
       handoffRef.current = null;
@@ -790,8 +1097,14 @@ export function useAudioPlayer(
     }
 
     const audioBefore = audioRef.current;
+    // Real card playback only: a bridge or the chime also keep the element
+    // un-paused, and neither is a position to resume from.
     const wasPlayingSameCard =
-      !!audioBefore && !audioBefore.paused && cardId != null && !isCardChange;
+      !!audioBefore &&
+      !audioBefore.paused &&
+      cardId != null &&
+      !isCardChange &&
+      loadedRef.current.kind === 'card';
 
     // Capture the user's structural position BEFORE the remerge so we can seek
     // the new blob to the equivalent (language, repIndex, localTimeOriginal),
@@ -806,6 +1119,7 @@ export function useAudioPlayer(
     const resumePos =
       !isCardChange &&
       !isCompositionChange &&
+      !isParkedResume &&
       !settingsOpenRef.current &&
       audioBefore &&
       languageCuesRef.current.length > 0
@@ -817,7 +1131,8 @@ export function useAudioPlayer(
         : null;
 
     if (!cardId) {
-      clearCurrentAudio();
+      // The queue ran out: nothing left to resume, give the session up.
+      clearCurrentAudio({ release: true });
       mergeAbortRef.current?.abort();
       mergeAbortRef.current = null;
       setIsMerging(false);
@@ -855,47 +1170,73 @@ export function useAudioPlayer(
       mergeAbortRef.current = null;
       prefetchCacheRef.current.delete(cardId);
 
-      // Ownership of the cached blob URL transfers to blobUrlRef. The old blob
-      // was already revoked by clearCurrentAudio() above.
-      blobUrlRef.current = cached.result.blobUrl;
-      languageCuesRef.current = cached.result.languageCues;
-      speedByLanguageRef.current = cached.result.speedByLanguage;
-      setLanguageCues(cached.result.languageCues);
-      setSpeedByLanguage(cached.result.speedByLanguage);
-      setDurationSec(cached.result.durationSec);
-      setIsMerging(false);
-
       const audio = getAudio();
-      // A bridge goes straight from silence to the blob (the src swap
-      // interrupts the loop by itself), the same as a handoff. Unless
-      // autoplay is muted: then nothing will start the blob, so pause first
-      // so the `pause` event lands and the playing state follows the element
-      // (a src swap alone flips `paused` without firing it).
-      const wasBridging = endBridge(audio);
-      if (!audio.paused && (!wasBridging || !autoPlayRef.current)) {
-        audio.pause();
-      }
-      audio.src = cached.result.blobUrl;
-
       const initiatedByThisTab = getReviewInitiatedByThisTab();
 
-      const doStart = () => {
-        // Re-check autoPlay at the moment of play, not from the captured
-        // closure. See `autoPlayRef` comment near hook top. A bridge already
-        // committed to continuous playback, so it needs only the autoPlay
-        // gate (the celebration / settings-sheet mute).
+      const start = (): boolean => {
+        // Ownership of the cached blob URL transfers to blobUrlRef. The old
+        // blob was already revoked by clearCurrentAudio() above. Assigned in
+        // here, not before: while the chime holds this start back, the cues
+        // of a card that is not playing yet must not drive the reveal.
+        blobUrlRef.current = cached.result.blobUrl;
+        languageCuesRef.current = cached.result.languageCues;
+        speedByLanguageRef.current = cached.result.speedByLanguage;
+        setLanguageCues(cached.result.languageCues);
+        setSpeedByLanguage(cached.result.speedByLanguage);
+        setDurationSec(cached.result.durationSec);
+
+        // A bridge goes straight from silence to the blob (the src swap
+        // interrupts the loop by itself), the same as a handoff; so does
+        // the chime once it has ended. Unless nothing will start the blob
+        // (autoplay muted and no Play pending): then pause first so the
+        // `pause` event lands and the playing state follows the element (a
+        // src swap alone flips `paused` without firing it).
+        const wasBridging = endBridge(audio);
+        const wasContinuous =
+          wasBridging || loadedRef.current.kind === 'chime';
+        // See the merge path below for why a gated Play is still consumed.
+        const userAsked =
+          pendingPlayRef.current && !playbackGatedRef.current;
+        pendingPlayRef.current = false;
         if (
-          autoPlayRef.current &&
-          (wasBridging ||
-            (!hasAutoPlayedForCardRef.current && initiatedByThisTab))
+          !audio.paused &&
+          (!wasContinuous || (!autoPlayRef.current && !userAsked))
         ) {
-          hasAutoPlayedForCardRef.current = true;
-          onResetReviewFlagRef.current();
-          audio.play().catch(ignorePlayInterrupt('Auto-play failed:', 'auto'));
+          audio.pause();
         }
+        audio.src = cached.result.blobUrl;
+        loadedRef.current = { kind: 'card', cardId };
+
+        const doStart = () => {
+          // Re-check autoPlay at the moment of play, not from the captured
+          // closure. See `autoPlayRef` comment near hook top. Continuous
+          // playback already committed, so it needs only the autoPlay gate
+          // (the celebration / settings-sheet mute); a Play the user pressed
+          // on the parked element needs no gate at all.
+          if (
+            userAsked ||
+            (autoPlayRef.current &&
+              (wasContinuous ||
+                (!hasAutoPlayedForCardRef.current && initiatedByThisTab)))
+          ) {
+            const path: PlayPath = userAsked
+              ? 'parked'
+              : wasContinuous
+                ? 'bridge'
+                : 'auto';
+            hasAutoPlayedForCardRef.current = true;
+            onResetReviewFlagRef.current();
+            audio.play().catch(ignorePlayInterrupt('Auto-play failed:', path));
+          }
+        };
+
+        whenMetadataReady(audio, doStart);
+        return true;
       };
 
-      whenMetadataReady(audio, doStart);
+      // The chime is playing: this card starts when it ends.
+      if (chimeHoldRef.current) pendingAfterChimeRef.current = start;
+      else start();
       return;
     }
 
@@ -908,7 +1249,8 @@ export function useAudioPlayer(
       !isCardChange &&
       audioBefore &&
       !audioBefore.paused &&
-      !bridgingRef.current
+      !bridgingRef.current &&
+      loadedRef.current.kind !== 'chime'
     ) {
       audioBefore.pause();
     }
@@ -936,117 +1278,141 @@ export function useAudioPlayer(
 
         const audio = getAudio();
 
-        // Stop current playback before swapping the source. A bridge is
-        // not stopped: the src swap below takes the element straight from
-        // silence to the blob. Unless autoplay is muted, in which case the
-        // blob will not be started and the pause has to land now (see the
-        // cache-hit path above).
-        const wasBridging = endBridge(audio);
-        if (!audio.paused && (!wasBridging || !autoPlayRef.current)) {
-          audio.pause();
-        }
+        const start = (): boolean => {
+          // Deferred behind the chime and overtaken since: the card that
+          // started this merge is gone, let `runAfterChime` fall through.
+          if (cancelled || controller.signal.aborted) return false;
 
-        // Revoke previous blob URL
-        if (blobUrlRef.current) {
-          URL.revokeObjectURL(blobUrlRef.current);
-          blobUrlRef.current = null;
-        }
-
-        if (!result) {
-          if (wasBridging) {
-            // Nothing to play for this card: unload the silence.
+          // Stop current playback before swapping the source. Continuous
+          // playback (a bridge, the chime once it ended) is not stopped: the
+          // src swap below takes the element straight to the blob. Unless
+          // nothing will start the blob, in which case the pause has to land
+          // now (see the cache-hit path above).
+          const wasBridging = endBridge(audio);
+          const wasContinuous =
+            wasBridging || loadedRef.current.kind === 'chime';
+          // A Play pressed on the parked element is consumed by this landing
+          // whether or not it may start the blob: a gate (tutorial, settings
+          // sheet) that mutes it also replays on its own when it lifts.
+          const userAsked =
+            pendingPlayRef.current && !playbackGatedRef.current;
+          pendingPlayRef.current = false;
+          if (
+            !audio.paused &&
+            (!wasContinuous || (!autoPlayRef.current && !userAsked))
+          ) {
             audio.pause();
-            audio.removeAttribute('src');
-            audio.load();
-            setIsPlaying(false);
-            setMediaSessionPlaybackState('paused');
           }
-          setDurationSec(0);
+
+          // Revoke previous blob URL
+          if (blobUrlRef.current) {
+            URL.revokeObjectURL(blobUrlRef.current);
+            blobUrlRef.current = null;
+          }
+
+          if (!result) {
+            // Nothing to play for this card: park the continuous playback.
+            if (wasContinuous) park(audio);
+            setDurationSec(0);
+            setIsMerging(false);
+            return false;
+          }
+
+          blobUrlRef.current = result.blobUrl;
+          languageCuesRef.current = result.languageCues;
+          speedByLanguageRef.current = result.speedByLanguage;
+          setLanguageCues(result.languageCues);
+          setSpeedByLanguage(result.speedByLanguage);
+          audio.src = result.blobUrl;
+          loadedRef.current = { kind: 'card', cardId };
+          setDurationSec(result.durationSec);
           setIsMerging(false);
-          return;
-        }
 
-        blobUrlRef.current = result.blobUrl;
-        languageCuesRef.current = result.languageCues;
-        speedByLanguageRef.current = result.speedByLanguage;
-        setLanguageCues(result.languageCues);
-        setSpeedByLanguage(result.speedByLanguage);
-        audio.src = result.blobUrl;
-        setDurationSec(result.durationSec);
-        setIsMerging(false);
+          const initiatedByThisTab = getReviewInitiatedByThisTab();
 
-        const initiatedByThisTab = getReviewInitiatedByThisTab();
-
-        // Assigning `audio.src` resets `currentTime` to 0. If the user had a
-        // structural position before this remerge, map it onto the new blob's
-        // timeline and seek there once metadata is loaded, otherwise a speed
-        // change mid-playback would jump back to the top of the merged audio.
-        const doResume = () => {
-          if (resumePos) {
-            const target = mergedTimeForCuePosition(
-              result.languageCues,
-              result.speedByLanguage,
-              resumePos,
-            );
-            if (target != null && Number.isFinite(target)) {
-              const clamped = Math.max(
-                0,
-                Math.min(target, Math.max(0, result.durationSec - 0.05)),
+          // Assigning `audio.src` resets `currentTime` to 0. If the user had
+          // a structural position before this remerge, map it onto the new
+          // blob's timeline and seek there once metadata is loaded, otherwise
+          // a speed change mid-playback would jump back to the top of the
+          // merged audio.
+          const doResume = () => {
+            if (resumePos) {
+              const target = mergedTimeForCuePosition(
+                result.languageCues,
+                result.speedByLanguage,
+                resumePos,
               );
-              try {
-                audio.currentTime = clamped;
-                clock.notifyOnce();
-                updateMediaSessionPosition(result.durationSec, clamped);
-              } catch {
-                // readyState edge. Safe to ignore; seek was best-effort.
+              if (target != null && Number.isFinite(target)) {
+                const clamped = Math.max(
+                  0,
+                  Math.min(target, Math.max(0, result.durationSec - 0.05)),
+                );
+                try {
+                  audio.currentTime = clamped;
+                  clock.notifyOnce();
+                  updateMediaSessionPosition(result.durationSec, clamped);
+                } catch {
+                  // readyState edge. Safe to ignore; seek was best-effort.
+                }
               }
             }
-          }
-          // Same-card remerge resume (e.g. settings tweak or client refresh):
-          // only resume if playback was running AND the caller hasn't gated
-          // autoplay since. Resume-after-async-merge isn't "user-initiated at
-          // the moment of play". The user clicked Play 100s of ms ago and an
-          // onboarding tutorial may have opened in between. A composition
-          // change never "resumes": it restarts from the top via the
-          // auto-play branch below, even when audio was mid-playback.
-          const shouldResumePlay =
-            wasPlayingSameCard && !isCompositionChange && autoPlayRef.current;
-          // Composition change is a user-initiated mode toggle in this tab.
-          // Bypass the `hasAutoPlayed` and `reviewInitiatedByThisTab` gates.
-          // Those exist to stop spurious auto-plays from URL refreshes and to
-          // coordinate across tabs on initial load; once the user explicitly
-          // flips review modes neither applies, and the tab-flag is otherwise
-          // stuck at false. We still honor `autoPlayRef.current` so callers
-          // (the onboarding tutorial gate) can suppress mid-flight plays.
-          const shouldAutoPlay =
-            !shouldResumePlay &&
-            autoPlayRef.current &&
-            (isCompositionChange ||
-              (!wasPlayingSameCard &&
-                !hasAutoPlayedForCardRef.current &&
-                initiatedByThisTab));
-          if (shouldResumePlay) {
-            audio
-              .play()
-              .catch(ignorePlayInterrupt('Resume playback failed:', 'resume'));
-          } else if (wasBridging && autoPlayRef.current) {
-            // Continuing the bridge onto the real blob. Same single gate as
-            // the cache-hit path above.
-            hasAutoPlayedForCardRef.current = true;
-            onResetReviewFlagRef.current();
-            audio
-              .play()
-              .catch(ignorePlayInterrupt('Bridge play failed:', 'bridge'));
-          } else if (shouldAutoPlay) {
-            hasAutoPlayedForCardRef.current = true;
-            onResetReviewFlagRef.current();
-            audio
-              .play()
-              .catch(ignorePlayInterrupt('Auto-play failed:', 'auto'));
-          }
+            // Same-card remerge resume (e.g. settings tweak or client
+            // refresh): only resume if playback was running AND the caller
+            // hasn't gated autoplay since. Resume-after-async-merge isn't
+            // "user-initiated at the moment of play". The user clicked Play
+            // 100s of ms ago and an onboarding tutorial may have opened in
+            // between. A composition change never "resumes": it restarts
+            // from the top via the auto-play branch below, even when audio
+            // was mid-playback.
+            const shouldResumePlay =
+              wasPlayingSameCard &&
+              !isCompositionChange &&
+              autoPlayRef.current;
+            // Composition change is a user-initiated mode toggle in this
+            // tab. Bypass the `hasAutoPlayed` and `reviewInitiatedByThisTab`
+            // gates. Those exist to stop spurious auto-plays from URL
+            // refreshes and to coordinate across tabs on initial load; once
+            // the user explicitly flips review modes neither applies, and
+            // the tab-flag is otherwise stuck at false. We still honor
+            // `autoPlayRef.current` so callers (the onboarding tutorial
+            // gate) can suppress mid-flight plays.
+            const shouldAutoPlay =
+              !shouldResumePlay &&
+              autoPlayRef.current &&
+              (isCompositionChange ||
+                (!wasPlayingSameCard &&
+                  !hasAutoPlayedForCardRef.current &&
+                  initiatedByThisTab));
+            const startFrom = (path: PlayPath) => {
+              hasAutoPlayedForCardRef.current = true;
+              onResetReviewFlagRef.current();
+              audio.play().catch(ignorePlayInterrupt('Play failed:', path));
+            };
+            if (shouldResumePlay) {
+              audio
+                .play()
+                .catch(
+                  ignorePlayInterrupt('Resume playback failed:', 'resume'),
+                );
+            } else if (userAsked) {
+              // A Play on the parked element asked for exactly this.
+              startFrom('parked');
+            } else if (wasContinuous && autoPlayRef.current) {
+              // Continuing the bridge (or the chime) onto the real blob.
+              // Same single gate as the cache-hit path above.
+              startFrom('bridge');
+            } else if (shouldAutoPlay) {
+              startFrom('auto');
+            }
+          };
+
+          whenMetadataReady(audio, doResume);
+          return true;
         };
 
-        whenMetadataReady(audio, doResume);
+        // The chime is playing: this card starts when it ends.
+        if (chimeHoldRef.current) pendingAfterChimeRef.current = start;
+        else start();
       } catch (err) {
         if (
           !cancelled &&
@@ -1071,6 +1437,7 @@ export function useAudioPlayer(
     settingsKey,
     baseOrderKey,
     targetOrderKey,
+    remergeNonce,
     clearCurrentAudio,
   ]);
 
@@ -1162,7 +1529,7 @@ export function useAudioPlayer(
           awaiting &&
           awaiting.nextCardId === targetCardId &&
           awaiting.fromCardId === currentCardIdRef.current &&
-          (getAudio().paused || bridgingRef.current)
+          (getAudio().paused || bridgingRef.current || chimeHoldRef.current)
         ) {
           awaitingHandoffRef.current = null;
           tryHandoffRef.current();
@@ -1195,25 +1562,37 @@ export function useAudioPlayer(
   ]);
 
   // --------------------------------------------------------------------------
-  // Media Session: update on card change
+  // Media Session: handlers once per mount, metadata per card. Registered
+  // through the stack in lib/audio/mediaSession.ts so the celebration's
+  // registration on top of ours gives the handlers back when it goes.
   // --------------------------------------------------------------------------
   useEffect(() => {
-    if (!cardId) return;
-
-    mediaSessionCleanupRef.current?.();
-
-    const cleanup = setupMediaSession({
-      title: sourceText,
-      artist: languageNames,
-      onPlay: () => play(),
+    const seekBy = (delta: number) => {
+      const audio = audioRef.current;
+      if (audio) seekTo(audio.currentTime + delta);
+    };
+    const handle = pushMediaSession({
+      title: '',
+      artist: '',
+      onPlay: () => playFrom('mediaSession'),
       onPause: () => pause(),
       onNextTrack: () => onNextRef.current(),
       onPreviousTrack: () => seekTo(0),
+      onSeekTo: (seconds) => seekTo(seconds),
+      onSeekBackward: () => seekBy(-10),
+      onSeekForward: () => seekBy(10),
     });
-    mediaSessionCleanupRef.current = cleanup;
+    mediaSessionRef.current = handle;
+    return () => {
+      handle.pop();
+      mediaSessionRef.current = null;
+    };
+  }, [playFrom, pause, seekTo]);
 
-    return cleanup;
-  }, [cardId, sourceText, languageNames, play, pause, seekTo]);
+  useEffect(() => {
+    if (!cardId) return;
+    mediaSessionRef.current?.update({ title: sourceText, artist: languageNames });
+  }, [cardId, sourceText, languageNames]);
 
   // --------------------------------------------------------------------------
   // Cleanup on unmount
@@ -1223,19 +1602,29 @@ export function useAudioPlayer(
     return () => {
       mergeAbortRef.current?.abort();
       prefetchAbortRef.current?.abort();
-      mediaSessionCleanupRef.current?.();
       if (webLockTimeoutRef.current) clearTimeout(webLockTimeoutRef.current);
       if (bridgeTimeoutRef.current) clearTimeout(bridgeTimeoutRef.current);
       bridgingRef.current = false;
+      chimeHoldRef.current = false;
+      pendingAfterChimeRef.current = null;
+      chimeAwaitingRef.current = null;
+      parkedAwaitingRef.current = null;
+      endedCardIdRef.current = null;
+      parkedEndedCardIdRef.current = null;
       webLockResolveRef.current?.();
       webLockResolveRef.current = null;
 
+      // Leaving the lesson is the one moment the audio session is given up:
+      // the shared element is emptied (not destroyed, its gesture unlock
+      // survives for the next lesson) and the Now Playing slot released.
       const audio = audioRef.current;
       if (audio) {
         audio.pause();
         audio.removeAttribute('src');
         audio.load();
       }
+      loadedRef.current = { kind: 'none' };
+      setMediaSessionPlaybackState('none');
 
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current);

@@ -31,7 +31,7 @@ export const generateAlternativeAnnotations = internalAction({
     );
     if (!context) return null; // evicted before we ran
 
-    const { text, language } = context;
+    const { text, language, userId } = context;
     const attempt = async (
       supported: boolean,
       generate: () => Promise<string>,
@@ -50,7 +50,7 @@ export const generateAlternativeAnnotations = internalAction({
 
     const [romanizedText, ipaText, furiganaText] = await Promise.all([
       attempt(ROMANIZATION_LANGUAGES.has(language), () =>
-        romanizeText(text, language),
+        romanizeText(text, language, { ctx, userId }),
       ),
       attempt(IPA_LANGUAGES.has(language), () => ipaForText(text, language)),
       attempt(FURIGANA_LANGUAGES.has(language), () =>

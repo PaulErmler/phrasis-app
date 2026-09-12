@@ -588,6 +588,81 @@ export const generateResponse = internalAction({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Dynamic chat billing: 1 credit was consumed up-front in `sendMessage`;
+    // the actual OpenRouter cost is accumulated across all LLM steps (tool
+    // loops included) and the remainder charged below. 1 credit per additional
+    // started CHAT_CREDIT_USD_STEP. Thread-title generation is deliberately
+    // not billed (flash-lite, ~4 words, negligible).
+    //
+    // Declared outside the try: a turn that throws mid-stream has still paid
+    // for the steps that completed, and the catch below flushes them. Keeping
+    // these inside the try is how that spend went unreported.
+    let totalCostUsd = 0;
+    let billedUserId: string | undefined = args.userId;
+    // One `$ai_generation` per LLM step is emitted after the stream finishes
+    // rather than from inside `usageHandler`: the handler runs mid-stream, and
+    // the response text needed for `$ai_output_choices` only exists once the
+    // whole thing has resolved. Steps are collected here and flushed by
+    // `flushStepEvents`.
+    const steps: Array<{
+      model: string;
+      provider: string;
+      inputTokens?: number;
+      outputTokens?: number;
+      costUsd: number;
+      generationId?: string;
+    }> = [];
+    const startedAt = Date.now();
+
+    /**
+     * Emit the collected steps, at most once per turn.
+     *
+     * Called from the success path and from the catch. The latch is the whole
+     * point: without it a throw AFTER a successful flush (the credit charge,
+     * say) would emit every step a second time, and trading an undercount for
+     * an overcount is no improvement.
+     */
+    let flushed = false;
+    const flushStepEvents = async (responseText?: string): Promise<void> => {
+      if (flushed) return;
+      flushed = true;
+      const latencyPerStepMs = steps.length
+        ? (Date.now() - startedAt) / steps.length
+        : 0;
+      for (const [index, step] of steps.entries()) {
+        const isFinalStep = index === steps.length - 1;
+        await captureGeneration(ctx, {
+          distinctId: billedUserId,
+          feature: 'chat',
+          model: step.model,
+          provider: step.provider,
+          latencyMs: latencyPerStepMs,
+          inputTokens: step.inputTokens,
+          outputTokens: step.outputTokens,
+          costUsd: step.costUsd,
+          // Prompt on the first step, completion on the last: the intermediate
+          // steps are tool loops with no user-facing text of their own.
+          // Content only with synced consent. The privacy policy promises
+          // that declining keeps chat text out of PostHog.
+          input:
+            args.includeAiContent && index === 0 && args.prompt
+              ? [{ role: 'user', content: args.prompt }]
+              : undefined,
+          outputChoices:
+            args.includeAiContent && isFinalStep && responseText
+              ? [{ role: 'assistant', content: responseText }]
+              : undefined,
+          traceId: step.generationId,
+          extra: {
+            thread_id: args.threadId,
+            step_index: index,
+            step_count: steps.length,
+            has_card_context: args.cardContextSection !== undefined,
+          },
+        });
+      }
+    };
+
     try {
       let languageSection = args.languageSection;
       let difficultySection = args.difficultySection;
@@ -624,31 +699,9 @@ export const generateResponse = internalAction({
       }
       const dynamicContext = dynamicContextParts.join('\n\n');
 
-      // Dynamic chat billing: 1 credit was consumed up-front in
-      // `sendMessage`; here we accumulate the actual OpenRouter cost across
-      // all LLM steps (tool loops included) and charge the remainder. 1
-      // credit per additional started CHAT_CREDIT_USD_STEP. The handler
-      // runs (awaited) per step while the stream is consumed, and
-      // `agent.streamText` only resolves after the stream finishes, so the
-      // accumulator is complete after the await. Thread-title generation is
-      // deliberately not billed (flash-lite, ~4 words, negligible).
-      let totalCostUsd = 0;
-      let billedUserId: string | undefined = args.userId;
-
-      // One `$ai_generation` per LLM step is emitted after the stream finishes
-      // rather than from inside `usageHandler`: the handler runs mid-stream, and
-      // the response text needed for `$ai_output_choices` only exists once the
-      // whole thing has resolved. Steps are collected here and flushed below.
-      const steps: Array<{
-        model: string;
-        provider: string;
-        inputTokens?: number;
-        outputTokens?: number;
-        costUsd: number;
-        generationId?: string;
-      }> = [];
-      const startedAt = Date.now();
-
+      // `usageHandler` runs (awaited) per step while the stream is consumed,
+      // and this only resolves after the stream finishes, so `totalCostUsd`
+      // and `steps` are complete after the await.
       const result = await agent.streamText(
         ctx,
         { threadId: args.threadId },
@@ -774,41 +827,7 @@ export const generateResponse = internalAction({
         responseText = undefined;
       }
 
-      const latencyPerStepMs = steps.length
-        ? (Date.now() - startedAt) / steps.length
-        : 0;
-      for (const [index, step] of steps.entries()) {
-        const isFinalStep = index === steps.length - 1;
-        await captureGeneration(ctx, {
-          distinctId: billedUserId,
-          feature: 'chat',
-          model: step.model,
-          provider: step.provider,
-          latencyMs: latencyPerStepMs,
-          inputTokens: step.inputTokens,
-          outputTokens: step.outputTokens,
-          costUsd: step.costUsd,
-          // Prompt on the first step, completion on the last: the intermediate
-          // steps are tool loops with no user-facing text of their own.
-          // Content only with synced consent. The privacy policy promises
-          // that declining keeps chat text out of PostHog.
-          input:
-            args.includeAiContent && index === 0 && args.prompt
-              ? [{ role: 'user', content: args.prompt }]
-              : undefined,
-          outputChoices:
-            args.includeAiContent && isFinalStep && responseText
-              ? [{ role: 'assistant', content: responseText }]
-              : undefined,
-          traceId: step.generationId,
-          extra: {
-            thread_id: args.threadId,
-            step_index: index,
-            step_count: steps.length,
-            has_card_context: args.cardContextSection !== undefined,
-          },
-        });
-      }
+      await flushStepEvents(responseText);
 
       // Integer micro-USD math: IEEE-754 division can land an exact multiple
       // of the step an epsilon above an integer (0.035 / 0.005 → 7.000…001),
@@ -834,6 +853,11 @@ export const generateResponse = internalAction({
       }
     } catch (error) {
       console.error('Failed to generate AI response:', error);
+      // The steps that completed before the throw were billed by OpenRouter,
+      // so they are reported even though the turn failed. No-op when the
+      // success path already flushed, or when nothing reached the model.
+      // No response text: there is no transcript to attach.
+      await flushStepEvents();
       // Caught, so the Convex dashboard's exception destination never sees it.
       // A silently failed reply is the single most user-visible chat bug there
       // is, so report it explicitly.

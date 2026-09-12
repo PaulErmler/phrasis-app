@@ -142,6 +142,7 @@ describe('lib/stt/openrouter transcribeAudio', () => {
       audioDurationMs: 1234,
       billedSeconds: 2,
       costUsd: 0.0000556,
+      attempts: 1,
       detectedLanguage: 'es',
     });
   });
@@ -178,6 +179,7 @@ describe('lib/stt/openrouter transcribeAudio', () => {
       audioDurationMs: undefined,
       billedSeconds: undefined,
       costUsd: undefined,
+      attempts: 1,
       detectedLanguage: undefined,
     });
   });

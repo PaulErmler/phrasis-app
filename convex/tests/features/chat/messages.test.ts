@@ -775,6 +775,62 @@ describe('features/chat/messages', () => {
       expect(await creditsBalance(t)).toBe(49);
     });
 
+    /** The `$ai_generation` cost events this turn sent to PostHog. */
+    function costEvents() {
+      return vi
+        .mocked(posthog.capture)
+        .mock.calls.map((c) => c[1] as { event: string })
+        .filter((e) => e.event === '$ai_generation');
+    }
+
+    it('emits exactly one cost event per LLM step', async () => {
+      const t = setup();
+      const { threadId, promptMessageId } = await seedThreadWithMessage(t);
+      vi.mocked(posthog.capture).mockClear();
+
+      llm.providerMetadataPerStep = [
+        { openrouter: { id: 'gen-once', usage: { cost: 0.012 } } },
+      ];
+      await t.action(internal.features.chat.messages.generateResponse, {
+        threadId,
+        promptMessageId,
+        includeAiContent: false,
+      });
+
+      // `flushStepEvents` is latched so it cannot run twice. One step in, one
+      // event out, with the billed figure attached.
+      const events = costEvents();
+      expect(events).toHaveLength(1);
+      expect(events[0]).toMatchObject({
+        properties: expect.objectContaining({
+          feature: 'chat',
+          $ai_total_cost_usd: 0.012,
+          $ai_trace_id: 'gen-once',
+          step_index: 0,
+          step_count: 1,
+        }),
+      });
+    });
+
+    it('reports no cost when the turn dies before reaching the model', async () => {
+      const t = setup();
+      const { threadId } = await seedThreadWithMessage(t);
+      vi.mocked(posthog.capture).mockClear();
+
+      await expect(
+        t.action(internal.features.chat.messages.generateResponse, {
+          threadId,
+          promptMessageId: 'not-a-message-id',
+          languageSection: 'langs',
+          difficultySection: 'difficulty',
+          includeAiContent: false,
+        }),
+      ).resolves.toBeNull();
+
+      // Nothing was billed, so the catch's flush must invent nothing.
+      expect(costEvents()).toEqual([]);
+    });
+
     it('never throws on pre-stream failures: reports via trackException instead', async () => {
       const t = setup();
       const { threadId } = await seedThreadWithMessage(t);

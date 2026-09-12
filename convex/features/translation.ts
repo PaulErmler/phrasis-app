@@ -23,6 +23,12 @@ import {
   parseRomanization,
 } from '../lib/romanizationPrompt';
 import { requireEnv } from '../lib/env';
+import {
+  captureGeneration,
+  openrouterCostUsd,
+  openrouterGenerationId,
+} from '../lib/posthogAi';
+import type { SchedulerCtx } from '../analytics';
 import { SignJWT, importPKCS8 } from 'jose';
 import { SUPPORTED_LANGUAGES } from '../../lib/languages';
 
@@ -283,6 +289,19 @@ export function isTransientLlmFailure(err: unknown): boolean {
 }
 
 /**
+ * Where a romanization's AI spend is reported, for the languages that route to
+ * the model. Optional on `romanizeText` so the unit tests can call it as a
+ * pure function, but **every production caller must pass it** — the LLM
+ * romanization path billed OpenRouter invisibly until 2026-09-12 precisely
+ * because it had nowhere to report.
+ */
+export type RomanizationTelemetry = {
+  ctx: SchedulerCtx;
+  /** The user who caused the work, when there is one. */
+  userId?: string;
+};
+
+/**
  * Romanization from the model, for a language with no library and no Google
  * support. See convex/lib/romanizationPrompt.ts for which languages route
  * here and why.
@@ -294,6 +313,7 @@ export function isTransientLlmFailure(err: unknown): boolean {
 async function romanizeViaLlm(
   text: string,
   sourceLanguage: string,
+  telemetry?: RomanizationTelemetry,
 ): Promise<string> {
   const openrouter = tryGetOpenRouter();
   if (openrouter === null) {
@@ -312,6 +332,7 @@ async function romanizeViaLlm(
   for (let attempt = 1; attempt <= LLM_ROMANIZE_MAX_ATTEMPTS; attempt++) {
     if (attempt > 1) await sleep(ROMANIZE_RETRY_DELAY_MS * (attempt - 1));
     let reply: string;
+    const startedAt = Date.now();
     try {
       const result = await generateText({
         model,
@@ -330,6 +351,25 @@ async function romanizeViaLlm(
         },
       });
       reply = result.text;
+      // Every attempt that reached the model billed, unusable replies
+      // included, so each one is captured rather than just the winner.
+      if (telemetry) {
+        await captureGeneration(telemetry.ctx, {
+          distinctId: telemetry.userId,
+          feature: 'romanization',
+          model: OPENROUTER_MODELS.romanization,
+          provider: 'openrouter',
+          latencyMs: Date.now() - startedAt,
+          inputTokens: result.usage.inputTokens ?? 0,
+          outputTokens: result.usage.outputTokens ?? 0,
+          // `ai_cost` does not run PostHog's automatic model pricing, so the
+          // pipeline features pass the billed figure themselves.
+          costUsd: openrouterCostUsd(result.providerMetadata),
+          traceId: openrouterGenerationId(result.providerMetadata),
+          sharedContent: true,
+          extra: { language: sourceLanguage, attempt },
+        });
+      }
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       if (isTransientLlmFailure(err)) {
@@ -377,6 +417,7 @@ async function romanizeViaLlm(
 export async function romanizeText(
   text: string,
   sourceLanguage: string,
+  telemetry?: RomanizationTelemetry,
 ): Promise<string> {
   const local = romanizeLocal(text, sourceLanguage);
   if (local !== null) return local;
@@ -385,7 +426,7 @@ export async function romanizeText(
   // (th, he). Ordered after the local libraries deliberately: those are free,
   // instant and deterministic, and this one is none of the three.
   if (usesLlmRomanization(sourceLanguage)) {
-    return await romanizeViaLlm(text, sourceLanguage);
+    return await romanizeViaLlm(text, sourceLanguage, telemetry);
   }
 
   // Hard gate: bail out cleanly before issuing a guaranteed-400 request.

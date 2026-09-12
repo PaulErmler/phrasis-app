@@ -1,7 +1,10 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
-import { useAudioPlayer } from '@/hooks/use-audio-player';
+import {
+  useAudioPlayer,
+  type ScheduleCompleteResult,
+} from '@/hooks/use-audio-player';
 import {
   resolveAudioSettings,
   resolveModeSetting,
@@ -9,6 +12,7 @@ import {
   applyOnlyNewListening,
   type AudioSettingsMode,
 } from '@/lib/audio/mergeAudio';
+import { isPageHidden } from '@/lib/audio/audioSurface';
 import { DEFAULT_AUTO_PLAY } from '@/lib/constants/audioPlayback';
 import { predictsMilestone } from '@/lib/constants/learning';
 import type { LearningState } from './useLearningMode';
@@ -151,7 +155,11 @@ export function useLearningAudio(
   // milestone celebration: `handleReview` predicts it the same way and mutes
   // autoplay for it, and audio started before that prediction lands would
   // talk over the celebration. Free play never rates, so it never celebrates.
-  const handleScheduleComplete = useCallback((): boolean => {
+  // While the page is hidden (screen locked) the celebration screen is not
+  // shown at all (`handleReview` skips it): the player plays the success
+  // sound itself and carries on, so a milestone never strands a locked-
+  // screen session.
+  const handleScheduleComplete = useCallback((): ScheduleCompleteResult => {
     if (
       !(
         state.status === 'reviewing' &&
@@ -160,7 +168,7 @@ export function useLearningAudio(
         !disableAutoAdvance
       )
     ) {
-      return false;
+      return 'hold';
     }
     // Notify the auto-next consumer (e.g. onboarding wrapper's
     // `onCardRated`) BEFORE advancing so the snapshot is captured
@@ -173,7 +181,8 @@ export function useLearningAudio(
         state.dailyReviewsToday,
         cs?.progressDisplayEnabled ?? true,
       );
-    return !willCelebrate;
+    if (!willCelebrate) return 'advance';
+    return isPageHidden() ? 'chime' : 'hold';
   }, [
     state,
     cs,
@@ -221,6 +230,7 @@ export function useLearningAudio(
           .join(' / ')
       : '',
     autoPlay,
+    playbackGated: disableAutoPlay || settingsOpen,
     settingsOpen,
     getReviewInitiatedByThisTab: isReviewing
       ? state.getReviewInitiatedByThisTab

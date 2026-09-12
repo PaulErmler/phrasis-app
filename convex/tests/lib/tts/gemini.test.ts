@@ -25,18 +25,24 @@ const INPUT: SpeakInput = {
   speed: 1,
 };
 
-/** A 200 response carrying `byteLength` bytes of PCM. */
-function pcmResponse(byteLength: number): Response {
+/** A 200 response carrying `byteLength` bytes of PCM.
+ *  `generationId` rides the `x-generation-id` header, which is how the clip's
+ *  cost is looked up afterwards (convex/lib/openrouterGeneration.ts). */
+function pcmResponse(byteLength: number, generationId = 'gen-1'): Response {
   return {
     ok: true,
     arrayBuffer: async () => new ArrayBuffer(byteLength),
     text: async () => '',
+    headers: new Headers(
+      generationId ? { 'x-generation-id': generationId } : {},
+    ),
   } as unknown as Response;
 }
 
-/** A 200 response with an empty body. The intermittent Gemini quirk. */
-function emptyResponse(): Response {
-  return pcmResponse(0);
+/** A 200 response with an empty body. The intermittent Gemini quirk. It still
+ *  billed, so it still carries a generation id. */
+function emptyResponse(generationId = 'gen-empty'): Response {
+  return pcmResponse(0, generationId);
 }
 
 /** Parse the JSON request body of the Nth fetch call. */
@@ -228,6 +234,33 @@ describe('geminiTts.speak: empty-response retry', () => {
     expect(transcriptOf(fetchMock.mock.calls[1])).toBe(' Guten Morgen!');
   });
 
+  it('returns the generation ids of every billed request, retries included', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(emptyResponse('gen-empty-1'))
+      .mockResolvedValueOnce(emptyResponse('gen-empty-2'))
+      .mockResolvedValueOnce(pcmResponse(4096, 'gen-good'));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(Math, 'random').mockReturnValue(0.1);
+
+    const result = await geminiTts.speak(INPUT);
+
+    // The two empty 200s billed as much as the one that worked. Pricing only
+    // the last would under-report the clip by two thirds.
+    expect(result.generationIds).toEqual([
+      'gen-empty-1',
+      'gen-empty-2',
+      'gen-good',
+    ]);
+  });
+
+  it('returns no ids when the response carries no x-generation-id header', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(pcmResponse(4096, '')));
+
+    // Reported as unpriceable rather than free; see lib/tts/cost.ts.
+    expect((await geminiTts.speak(INPUT)).generationIds).toEqual([]);
+  });
+
   it('pads front and/or end independently (50% each) on retries', async () => {
     const fetchMock = vi
       .fn()
@@ -271,6 +304,7 @@ describe('geminiTts.speak: empty-response retry', () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: false,
       status: 429,
+      headers: new Headers(),
       arrayBuffer: async () => new ArrayBuffer(0),
       text: async () => 'rate limited',
     } as unknown as Response);
