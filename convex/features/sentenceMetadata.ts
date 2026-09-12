@@ -605,6 +605,18 @@ export async function applyTextMetadata(
       .withIndex('by_textId', (q) => q.eq('textId', args.textId))
       .collect();
     for (const translation of translations) {
+      // LIVE rows only. `by_textId` also returns the superseded revisions a
+      // pinned card still reads, and those were written for the old voice and
+      // keep an old-voice clip on their `audioAssetId`. Restamping one would
+      // break invariant 4 (a row carries the voice it was written for,
+      // docs/architecture/rendering-keys.md): its chip would claim the new
+      // voice over old-voice audio, and the next repair of that clip would
+      // synthesize the new voice for wording written for the old one, because
+      // `regenerateSupersededRevisionAudio` (convex/lib/contentScheduling.ts)
+      // picks the voice from this stamp. Nothing would heal it either, since
+      // the sweep only compares the key against the text's voice, which would
+      // now agree.
+      if (translation.supersededAt !== undefined) continue;
       if (translation.variantKey === undefined) {
         if (translation.speakerGender !== audioSpeakerGender) {
           await ctx.db.patch(translation._id, {

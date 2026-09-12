@@ -1169,11 +1169,6 @@ export async function dedupeApostropheWordOne(
   return undefined;
 }
 
-/**
- * Runs with `runAll` after the apostrophe fold landed in the tokenizer.
- * Idempotent: a row whose word is already ASCII is skipped, so later runs
- * find nothing to do.
- */
 /** `{ column: undefined }` for every listed column the doc still carries. */
 function unsetPatch<T extends Record<string, unknown>>(
   doc: T,
@@ -1213,11 +1208,28 @@ export const dropMetadataRequestState = migrations.define({
  * rows keyed or stamped for the old voice re-render lazily
  * (`sweepStaleTranslations`). Permanent: stays in the runner across the
  * cutover cleanups.
+ *
+ * The whole verdict set is walked in ONE mutation, one point read each, so
+ * it only works while the set stays far below the per-transaction read
+ * limit. `MAX_VERDICTS_PER_TRANSACTION` makes that ceiling explicit: a scan
+ * that ever emits more has to be chunked across scheduled continuations
+ * (the migrateOne stays idempotent, so an early stop is safe) instead of
+ * silently drifting toward the limit.
  */
+const MAX_VERDICTS_PER_TRANSACTION = 2000;
+
 export async function applySpeakerGenderVerdictsToDataset(
   ctx: MutationCtx,
   dataset: Doc<'datasets'>,
 ): Promise<{ patched: number }> {
+  const verdictCount = Object.keys(SPEAKER_GENDER_VERDICTS).length;
+  if (verdictCount > MAX_VERDICTS_PER_TRANSACTION) {
+    throw new Error(
+      `applySpeakerGenderVerdicts: ${verdictCount} verdicts exceeds ` +
+        `${MAX_VERDICTS_PER_TRANSACTION} per transaction. Chunk the walk ` +
+        `across scheduled continuations before regenerating the set.`,
+    );
+  }
   let patched = 0;
   for (const [externalId, verdict] of Object.entries(SPEAKER_GENDER_VERDICTS)) {
     const text = await ctx.db
@@ -1258,6 +1270,11 @@ export const applySpeakerGenderVerdicts = migrations.define({
   },
 });
 
+/**
+ * Runs with `runAll` after the apostrophe fold landed in the tokenizer.
+ * Idempotent: a row whose word is already ASCII is skipped, so later runs
+ * find nothing to do.
+ */
 export const dedupeApostropheWords = migrations.define({
   table: 'userWords',
   batchSize: CHECK_SWEEP_BATCH_SIZE,

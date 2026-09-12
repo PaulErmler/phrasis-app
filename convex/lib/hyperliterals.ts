@@ -20,7 +20,11 @@ import type { MutationCtx, QueryCtx } from '../_generated/server';
  * Engine + prompt version. Bumping this makes every existing row stale, and
  * each one regenerates the next time its card is viewed.
  *
- * `gemini-3.8-flash-floor-v1`: chosen by `pnpm eval:hyperliteral` on
+ * `-v2` (2026-09-11) is the switch from one gloss STRING to per-word PAIRS.
+ * Rows written by v1 carry no pairs, so they cannot show the word mapping;
+ * the bump regenerates each one the next time its card is viewed.
+ *
+ * `gemini-3.8-flash-floor`: chosen by `pnpm eval:hyperliteral` on
  * 2026-09-11 over GPT-5.6 Luna, which the plan had proposed. Across 200 items
  * in fi/hu/tr/ja/zh, Flash scored 86% lexical coverage against Luna's 83%,
  * produced the right number of gloss units on 100% of sentences against Luna's
@@ -30,7 +34,7 @@ import type { MutationCtx, QueryCtx } from '../_generated/server';
  * romanization model, so it adds no new provider surface.
  */
 export const HYPERLITERAL_SOURCES = {
-  geminiFlashFloor: 'gemini-3.8-flash-floor-v1',
+  geminiFlashFloor: 'gemini-3.8-flash-floor-v2',
 } as const;
 
 export type HyperliteralSource =

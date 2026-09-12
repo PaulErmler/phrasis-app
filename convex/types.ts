@@ -55,6 +55,10 @@ export const translationValidator = v.object({
    * romanization. Only populated when the course asks for glosses.
    */
   hyperliteral: v.optional(v.string()),
+  /** The same gloss as per-word pairs; drives the card's word mapping. */
+  hyperliteralPairs: v.optional(
+    v.array(v.object({ source: v.string(), gloss: v.string() })),
+  ),
   /**
    * The user's stored AI-feedback accepted alternatives for this card +
    * language (writingAlternatives table, max WRITING_ALTERNATIVES_MAX).

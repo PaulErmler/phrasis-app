@@ -326,6 +326,7 @@ export function WordSentencesDialog({
                               language={tr.language}
                               romanization={tr.romanization}
                               hyperliteral={tr.hyperliteral}
+                              hyperliteralPairs={tr.hyperliteralPairs}
                               ipa={tr.ipa}
                               {...annotationLinePropsFromSettings(
                                 courseSettings,
@@ -395,6 +396,7 @@ export function WordSentencesDialog({
                               language={tr.language}
                               romanization={tr.romanization}
                               hyperliteral={tr.hyperliteral}
+                              hyperliteralPairs={tr.hyperliteralPairs}
                               ipa={tr.ipa}
                               {...annotationLinePropsFromSettings(
                                 courseSettings,

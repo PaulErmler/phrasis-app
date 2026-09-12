@@ -1533,8 +1533,8 @@ async function enqueueFlagRetranslation(
     reason: 'flag' | 'curriculum_fix';
     /**
      * The live row the card reads for this language, which the new wording
-     * replaces: a keyed row under its key, a legacy row under the legacy
-     * slot (`replacesLegacyRow`, docs/architecture/rendering-keys.md).
+     * replaces. One live row per (text, language), keyed or legacy
+     * (docs/architecture/rendering-keys.md).
      */
     row: Doc<'translations'>;
     /** The wording the learner saw, for the prompt's reconsider block. */
@@ -1754,40 +1754,6 @@ async function suggestCurriculumFixesForEdit(
   return flagged;
 }
 
-/**
- * Flag a card as having bad translation content. The user sees a single
- * "Flag" affordance on the card; we then increment `flagCount` on every
- * non-source-language `translations` row for that card's text, and enqueue
- * a retranslation for each one whose post-increment count is within
- * `FLAG_AUTO_RETRANSLATION_MAX` AND whose language is part of the user's
- * course. Counts past the cap still increment the counter (for later
- * admin triage) but skip the retranslation work to bound cost.
- *
- * Routing per text: curriculum (premade-dataset) texts use
- * `retranslation_high` (Pro-medium). User-created custom texts are
- * **flagged without retranslation**. The LLM has no curated source of
- * truth to second-guess against, so flagging a custom-text translation
- * only bumps `flagCount` (for admin triage / surfacing the "Flagged" pill)
- * and exits without enqueueing an LLM call. The rule applies to the whole
- * card because `text.userCreated` is a property of the text, not the
- * translation.
- *
- * Quota: one `translation_flags` unit total per flag click, regardless of
- * how many languages were retranslated. Charged on the first language
- * that successfully claims a slot; not charged at all if every language
- * was over-cap or claim-contested. If `consumeQuota` throws USAGE_LIMIT,
- * the whole mutation rolls back. Counters and any prior claim/audio
- * deletion are reverted.
- *
- * Pinned cards: a card created before a version bump keeps showing the
- * superseded wording (see `supersededAt` in schema.ts). Flagging such a
- * card disputes wording the curriculum has already moved past, so the card
- * is moved to the latest revision (`translationsAcceptedAt = now`) instead of
- * counting a complaint against the live row; only languages whose live row
- * IS what the learner saw continue into the retranslation path. The result
- * carries `updatedToLatest` so the client can say so instead of showing the
- * "Flagged" pill.
- */
 /** Longest "other" note stored on the audit row. */
 const FLAG_NOTE_MAX_LENGTH = 500;
 
@@ -1857,6 +1823,37 @@ async function payFlagReward(
  * The view is the card's own, so the pinned check and the audit's `before`
  * describe the wording the learner saw, and the retranslation targets the
  * row the card reads (docs/architecture/rendering-keys.md).
+ *
+ * Every reason increments `flagCount` on every non-source-language
+ * `translations` row of the card's text. A row only earns retranslation work
+ * while its post-increment count is within `FLAG_AUTO_RETRANSLATION_MAX` AND
+ * its language is part of the user's course. Counts past the cap still
+ * increment the counter (for later admin triage) but skip the work to bound
+ * cost.
+ *
+ * Routing per text: curriculum (premade-dataset) texts use
+ * `retranslation_high` (Pro-medium). User-created custom texts are
+ * **flagged without retranslation**. The LLM has no curated source of truth
+ * to second-guess against, so flagging a custom-text translation only bumps
+ * `flagCount` (for admin triage / surfacing the "Flagged" pill) and exits
+ * without enqueueing an LLM call. The rule applies to the whole card because
+ * `text.userCreated` is a property of the text, not the translation.
+ *
+ * Quota: one `translation_flags` unit total per flag click, regardless of how
+ * many languages were retranslated. Charged on the first language that
+ * successfully claims a slot; not charged at all if every language was
+ * over-cap or claim-contested. If `consumeQuota` throws USAGE_LIMIT, the
+ * whole mutation rolls back. Counters and any prior claim/audio deletion are
+ * reverted.
+ *
+ * Pinned cards: a card created before a version bump keeps showing the
+ * superseded wording (see `supersededAt` in schema.ts). Flagging such a card
+ * disputes wording the curriculum has already moved past, so the card is
+ * moved to the latest revision (`translationsAcceptedAt = now`) instead of
+ * counting a complaint against the live row; only languages whose live row IS
+ * what the learner saw continue into the retranslation path. The result
+ * carries `updatedToLatest` so the client can say so instead of showing the
+ * "Flagged" pill.
  */
 export const flagTranslation = mutation({
   args: {

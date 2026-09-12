@@ -538,8 +538,8 @@ export default defineSchema({
     // request claim and attempt counter the sweep kept while it waited for
     // a verdict. Dev and staging rows only; unset by the runAll-chained
     // `dropMetadataRequestState`, then dropped in a later cleanup.
-    metadataRequestedAt: v.optional(v.any()),
-    metadataAttempts: v.optional(v.any()),
+    metadataRequestedAt: v.optional(v.number()),
+    metadataAttempts: v.optional(v.number()),
     /**
      * When a sweep last asked for this text's missing source annotations;
      * see `translations.annotationRequestedAt` for the contract.
@@ -640,23 +640,24 @@ export default defineSchema({
     // Every row on a userCreated text, plus user-provided / curated-manual
     // rows anywhere. Are skipped by the sweep regardless of their stamp.
     translationVersion: v.optional(v.number()),
-    // The RENDERING KEY, `"<male|female>|<formId|none>"` as built by
-    // lib/preferenceResolution.ts (`renderingKey`): the voice and the
-    // politeness form this wording was generated for. Every row written
-    // since 2026-09-10 carries one; a row without it is a LEGACY row from
-    // before, never generated again and served only to cards that do not
-    // follow the settings (docs/architecture/rendering-keys.md). Keyed rows
-    // are ordinary rows to every walk (annotations, superseded revisions,
-    // cascades) and are never deleted because another rendering was
-    // requested. Point reads pin all four index columns through
+    // The RENDERING KEY: the voice this wording was generated for, `"male"`
+    // or `"female"`, as built by lib/preferenceResolution.ts
+    // (`renderingKey`). One axis only since politeness was withdrawn, so the
+    // key IS the voice; it stays a string because a second axis would widen
+    // it here. Every row written since 2026-09-10 carries one; a row without
+    // it is a LEGACY row from before, never generated again and served only
+    // to cards that do not follow the settings
+    // (docs/architecture/rendering-keys.md). Keyed rows are ordinary rows to
+    // every walk (annotations, superseded revisions, cascades) and are never
+    // deleted because another rendering was requested. Reads go through
     // convex/db/translationReads.ts.
     variantKey: v.optional(v.string()),
     // The rendering classifier's verdict on this wording against its key,
     // taken right after generation (`verifyRendering`): true when the voice
-    // and the form agree with the key, false when the model still
-    // contradicted it after one retry, absent when no verdict could be
-    // taken (a classifier outage, a language that marks neither axis, a
-    // copied legacy row) or on a legacy row.
+    // agrees with the key, false when the model still contradicted it after
+    // one retry, absent when no verdict could be taken (a classifier outage,
+    // a language whose wording does not change with the speaker, a copied
+    // legacy row) or on a legacy row.
     renderingVerified: v.optional(v.boolean()),
     /**
      * When a sweep last asked for this row's missing annotations
@@ -767,7 +768,19 @@ export default defineSchema({
     // note there. Test with `=== undefined`, never `!x`. The row's existence
     // IS the request claim, so there is no separate requestedAt marker on the
     // parent.
+    //
+    // Derived from `pairs` (their glosses joined by spaces), so the line under
+    // the sentence and the per-word columns can never disagree.
     text: v.optional(v.string()),
+    // Each source word and what it becomes, in order. The model returns these
+    // rather than one string because the app cannot recover the split
+    // afterwards: a sentence written without spaces has none to recover, and
+    // even a spaced one can disagree — Thai `สบายดี ขอบใจนะ!` is two
+    // space-separated tokens whose gloss has four units. Absent on a row
+    // written before pairs existed, and on the `''` failure sentinel.
+    pairs: v.optional(
+      v.array(v.object({ source: v.string(), gloss: v.string() })),
+    ),
     // Engine + prompt version that produced (or failed to produce) `text`.
     // A row tagged with a retired engine is stale and regenerates on the next
     // view. The gloss language is NOT part of this tag: it is its own column,
@@ -891,18 +904,20 @@ export default defineSchema({
     textId: v.id('texts'),
     language: v.string(), // Base language code (e.g., "en", "es", "de")
     assetId: v.id('audioAssets'),
-    // The rendering key this pointer speaks, `"<male|female>|<formId|none>"`
-    // (lib/preferenceResolution.ts): the same key as the translation row it
-    // voices, or the card's voice with `none` for the text's own language.
-    // Absent = a LEGACY pointer from before 2026-09-10, spoken in the
-    // text's own voice, read only by cards that do not follow the settings.
-    // Never deleted because another voice was requested.
+    // The rendering key this pointer speaks: the voice, `"male"` or
+    // `"female"` (lib/preferenceResolution.ts `renderingKey`). The same key
+    // as the translation row it voices. Absent = a LEGACY pointer from
+    // before 2026-09-10, spoken in the text's own voice, read only by cards
+    // that do not follow the settings. Never deleted because another voice
+    // was requested.
     variantKey: v.optional(v.string()),
   })
     .index('by_textId', ['textId'])
-    // Legacy two-column index, kept unqueried until a flagged deploy drops
-    // it (same rule as translations.by_text_and_language); the invariant
-    // test forbids querying it.
+    // LIVE and load-bearing: `audioPointer` (convex/db/translationReads.ts)
+    // reads it for every (text, language) pointer lookup. Do NOT drop it,
+    // and do NOT confuse it with its unqueried namesake on `translations`
+    // (which IS waiting for a flagged deploy). The invariant test forbids
+    // querying it OUTSIDE that accessor, not at all.
     .index('by_text_and_language', ['textId', 'language'])
     // Reference counting for shared assets: an asset (and its blob) is deleted
     // only when no row points at it any more.

@@ -291,13 +291,23 @@ export function AnnotationSettingsTabs({
       <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
         {t('languageSettings')}
       </p>
+      {/* Wraps rather than sharing one fixed-height row. The shared TabsList is
+          a 36px bar whose triggers never wrap, so a course with several
+          long-named languages ("Spanish (Spain)", "English (Mixed)") pushed
+          the last one off the edge and clipped it. Language count and name
+          length are both outside this component's control, so the row has to
+          grow instead of the labels having to fit. */}
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full">
-          <TabsTrigger value="all" className="flex-1">
+        <TabsList className="h-auto w-full flex-wrap justify-start gap-1">
+          <TabsTrigger value="all" className="h-8 flex-none">
             {t('annotationsAllTab')}
           </TabsTrigger>
           {tabLanguages.map((language) => (
-            <TabsTrigger key={language} value={language} className="flex-1">
+            <TabsTrigger
+              key={language}
+              value={language}
+              className="h-8 flex-none"
+            >
               {languageName(language)}
             </TabsTrigger>
           ))}

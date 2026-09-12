@@ -29,6 +29,8 @@ import { resolve } from 'node:path';
 import { generateText } from 'ai';
 import {
   buildHyperliteralSystemPrompt,
+  hyperliteralLine,
+  pairsCoverSentence,
   parseHyperliteral,
 } from '../convex/lib/hyperliteralPrompt';
 import {
@@ -520,6 +522,8 @@ async function main(): Promise<void> {
   );
 
   const rows: Row[] = [];
+  /** Replies whose source halves did not reproduce the sentence. */
+  const uncovered: string[] = [];
   const spent = new Map<string, number>();
   const calls = new Map<string, number>();
   const before = new Map(conditions.map((c) => [c.id, 0]));
@@ -537,7 +541,13 @@ async function main(): Promise<void> {
         item.text,
       );
       n += 1;
-      const gloss = raw === null ? null : parseHyperliteral(raw);
+      // The model now returns PAIRS. The gloss line is derived from them, and
+      // a reply whose source halves do not reproduce the sentence is treated
+      // as unusable: it would pair the wrong words while looking right.
+      const pairs = raw === null ? null : parseHyperliteral(raw);
+      const covers = pairs !== null && pairsCoverSentence(pairs, item.text);
+      if (pairs !== null && !covers) uncovered.push(`${lang}: ${item.text}`);
+      const gloss = pairs === null || !covers ? null : hyperliteralLine(pairs);
       rows.push({
         condition: condition.id,
         language: lang,
@@ -596,6 +606,8 @@ async function main(): Promise<void> {
 
   const lines = [
     `hyperliteral gloss bench — ${new Date().toISOString().slice(0, 10)}`,
+    `pairs not covering the sentence: ${uncovered.length}` +
+      (uncovered.length ? ` (e.g. ${uncovered[0]})` : ''),
     `gloss language: ${glossLanguage}   items/lang: ${limit}   total spend: ${fmtUsd(bench.spentUsd)}`,
     ...report(rows, conditions, spent),
     ...samples(rows, conditions, gold),

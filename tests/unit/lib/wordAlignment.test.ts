@@ -116,3 +116,82 @@ describe('canAlign', () => {
     expect(canAlign({ ...input, hyperliteral: 'To-me' })).toBe(false);
   });
 });
+
+describe('alignAnnotations with model pairs', () => {
+  it('uses the pairs instead of re-splitting the sentence', () => {
+    // Thai: two space-separated tokens, four gloss units. Nothing in the
+    // strings could have paired these, which is why the model returns pairs.
+    const aligned = alignAnnotations({
+      text: 'สบายดี ขอบใจนะ!',
+      language: 'th',
+      hyperliteral: 'comfortable-good thank [softener] !',
+      hyperliteralPairs: [
+        { source: 'สบายดี', gloss: 'comfortable-good' },
+        { source: 'ขอบใจ', gloss: 'thank' },
+        { source: 'นะ', gloss: '[softener]' },
+        { source: '!', gloss: '!' },
+      ],
+    });
+    expect(aligned).toHaveLength(4);
+    expect(aligned?.[0]).toEqual({
+      source: 'สบายดี',
+      hyperliteral: 'comfortable-good',
+    });
+    expect(aligned?.[2].source).toBe('นะ');
+  });
+
+  it('pairs a spaceless Japanese sentence, which the split could never do', () => {
+    const aligned = alignAnnotations({
+      text: '私は本を読みます。',
+      language: 'ja',
+      hyperliteral: 'I [topic] book [object] read',
+      hyperliteralPairs: [
+        { source: '私', gloss: 'I' },
+        { source: 'は', gloss: '[topic]' },
+        { source: '本', gloss: 'book' },
+        { source: 'を', gloss: '[object]' },
+        { source: '読みます。', gloss: 'read.' },
+      ],
+    });
+    expect(aligned?.map((w) => w.source)).toEqual([
+      '私',
+      'は',
+      '本',
+      'を',
+      '読みます。',
+    ]);
+  });
+
+  it('still aligns another aid against the pairs when its count agrees', () => {
+    const aligned = alignAnnotations({
+      text: 'Мне нравится',
+      language: 'ru',
+      hyperliteral: 'To-me pleases',
+      hyperliteralPairs: [
+        { source: 'Мне', gloss: 'To-me' },
+        { source: 'нравится', gloss: 'pleases' },
+      ],
+      romanization: 'mne nravitsya',
+    });
+    expect(aligned?.[1]).toEqual({
+      source: 'нравится',
+      hyperliteral: 'pleases',
+      romanization: 'nravitsya',
+    });
+  });
+
+  it('ignores the pairs when the gloss line is switched off', () => {
+    // The caller blanks `hyperliteral` for a line the learner turned off, so
+    // its pairs must not smuggle it back into the columns.
+    const aligned = alignAnnotations({
+      text: 'Мне нравится',
+      language: 'ru',
+      hyperliteralPairs: [
+        { source: 'Мне', gloss: 'To-me' },
+        { source: 'нравится', gloss: 'pleases' },
+      ],
+      romanization: 'mne nravitsya',
+    });
+    expect(aligned?.every((w) => w.hyperliteral === undefined)).toBe(true);
+  });
+});

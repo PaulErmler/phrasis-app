@@ -1501,6 +1501,7 @@ function TargetLanguageInput({
       language={translation.language}
       romanization={translation.romanization}
       hyperliteral={translation.hyperliteral}
+      hyperliteralPairs={translation.hyperliteralPairs}
       ipa={translation.ipa}
       {...annotationLineProps(annotationDisplay, translation.language, {
         showRomanization,

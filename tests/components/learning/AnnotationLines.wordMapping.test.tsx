@@ -128,4 +128,55 @@ describe('AnnotationLines: word mapping', () => {
       'To-me pleases',
     );
   });
+
+  it('keeps each language row independent, so a second target works too', async () => {
+    // Two target rows on one card. Each AnnotationLines owns its own open
+    // state; expanding one must not expand or disturb the other.
+    const user = userEvent.setup();
+    render(
+      <>
+        <AnnotationLines
+          text="Мне нравится гулять"
+          language="ru"
+          hyperliteral="To-me pleases to-walk"
+          showHyperliteral
+          showRomanization={false}
+        />
+        <AnnotationLines
+          text="Jag tycker om att gå"
+          language="sv"
+          hyperliteral="I like about to walk"
+          showHyperliteral
+          showRomanization={false}
+        />
+      </>,
+    );
+    const toggles = screen.getAllByTestId('word-mapping-toggle');
+    expect(toggles).toHaveLength(2);
+
+    await user.click(toggles[1]);
+    const stacks = screen.getAllByTestId('interlinear-stack');
+    expect(stacks).toHaveLength(1);
+    // The one that opened is the SECOND row, with the Swedish sentence.
+    expect(stacks[0]).toHaveTextContent('Jag');
+    expect(stacks[0]).not.toHaveTextContent('Мне');
+    // The first row is untouched and still showing its flat line.
+    expect(toggles[0]).toHaveAttribute('aria-pressed', 'false');
+    expect(toggles[1]).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('aligns a five-word sentence to five columns', async () => {
+    const user = userEvent.setup();
+    render(
+      <AnnotationLines
+        text="Jag tycker om att gå"
+        language="sv"
+        hyperliteral="I like about to walk"
+        showHyperliteral
+        showRomanization={false}
+      />,
+    );
+    await user.click(screen.getByTestId('word-mapping-toggle'));
+    expect(screen.getByTestId('interlinear-stack').children).toHaveLength(5);
+  });
 });

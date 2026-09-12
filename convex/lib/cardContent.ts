@@ -81,6 +81,13 @@ export interface CardTranslationContent {
    */
   hyperliteral?: string;
   /**
+   * The same gloss as per-word pairs, when the row has them. The card's word
+   * mapping uses these rather than re-splitting the sentence, which it cannot
+   * do for a language written without spaces. Absent on a row written before
+   * pairs existed; such a row still shows its line, just not its mapping.
+   */
+  hyperliteralPairs?: { source: string; gloss: string }[];
+  /**
    * True iff an LLM retranslation is currently in flight for this language
    * AND an existing `translatedText` is on file. Keyed off the LLM claim
    * so it does NOT fire during a "regenerate audio" action (no LLM phase).
@@ -597,6 +604,17 @@ export async function buildTextContentBatchForLanguages(
       ? undefined
       : hyperliteralTextOf(glossByRow.get(rowKey), { language, wording });
 
+  /** Its pairs, under the same guard, so the line and the columns agree. A
+   *  row written before pairs existed has none and shows only its line. */
+  const glossPairsFor = (
+    rowKey: string,
+    language: string,
+    wording: string,
+  ): { source: string; gloss: string }[] | undefined =>
+    glossFor(rowKey, language, wording) === undefined
+      ? undefined
+      : glossByRow.get(rowKey)?.pairs;
+
   const result = new Map<string, TextContentResult>();
   for (const input of inputs) {
     const audioRecordings = allLanguages.map((lang) => {
@@ -651,6 +669,11 @@ export async function buildTextContentBatchForLanguages(
             lang,
             input.sourceText,
           ),
+          hyperliteralPairs: glossPairsFor(
+            `text:${input.textId}`,
+            lang,
+            input.sourceText,
+          ),
           retranslating: false,
           ...(voiceGender ? { voiceGender } : {}),
         };
@@ -671,6 +694,10 @@ export async function buildTextContentBatchForLanguages(
           entry?.rowId === undefined
             ? undefined
             : glossFor(`translation:${entry.rowId}`, lang, translatedText),
+        hyperliteralPairs:
+          entry?.rowId === undefined
+            ? undefined
+            : glossPairsFor(`translation:${entry.rowId}`, lang, translatedText),
         // Show the pill only when an LLM retranslation is in flight AND a
         // prior translatedText exists (i.e. this is a *re*translation, not
         // the first-time translation of a new card).

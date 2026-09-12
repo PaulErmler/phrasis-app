@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildHyperliteralSystemPrompt,
   getGlossConvention,
+  hyperliteralLine,
+  pairsCoverSentence,
   parseHyperliteral,
 } from '../../lib/hyperliteralPrompt';
 import { SUPPORTED_LANGUAGES } from '../../../lib/languages';
@@ -67,16 +69,17 @@ describe('buildHyperliteralSystemPrompt', () => {
 });
 
 describe('parseHyperliteral', () => {
-  it('reads the requested shape', () => {
-    expect(parseHyperliteral('{"hyperliteral": "I not know."}')).toBe(
-      'I not know.',
-    );
+  it('reads the requested pairs', () => {
+    expect(parseHyperliteral('{"pairs":[["Я","I"],["не","not"]]}')).toEqual([
+      { source: 'Я', gloss: 'I' },
+      { source: 'не', gloss: 'not' },
+    ]);
   });
 
-  it('reads it through a markdown fence', () => {
+  it('reads them through a markdown fence', () => {
     expect(
-      parseHyperliteral('```json\n{"hyperliteral": "to-me pleases"}\n```'),
-    ).toBe('to-me pleases');
+      parseHyperliteral('```json\n{"pairs":[["Мне","to-me"]]}\n```'),
+    ).toEqual([{ source: 'Мне', gloss: 'to-me' }]);
   });
 
   it('returns null for anything else, so the caller writes the sentinel', () => {

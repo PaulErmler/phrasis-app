@@ -11,7 +11,10 @@ import { tryGetOpenRouter } from '../lib/openrouter';
 import { HYPERLITERAL_REASONING, OPENROUTER_MODELS } from '../config/aiModels';
 import {
   buildHyperliteralSystemPrompt,
+  hyperliteralLine,
+  pairsCoverSentence,
   parseHyperliteral,
+  type HyperliteralPair,
 } from '../lib/hyperliteralPrompt';
 import { TransientAnnotationError } from '../lib/textAnnotations';
 import { isTransientLlmFailure } from './translation';
@@ -53,7 +56,7 @@ export async function hyperliteralForText(
     glossLanguage: string;
     userId?: string;
   },
-): Promise<string | null> {
+): Promise<HyperliteralPair[] | null> {
   const openrouter = tryGetOpenRouter();
   if (openrouter === null) {
     throw new TransientAnnotationError('OPENROUTER_API_KEY is not set');
@@ -112,8 +115,19 @@ export async function hyperliteralForText(
       traceId: openrouterGenerationId(result.providerMetadata),
     });
 
-    const gloss = parseHyperliteral(result.text);
-    if (gloss !== null) return gloss;
+    const pairs = parseHyperliteral(result.text);
+    // A reply whose source halves do not reproduce the sentence is unusable:
+    // it would pair the wrong words while looking right on screen, and nothing
+    // downstream could tell. Retrying is worth it; the second attempt is the
+    // same price as the first.
+    if (pairs !== null && pairsCoverSentence(pairs, args.text)) return pairs;
+    if (pairs !== null) {
+      console.warn('[hyperliteral] pairs do not cover the sentence', {
+        language: args.language,
+        attempt,
+        text: args.text.slice(0, 80),
+      });
+    }
     lastReply = result.text;
     console.warn('[hyperliteral] unusable reply', {
       language: args.language,
@@ -165,6 +179,9 @@ export const store = internalMutation({
     source: v.string(),
     // `''` is the deliberate failure sentinel, not an empty result.
     text: v.string(),
+    pairs: v.optional(
+      v.array(v.object({ source: v.string(), gloss: v.string() })),
+    ),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -195,9 +212,9 @@ export const process = internalAction({
     });
     if (!claim) return null;
 
-    let gloss: string | null;
+    let pairs: HyperliteralPair[] | null;
     try {
-      gloss = await hyperliteralForText(ctx, {
+      pairs = await hyperliteralForText(ctx, {
         text: claim.forText,
         language: claim.language,
         glossLanguage: claim.glossLanguage,
@@ -222,7 +239,8 @@ export const process = internalAction({
       source: claim.source,
       // '' records "this engine tried this sentence and failed", so the next
       // view does not pay for the same failure again.
-      text: gloss ?? '',
+      text: pairs === null ? '' : hyperliteralLine(pairs),
+      ...(pairs === null ? {} : { pairs }),
     });
     return null;
   },

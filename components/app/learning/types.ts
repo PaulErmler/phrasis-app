@@ -41,6 +41,12 @@ export interface CardTranslation {
    */
   hyperliteral?: string;
   /**
+   * The same gloss as per-word pairs, when the row has them. The word mapping
+   * uses these rather than re-splitting the sentence, which cannot be done for
+   * a language written without spaces.
+   */
+  hyperliteralPairs?: { source: string; gloss: string }[];
+  /**
    * AI-feedback accepted alternatives for this card + language (max
    * WRITING_ALTERNATIVES_MAX). Writing mode diffs against the closest of
    * primary + alternatives and lists the others under the answer with

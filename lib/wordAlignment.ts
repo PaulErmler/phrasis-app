@@ -31,6 +31,15 @@ export type AlignmentInput = {
   romanization?: string;
   hyperliteral?: string;
   ipa?: string;
+  /**
+   * The gloss as per-word pairs, when the row has them. These SUPERSEDE the
+   * recovered split: the model segmented the sentence itself, so they are
+   * exact where splitting on spaces is a guess and, for a language written
+   * without spaces, impossible. Thai `สบายดี ขอบใจนะ!` is the case that
+   * forced this: two space-separated tokens, four gloss units, no way to pair
+   * them from the strings alone.
+   */
+  hyperliteralPairs?: readonly { source: string; gloss: string }[];
 };
 
 type AidKey = 'romanization' | 'hyperliteral' | 'ipa';
@@ -75,11 +84,23 @@ function units(value: string | undefined): string[] | null {
  * every column; the others still pair.
  */
 export function alignAnnotations(input: AlignmentInput): AlignedWord[] | null {
-  const words = sentenceWords(input.text, input.language);
+  // The model's own segmentation when it gave one; otherwise recover a split
+  // from the sentence and hope the counts agree.
+  const pairs =
+    input.hyperliteral === undefined ? undefined : input.hyperliteralPairs;
+  const words =
+    pairs && pairs.length > 0
+      ? pairs.map((p) => p.source)
+      : sentenceWords(input.text, input.language);
   if (words.length === 0) return null;
 
   const aligned: Partial<Record<AidKey, string[]>> = {};
+  if (pairs && pairs.length > 0) {
+    // Exact by construction; no count check to pass.
+    aligned.hyperliteral = pairs.map((p) => p.gloss);
+  }
   for (const aid of AIDS) {
+    if (aligned[aid] !== undefined) continue;
     const parts = units(input[aid]);
     if (parts !== null && parts.length === words.length) aligned[aid] = parts;
   }

@@ -565,6 +565,7 @@ function PreviewTextRow({
             language={translation.language}
             romanization={translation.romanization}
             hyperliteral={translation.hyperliteral}
+            hyperliteralPairs={translation.hyperliteralPairs}
             ipa={translation.ipa}
             {...annotationLinePropsFromSettings(
               courseSettings,

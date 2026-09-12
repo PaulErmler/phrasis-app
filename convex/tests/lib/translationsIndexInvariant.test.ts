@@ -72,6 +72,33 @@ describe('translations index invariant', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('only the cascade/re-key walks read a whole text through by_textId', () => {
+    // The plain `by_textId` returns the live row AND every superseded
+    // revision. That is correct for a walk that genuinely wants all of them
+    // (a cascade delete, the re-key after a voice change) and wrong for
+    // anything that means "the row this card reads", which belongs in
+    // db/translationReads.ts. A grep cannot tell those apart, so the
+    // legitimate full-walks are named here: adding a file to this list is
+    // the deliberate step that says "I want the superseded rows too".
+    const FULL_WALK_ALLOWED = new Set([
+      // Cascade-deletes an orphaned user text: every row must go.
+      'features/scheduling.ts',
+      // Re-keys a user text's rows after its voice moved. Skips
+      // `supersededAt` rows explicitly; see the comment at the loop.
+      'features/sentenceMetadata.ts',
+      // Account deletion: every row of the user's texts must go.
+      'admin/deleteUser.ts',
+    ]);
+    const perTextWalk =
+      /\.query\(\s*'(?:translations|audioRecordings)'\s*\)\s*\.withIndex\(\s*'by_textId'/;
+    const offenders = sources()
+      .filter(({ rel }) => !rel.startsWith('tests/'))
+      .filter(({ rel }) => !FULL_WALK_ALLOWED.has(rel))
+      .filter(({ src }) => perTextWalk.test(src))
+      .map(({ rel }) => rel);
+    expect(offenders).toEqual([]);
+  });
+
   it('nothing queries translations through the legacy two-column index', () => {
     // `by_text_and_language` still exists on `translations` (schema.ts says
     // why); the same name is a legitimate `audioRecordings` index, so the

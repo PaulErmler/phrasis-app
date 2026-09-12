@@ -38,6 +38,11 @@ export interface AnnotationLinesProps {
    * rather than below the phonetics.
    */
   hyperliteral?: string;
+  /**
+   * The gloss as per-word pairs. Supersedes the recovered split, and is the
+   * only way a language written without spaces can show its mapping.
+   */
+  hyperliteralPairs?: readonly { source: string; gloss: string }[];
   ipa?: string;
   showRomanization?: boolean;
   showHyperliteral?: boolean;
@@ -61,6 +66,7 @@ export interface AnnotationLinesProps {
 export function AnnotationLines({
   romanization,
   hyperliteral,
+  hyperliteralPairs,
   ipa,
   showRomanization = true,
   showHyperliteral = false,
@@ -85,6 +91,7 @@ export function AnnotationLines({
             language,
             romanization: showRomanization ? romanization : undefined,
             hyperliteral: showHyperliteral ? hyperliteral : undefined,
+            hyperliteralPairs: showHyperliteral ? hyperliteralPairs : undefined,
             ipa: showIpa ? ipa : undefined,
           }),
     [
@@ -92,6 +99,7 @@ export function AnnotationLines({
       language,
       romanization,
       hyperliteral,
+      hyperliteralPairs,
       ipa,
       showRomanization,
       showHyperliteral,

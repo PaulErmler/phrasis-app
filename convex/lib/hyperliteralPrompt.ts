@@ -176,19 +176,22 @@ export function getGlossConvention(code: string): GlossConvention | null {
 
 const SHARED_RULES = `You write a hyperliteral gloss of one sentence for a language learner. Return ONLY a JSON object, no markdown fence and no explanation:
 
-{"hyperliteral": "<the gloss>"}
+{"pairs": [["<source word>", "<its gloss>"], ["<source word>", "<its gloss>"], ...]}
+
+Each pair is one word of the sentence and what it becomes. Splitting the sentence is part of the job: the app cannot split it for you, and languages written without spaces have no split to find.
 
 WHAT A HYPERLITERAL GLOSS IS. It shows what each word of the sentence is doing, in the sentence's own order. It is not a translation: it is allowed to read as broken, and it should.
 
 RULES:
 
 - Keep the source word order EXACTLY. Never move a word to where the gloss language would put it.
-- One gloss unit per source word, separated by single spaces. Same number of units as the sentence has words.
-- When one source word needs several words, join them with hyphens into ONE unit: "to-me", "is-going", "in-house". Never let one source word become two space-separated units.
+- The first element of every pair is a literal, unaltered substring of the sentence. Concatenating them in order must give the sentence back apart from spacing. Never translate, transliterate or correct a source word.
+- Spacing is not your concern. Do not emit a pair for a space.
+- One pair per word. When one source word needs several gloss words, join them with hyphens: "to-me", "is-going", "in-house". Never split a gloss into two pairs.
 - Gloss function words literally, never idiomatically: a preposition meaning "at" is "at", even when natural translation would say "for".
 - Do not add a word the sentence does not have. If the language omits "is", "the" or "a", the gloss omits it too.
 - Do not drop a word the sentence does have.
-- Keep the sentence's own punctuation in place.
+- Keep the sentence's own punctuation on the word it belongs to, in both halves of the pair.
 - When a word marks grammar the gloss language has no word for, write a bracketed lowercase label instead: [topic], [subject], [object], [question], [polite], [classifier], [measure], [completed]. Use a label only when no ordinary word will do.
 - Do not use Leipzig glossing abbreviations (ACC, 3SG, PST, NOM). Write readable words.`;
 
@@ -213,12 +216,21 @@ export function buildHyperliteralSystemPrompt(
   return lines.join('\n');
 }
 
+/** One source word and what it becomes. */
+export type HyperliteralPair = { source: string; gloss: string };
+
 /**
  * Parse a model reply, or null when it isn't the shape the prompt asked for.
  * Lives beside the prompt because the two define one contract: a change to the
  * requested JSON has to move both.
+ *
+ * Pairs rather than one string because the app cannot recover the split
+ * afterwards. A sentence written without spaces (Thai, Japanese, Chinese) has
+ * no split to recover, and even a spaced one can disagree: Thai
+ * `สบายดี ขอบใจนะ!` is two space-separated tokens whose gloss has four units.
+ * Asking the model to segment is the only place the two can be made to agree.
  */
-export function parseHyperliteral(raw: string): string | null {
+export function parseHyperliteral(raw: string): HyperliteralPair[] | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(stripJsonFences(raw));
@@ -226,8 +238,46 @@ export function parseHyperliteral(raw: string): string | null {
     return null;
   }
   if (typeof parsed !== 'object' || parsed === null) return null;
-  const value = (parsed as Record<string, unknown>).hyperliteral;
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
+  const value = (parsed as Record<string, unknown>).pairs;
+  if (!Array.isArray(value) || value.length === 0) return null;
+
+  const pairs: HyperliteralPair[] = [];
+  for (const entry of value) {
+    if (!Array.isArray(entry) || entry.length !== 2) return null;
+    const [source, gloss] = entry;
+    if (typeof source !== 'string' || typeof gloss !== 'string') return null;
+    const trimmedSource = source.trim();
+    const trimmedGloss = gloss.trim();
+    // A whitespace-only pair is the model reproducing the sentence's spaces,
+    // which it does even when told not to. Dropping it is right — spacing is
+    // the display's job — and rejecting the whole reply over one, which an
+    // earlier version did, threw away half of otherwise perfect answers.
+    if (trimmedSource.length === 0) continue;
+    if (trimmedGloss.length === 0) return null;
+    pairs.push({ source: trimmedSource, gloss: trimmedGloss });
+  }
+  return pairs.length > 0 ? pairs : null;
+}
+
+/**
+ * The display line: the pairs' glosses in order. Derived rather than asked
+ * for separately, so the line and the columns can never disagree.
+ */
+export function hyperliteralLine(pairs: readonly HyperliteralPair[]): string {
+  return pairs.map((p) => p.gloss).join(' ');
+}
+
+/**
+ * Whether the pairs actually reproduce the sentence. The prompt asks for
+ * literal substrings; a model that translates or drops one would otherwise
+ * produce a mapping that looks right and pairs the wrong words. Compared with
+ * whitespace removed, because the model cannot know the sentence's own spacing
+ * for a language that has none.
+ */
+export function pairsCoverSentence(
+  pairs: readonly HyperliteralPair[],
+  text: string,
+): boolean {
+  const strip = (s: string) => s.replace(/\s+/g, '');
+  return strip(pairs.map((p) => p.source).join('')) === strip(text);
 }
